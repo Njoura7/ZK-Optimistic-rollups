@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  zk-rollup:
+    build: .
+    container_name: zk-rollup-demo
+    ports:
+      - "3000:3000"  # Dashboard
+      - "8545:8545"  # L1 RPC
+      - "5000:5000"  # L2 API
+    environment:
+      - BATCH_SIZE=100
+      - BATCH_INTERVAL=10
+    volumes:
+      - zk-data:/app/data
+
+volumes:
+  zk-data:

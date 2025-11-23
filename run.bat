@@ -1,0 +1,3 @@
+@echo off
+echo Starting ZK Rollup MVP...
+docker-compose up --build
