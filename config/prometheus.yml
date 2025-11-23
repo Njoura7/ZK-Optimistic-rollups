@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 5s # Scrape metrics every 5 seconds
+  evaluation_interval: 5s # Evaluate rules every 5 seconds
+  scrape_timeout: 4s
+
+scrape_configs:
+  # Job to scrape ZK Rollup L2 Sequencer metrics
+  - job_name: 'zk-rollup-l2'
+    static_configs:
+      - targets: ['zk-rollup:9100']
+        labels:
+          service: 'l2-sequencer'
+          environment: 'demo'
+
+    # Optional: Add basic health check
+    metrics_path: '/metrics'
