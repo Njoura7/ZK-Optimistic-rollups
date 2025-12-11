@@ -38,7 +38,6 @@ zk-rollup-mvp/
 ## Documentation
 
 - **[SETUP.md](SETUP.md)** - Installation (30 seconds)
-- **[DEMO.md](DEMO.md)** - For teacher presentation
 
 ---
 
@@ -49,7 +48,6 @@ zk-rollup-mvp/
 3. **Submits** to L1 smart contract
 4. **Displays** real-time metrics
 
-**That's it!** Simple, clean, working.
 
 ---
 
@@ -60,8 +58,7 @@ zk-rollup-mvp/
 - Solidity (L1 contract)
 - Flask (web dashboard)
 
-No Prometheus, no complexity, just core functionality.
 
 ---
 
-Total: **~300 lines of code**, ready in **2 minutes**.
+
