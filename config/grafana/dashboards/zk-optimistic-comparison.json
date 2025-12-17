@@ -13,11 +13,11 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": { "mode": "fixed", "fixedColor": "#00d9ff" },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
+            "steps": [{ "color": "#00d9ff", "value": null }]
           },
           "unit": "short"
         }
@@ -38,18 +38,18 @@
       },
       "pluginVersion": "10.0.0",
       "targets": [{ "expr": "l2_transactions_total", "refId": "A" }],
-      "title": "Total Transactions",
+      "title": "ZK - Total Transactions",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": { "mode": "fixed", "fixedColor": "#00d9ff" },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "blue", "value": null }]
+            "steps": [{ "color": "#00d9ff", "value": null }]
           },
           "unit": "short"
         }
@@ -70,24 +70,20 @@
       },
       "pluginVersion": "10.0.0",
       "targets": [{ "expr": "l2_batches_total", "refId": "A" }],
-      "title": "Batches Submitted to L1",
+      "title": "ZK - Batches Submitted",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": { "mode": "fixed", "fixedColor": "#00ff88" },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 50 },
-              { "color": "red", "value": 100 }
-            ]
+            "steps": [{ "color": "#00ff88", "value": null }]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
@@ -105,20 +101,88 @@
         "textMode": "auto"
       },
       "pluginVersion": "10.0.0",
-      "targets": [{ "expr": "l2_tps", "refId": "A" }],
-      "title": "Current TPS",
+      "targets": [{ "expr": "opt_l2_transactions_total", "refId": "A" }],
+      "title": "Optimistic - Total Transactions",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": { "mode": "fixed", "fixedColor": "#00ff88" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "#00ff88", "value": null }]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [{ "expr": "opt_l2_batches_total", "refId": "A" }],
+      "title": "Optimistic - Batches Submitted",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#00d9ff" },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
+              { "color": "#00d9ff", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 100 }
+            ]
+          },
+          "unit": "ops"
+        }
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 6 },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [{ "expr": "l2_tps", "refId": "A" }],
+      "title": "ZK - Current TPS",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#00d9ff" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#00d9ff", "value": null },
               { "color": "yellow", "value": 30 },
               { "color": "red", "value": 60 }
             ]
@@ -126,8 +190,8 @@
           "unit": "s"
         }
       },
-      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
-      "id": 7,
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 6 },
+      "id": 6,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -144,13 +208,154 @@
       "targets": [
         {
           "expr": "histogram_quantile(0.95, rate(l2_finality_time_seconds_bucket[5m]))",
-          "refId": "A",
-          "legendFormat": "P95 Finality Time"
+          "refId": "A"
         }
       ],
-      "title": "L2→L1 Finality Time (P95)",
+      "title": "ZK - Finality Time (P95)",
       "type": "stat",
-      "description": "THESIS METRIC: Time for L2 batch to achieve finality on L1 (95th percentile)"
+      "description": "Time for ZK batch to achieve L1 finality"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#00ff88" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#00ff88", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 100 }
+            ]
+          },
+          "unit": "ops"
+        }
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 6 },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [{ "expr": "opt_l2_tps", "refId": "A" }],
+      "title": "Optimistic - Current TPS",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#00ff88" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#00ff88", "value": null },
+              { "color": "yellow", "value": 60 },
+              { "color": "red", "value": 120 }
+            ]
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 6 },
+      "id": 8,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["mean"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(opt_l2_finality_time_seconds_bucket[5m]))",
+          "refId": "A"
+        }
+      ],
+      "title": "Optimistic - Finality Time (P95)",
+      "type": "stat",
+      "description": "Time for Optimistic batch to achieve L1 finality"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "TPS",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          },
+          "unit": "ops"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "lastNotNull", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "l2_tps",
+          "refId": "A",
+          "legendFormat": "ZK Rollup TPS"
+        },
+        {
+          "expr": "opt_l2_tps",
+          "refId": "B",
+          "legendFormat": "Optimistic Rollup TPS"
+        }
+      ],
+      "title": "TPS Comparison (THESIS)",
+      "type": "timeseries",
+      "description": "Side-by-side TPS comparison between rollup types"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -188,8 +393,8 @@
           "unit": "s"
         }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
-      "id": 8,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "id": 10,
       "options": {
         "legend": {
           "calcs": ["mean", "lastNotNull", "max"],
@@ -197,29 +402,87 @@
           "placement": "bottom",
           "showLegend": true
         },
-        "tooltip": { "mode": "single", "sort": "none" }
+        "tooltip": { "mode": "multi", "sort": "none" }
       },
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, rate(l2_finality_time_seconds_bucket[1m]))",
-          "refId": "A",
-          "legendFormat": "P50 (Median)"
-        },
-        {
           "expr": "histogram_quantile(0.95, rate(l2_finality_time_seconds_bucket[1m]))",
-          "refId": "B",
-          "legendFormat": "P95"
+          "refId": "A",
+          "legendFormat": "ZK P95 Finality"
         },
         {
-          "expr": "histogram_quantile(0.99, rate(l2_finality_time_seconds_bucket[1m]))",
-          "refId": "C",
-          "legendFormat": "P99"
+          "expr": "histogram_quantile(0.95, rate(opt_l2_finality_time_seconds_bucket[1m]))",
+          "refId": "B",
+          "legendFormat": "Optimistic P95 Finality"
         }
       ],
-      "title": "Finality Time Distribution (THESIS)",
+      "title": "Finality Time Comparison (THESIS)",
       "type": "timeseries",
-      "description": "Time for L2 batches to achieve L1 finality - key resilience metric"
+      "description": "L2→L1 finality time comparison - key resilience metric"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Transaction Rate",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          },
+          "unit": "ops"
+        }
+      },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 20 },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "lastNotNull", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "rate(l2_transactions_total[1m])",
+          "legendFormat": "ZK TX Rate",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(opt_l2_transactions_total[1m])",
+          "legendFormat": "Optimistic TX Rate",
+          "refId": "B"
+        }
+      ],
+      "title": "Transaction Rate Comparison",
+      "type": "timeseries"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -257,8 +520,8 @@
           "unit": "ms"
         }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
-      "id": 9,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 29 },
+      "id": 12,
       "options": {
         "legend": {
           "calcs": ["mean", "lastNotNull", "max"],
@@ -273,10 +536,10 @@
         {
           "expr": "histogram_quantile(0.95, rate(l2_proof_generation_seconds_bucket[1m])) * 1000",
           "refId": "A",
-          "legendFormat": "P95 Proof Time"
+          "legendFormat": "ZK Proof Gen (P95)"
         }
       ],
-      "title": "Proof Generation Time (THESIS)",
+      "title": "ZK Proof Generation Time (THESIS)",
       "type": "timeseries",
       "description": "ZK proof generation latency - impacts L2 throughput"
     },
@@ -288,109 +551,7 @@
           "custom": {
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "Success Rate",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            },
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "line" }
-          },
-          "mappings": [],
-          "max": 1,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.95 },
-              { "color": "green", "value": 0.99 }
-            ]
-          },
-          "unit": "percentunit"
-        }
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
-      "id": 10,
-      "options": {
-        "legend": {
-          "calcs": ["mean", "lastNotNull"],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": { "mode": "single", "sort": "none" }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "rate(l2_l1_submissions_total{status=\"success\"}[5m]) / (rate(l2_l1_submissions_total{status=\"success\"}[5m]) + rate(l2_l1_submissions_total{status=\"failed\"}[5m]))",
-          "refId": "A",
-          "legendFormat": "L1 Submission Success Rate"
-        }
-      ],
-      "title": "L1 Submission Success Rate (THESIS)",
-      "type": "timeseries",
-      "description": "Percentage of batches successfully submitted to L1 - resilience under congestion"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 300 },
-              { "color": "green", "value": 3600 }
-            ]
-          },
-          "unit": "s"
-        }
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
-      "id": 11,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [{ "expr": "l2_sequencer_uptime_seconds", "refId": "A" }],
-      "title": "Sequencer Uptime (THESIS)",
-      "type": "stat",
-      "description": "Time since last sequencer restart - measures system stability"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
+            "axisLabel": "Pending Transactions",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
@@ -418,8 +579,8 @@
           "unit": "short"
         }
       },
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 22 },
-      "id": 4,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 29 },
+      "id": 13,
       "options": {
         "legend": {
           "calcs": ["mean", "lastNotNull", "max"],
@@ -427,83 +588,34 @@
           "placement": "bottom",
           "showLegend": true
         },
-        "tooltip": { "mode": "single", "sort": "none" }
+        "tooltip": { "mode": "multi", "sort": "none" }
       },
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "rate(l2_transactions_total[1m])",
-          "legendFormat": "TX Rate",
-          "refId": "A"
-        }
-      ],
-      "title": "Transaction Rate Over Time",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            },
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
-          },
-          "unit": "ops"
-        }
-      },
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 31 },
-      "id": 5,
-      "options": {
-        "legend": {
-          "calcs": ["mean", "lastNotNull", "max"],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
+          "expr": "l2_pending_transactions",
+          "refId": "A",
+          "legendFormat": "ZK Pending"
         },
-        "tooltip": { "mode": "single", "sort": "none" }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        { "expr": "l2_tps", "legendFormat": "TPS", "refId": "A" }
+        {
+          "expr": "opt_l2_pending_transactions",
+          "refId": "B",
+          "legendFormat": "Optimistic Pending"
+        }
       ],
-      "title": "Transactions Per Second (Live)",
+      "title": "Pending Transactions Comparison",
       "type": "timeseries"
     }
   ],
   "refresh": "5s",
   "schemaVersion": 38,
-  "tags": ["zk-rollup", "layer2", "blockchain", "thesis"],
+  "tags": ["zk-rollup", "optimistic-rollup", "layer2", "blockchain", "thesis", "comparison"],
   "templating": { "list": [] },
   "time": { "from": "now-15m", "to": "now" },
   "timepicker": {},
   "timezone": "",
-  "title": "ZK Rollup L2 Metrics (Thesis Edition)",
-  "uid": "zk-rollup-thesis",
+  "title": "ZK / Optimistic Rollup L2 Metrics Comparison",
+  "uid": "zk-optimistic-comparison",
   "version": 1,
   "weekStart": ""
 }

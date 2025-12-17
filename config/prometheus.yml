@@ -11,6 +11,15 @@ scrape_configs:
         labels:
           service: 'l2-sequencer'
           environment: 'demo'
+          rollup_type: 'zk'
+    metrics_path: '/metrics'
 
-    # Optional: Add basic health check
+  # Job to scrape Optimistic Rollup L2 Sequencer metrics
+  - job_name: 'optimistic-rollup-l2'
+    static_configs:
+      - targets: ['zk-rollup:9101']
+        labels:
+          service: 'l2-sequencer'
+          environment: 'demo'
+          rollup_type: 'optimistic'
     metrics_path: '/metrics'
