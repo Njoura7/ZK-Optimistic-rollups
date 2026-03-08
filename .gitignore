@@ -34,3 +34,6 @@ contract.txt
 # OS
 .DS_Store
 Thumbs.db
+
+# latex for thesis
+main.tex
