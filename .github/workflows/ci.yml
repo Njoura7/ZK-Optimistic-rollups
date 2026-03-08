@@ -1,0 +1,42 @@
+name: Test Suite
+
+on:
+  push:
+    paths:
+      - "tests/**"
+      - "l2-zk/**"
+      - "l2-optimistic/**"
+      - "l1/contracts/**"
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build test runner
+        run: docker compose build test-runner
+
+      - name: Start main stack
+        run: docker compose up -d
+
+      - name: Wait for stack to be ready
+        run: sleep 15
+
+      - name: Run unit tests
+        run: |
+          docker compose --profile test run --rm test-runner \
+            pytest tests/unit/ -v --tb=short
+
+      - name: Run adversarial tests
+        run: |
+          docker compose --profile test run --rm test-runner \
+            pytest tests/adversarial/ -v --tb=short
+
+      - name: Tear down
+        if: always()
+        run: docker compose down

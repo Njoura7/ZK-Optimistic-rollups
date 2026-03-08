@@ -1,16 +1,15 @@
-
 services:
   # L1 + L2 + Flask Dashboard (existing)
   zk-rollup:
     build: .
     container_name: zk-rollup-demo
     ports:
-      - '3000:3000' # Flask Dashboard
-      - '8545:8545' # L1 RPC
-      - '5000:5000' # ZK Rollup L2 API
-      - '5001:5001' # Optimistic Rollup L2 API
-      - '9100:9100' # ZK Prometheus metrics
-      - '9101:9101' # Optimistic Prometheus metrics
+      - "3000:3000" # Flask Dashboard
+      - "8545:8545" # L1 RPC
+      - "5000:5000" # ZK Rollup L2 API
+      - "5001:5001" # Optimistic Rollup L2 API
+      - "9100:9100" # ZK Prometheus metrics
+      - "9101:9101" # Optimistic Prometheus metrics
     environment:
       - BATCH_SIZE=100
       - BATCH_INTERVAL=10
@@ -24,14 +23,14 @@ services:
     image: prom/prometheus:latest
     container_name: zk-prometheus
     ports:
-      - '9090:9090'
+      - "9090:9090"
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=7d'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
     networks:
       - zk-network
     depends_on:
@@ -42,7 +41,7 @@ services:
     image: grafana/grafana:latest
     container_name: zk-grafana
     ports:
-      - '3001:3000'
+      - "3001:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
@@ -57,7 +56,20 @@ services:
       - zk-network
     depends_on:
       - prometheus
-
+  # Test runner service - does not start automatically
+  test-runner:
+    build: .
+    container_name: zk-test-runner
+    command: ["pytest", "tests/", "-v", "--tb=short"]
+    environment:
+      - TESTING=true
+      - L1_RPC=http://zk-rollup:8545
+    networks:
+      - zk-network
+    depends_on:
+      - zk-rollup
+    profiles:
+      - test # Only runs when explicitly called
 networks:
   zk-network:
     driver: bridge
