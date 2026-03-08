@@ -45,7 +45,7 @@ fi
 # Start ZK Rollup sequencer (Port 5000)
 echo "Starting ZK Rollup sequencer..."
 cd /app
-python l2/sequencer.py > /app/data/zk-sequencer.log 2>&1 &
+python l2-zk/sequencer.py > /app/data/zk-sequencer.log 2>&1 &
 ZK_PID=$!
 sleep 2
 

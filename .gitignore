@@ -1,0 +1,36 @@
+# Python cache — never commit these
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+
+# CPython compiled files (the numbers are Python version e.g. cpython-313 = Python 3.13)
+*.cpython-*.pyc
+*.cpython-*.pyo
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+test_results.txt
+
+# Python init files (optional — only ignore if auto-generated)
+tests/**/__init__.py  
+
+# Node
+node_modules/
+npm-debug.log
+
+# Docker
+.docker/
+
+# Data / secrets
+/app/data/
+contracts.json
+contract.txt
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
