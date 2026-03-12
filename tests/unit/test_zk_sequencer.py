@@ -28,7 +28,7 @@ sys.modules["prometheus_client"] = MagicMock()
 sys.modules["flask_cors"] = MagicMock()
 
 # ---------------------------------------------------------------------------
-# Ensure the l2/ package is importable regardless of the working directory
+# Ensure the l2-zkpackage is importable regardless of the working directory
 # from which pytest is invoked.
 # ---------------------------------------------------------------------------
 _L2_DIR = str(pathlib.Path(__file__).resolve().parents[2] / "l2-zk")
