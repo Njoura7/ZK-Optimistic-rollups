@@ -194,7 +194,7 @@ def test_metrics_endpoint_returns_correct_fields():
 
     assert response.status_code == 200
     data = response.get_json()
-
+    # test CI
     assert data is not None, "/metrics must return valid JSON"
     assert "txs" in data, "response must include 'txs' field"
     assert "batches" in data, "response must include 'batches' field"
