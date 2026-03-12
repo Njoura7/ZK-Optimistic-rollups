@@ -17,6 +17,7 @@ batch_counter = Counter('opt_l2_batches_total', 'Total Optimistic batches submit
 tps_gauge = Gauge('opt_l2_tps', 'Optimistic transactions per second')
 finality_time_histogram = Histogram('opt_l2_finality_time_seconds', 'Optimistic finality time', buckets=(5,10,15,30,60,120))
 pending_txs_gauge = Gauge('opt_l2_pending_transactions', 'Optimistic pending transactions')
+batch_processing_time = Histogram('opt_l2_batch_processing_seconds', 'Optimistic batch processing time', buckets=(0.01,0.05,0.1,0.5,1,2))
 
 class OptimisticSequencer:
     def __init__(self):
@@ -90,7 +91,10 @@ class OptimisticSequencer:
         pending_txs_gauge.set(len(self.pending))
         
         # Generate state root (no proof needed!)
+        batch_start = time.time()
         state_root = hashlib.sha256(str(batch).encode()).digest()
+        batch_duration = time.time() - batch_start
+        batch_processing_time.observe(batch_duration)
         
         # Submit to L1 optimistically
         l1_start = time.time()
@@ -98,14 +102,15 @@ class OptimisticSequencer:
             if not self.contract:
                 self._init_contract()
             
-            account = self.w3.eth.accounts[0]
+            account = self.w3.eth.accounts[1]
             tx = self.contract.functions.submit(state_root).build_transaction({
                 'from': account,
                 'nonce': self.w3.eth.get_transaction_count(account),
                 'gas': 150000
             })
             
-            private_key = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+            # Hardhat default account[1] private key
+            private_key = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d'
             signed = self.w3.eth.account.sign_transaction(tx, private_key=private_key)
             tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
             receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)

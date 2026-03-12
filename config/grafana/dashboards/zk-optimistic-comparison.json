@@ -353,7 +353,7 @@
           "legendFormat": "Optimistic Rollup TPS"
         }
       ],
-      "title": "TPS Comparison (THESIS)",
+      "title": "TPS Comparison",
       "type": "timeseries",
       "description": "Side-by-side TPS comparison between rollup types"
     },
@@ -417,7 +417,7 @@
           "legendFormat": "Optimistic P95 Finality"
         }
       ],
-      "title": "Finality Time Comparison (THESIS)",
+      "title": "Finality Time Comparison",
       "type": "timeseries",
       "description": "L2→L1 finality time comparison - key resilience metric"
     },
@@ -481,7 +481,7 @@
           "refId": "B"
         }
       ],
-      "title": "Transaction Rate Comparison",
+      "title": "Transaction Rate Comparison (THESIS)",
       "type": "timeseries"
     },
     {
@@ -551,6 +551,61 @@
           "custom": {
             "axisCenteredZero": false,
             "axisColorMode": "text",
+            "axisLabel": "Batch Processing Time (ms)",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "tooltip": false, "viz": false, "legend": false },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          },
+          "unit": "ms"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 37 },
+      "id": 14,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "lastNotNull", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(opt_l2_batch_processing_seconds_bucket[1m])) * 1000",
+          "refId": "A",
+          "legendFormat": "Optimistic Batch Processing (P95)"
+        }
+      ],
+      "title": "Optimistic Batch Processing Time (THESIS)",
+      "type": "timeseries",
+      "description": "Optimistic batch state-root computation time (no proof) - contrast with ZK proof generation"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "Pending Transactions",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -603,13 +658,20 @@
           "legendFormat": "Optimistic Pending"
         }
       ],
-      "title": "Pending Transactions Comparison",
+      "title": "Pending Transactions Comparison (THESIS)",
       "type": "timeseries"
     }
   ],
   "refresh": "5s",
   "schemaVersion": 38,
-  "tags": ["zk-rollup", "optimistic-rollup", "layer2", "blockchain", "thesis", "comparison"],
+  "tags": [
+    "zk-rollup",
+    "optimistic-rollup",
+    "layer2",
+    "blockchain",
+    "thesis",
+    "comparison"
+  ],
   "templating": { "list": [] },
   "time": { "from": "now-15m", "to": "now" },
   "timepicker": {},

@@ -17,6 +17,7 @@ batch_counter = Counter('l2_batches_total', 'Total batches submitted')
 tps_gauge = Gauge('l2_tps', 'Transactions per second')
 finality_time_histogram = Histogram('l2_finality_time_seconds', 'Time to finality', buckets=(5,10,15,30,60))
 proof_generation_time = Histogram('l2_proof_generation_seconds', 'Proof generation time', buckets=(0.1,0.5,1,2,5))
+pending_txs_gauge = Gauge('l2_pending_transactions', 'ZK pending transactions')
 
 class Sequencer:
     def __init__(self):
@@ -33,6 +34,7 @@ class Sequencer:
             self.pending.append(tx)
             self.metrics['txs'] += 1
         tx_counter.inc()
+        pending_txs_gauge.set(len(self.pending))
         if len(self.pending) >= 100:
             self._batch()
     
@@ -42,6 +44,8 @@ class Sequencer:
                 return
             batch = self.pending[:100]
             self.pending = self.pending[100:]
+        
+        pending_txs_gauge.set(len(self.pending))
         
         proof_start = time.time()
         state_root = hashlib.sha256(str(batch).encode()).digest()
