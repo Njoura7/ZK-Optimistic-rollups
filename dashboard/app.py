@@ -5,125 +5,263 @@ import requests
 app = Flask(__name__)
 
 HTML = """<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>ZK vs Optimistic Rollup</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial; background: #0a0a1a; color: #fff; padding: 20px; }
-        .container { max-width: 1400px; margin: 0 auto; }
-        h1 { color: #3282b8; margin-bottom: 30px; text-align: center; }
-        .rollups { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin: 20px 0; }
-        .rollup-section { background: #16213e; padding: 20px; border-radius: 15px; }
-        .rollup-section h2 { margin-bottom: 20px; }
-        .rollup-section.zk h2 { color: #00d9ff; }
-        .rollup-section.optimistic h2 { color: #00ff88; }
-        .metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; }
-        .metric { background: #0f1419; padding: 15px; border-radius: 10px; text-align: center; }
-        .metric-value { font-size: 36px; font-weight: bold; margin: 10px 0; }
-        .zk .metric-value { color: #00d9ff; }
-        .optimistic .metric-value { color: #00ff88; }
-        .metric-label { color: #bbe1fa; font-size: 14px; }
-        .controls { background: #16213e; padding: 20px; border-radius: 10px; margin: 20px 0; }
-        .button-group { display: flex; gap: 10px; flex-wrap: wrap; margin: 15px 0; }
-        button { background: #3282b8; color: white; border: none; padding: 12px 25px; 
-                font-size: 14px; border-radius: 5px; cursor: pointer; transition: 0.3s; }
-        button:hover { background: #0f4c75; transform: translateY(-2px); }
-        button.optimistic-btn { background: #00aa66; }
-        button.optimistic-btn:hover { background: #008855; }
-        .comparison { background: #1a1a2e; padding: 20px; border-radius: 10px; margin: 20px 0; }
-        .comparison h3 { color: #3282b8; margin-bottom: 15px; }
-        .comparison-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
-        .comparison-item { background: #16213e; padding: 15px; border-radius: 8px; }
-        .comparison-item strong { display: block; color: #00d9ff; margin-bottom: 5px; }
-        .vs { color: #888; font-size: 12px; margin: 5px 0; }
-        #log { background: #0f1419; padding: 15px; border-radius: 5px; height: 250px; 
-              overflow-y: auto; font-family: monospace; font-size: 11px; line-height: 1.5; }
-        .badge { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 11px; 
-                font-weight: bold; margin-left: 10px; }
-        .badge.zk { background: #00d9ff; color: #000; }
-        .badge.opt { background: #00ff88; color: #000; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L2 Scaling Comparison — MSc Thesis Demo</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h1>Layer 2 Comparison: ZK Rollup vs Optimistic Rollup</h1>
-        <div class="rollups">
-            <div class="rollup-section zk">
-                <h2>ZK Rollup <span class="badge zk">VALIDITY</span></h2>
-                <div class="metrics">
-                    <div class="metric">
-                        <div class="metric-value" id="zk-txs">0</div>
-                        <div class="metric-label">Transactions</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value" id="zk-batches">0</div>
-                        <div class="metric-label">Batches</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value" id="zk-tps">0.0</div>
-                        <div class="metric-label">TPS</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value">~15s</div>
-                        <div class="metric-label">Finality</div>
-                    </div>
+
+<!-- Header -->
+<div class="header">
+    <div class="header-left">
+        <h1>L2 Scaling Solutions — Comparative Analysis</h1>
+        <p>MSc Thesis Demo &middot; ELTE Faculty of Informatics</p>
+    </div>
+    <div class="status-group">
+        <div class="status-item" id="status-zk"><span class="status-dot off"></span>ZK :5000</div>
+        <div class="status-item" id="status-opt"><span class="status-dot off"></span>OPT :5001</div>
+        <div class="status-item" id="status-l1"><span class="status-dot off"></span>L1 :8545</div>
+    </div>
+</div>
+
+<div class="main">
+
+    <!-- Two sequencer panels -->
+    <div class="panels">
+        <div class="panel zk">
+            <div class="panel-header">
+                <h2>ZK Rollup <span class="tag">Validity Proof</span></h2>
+                <span class="port">:5000</span>
+            </div>
+            <div class="metric-grid">
+                <div class="metric-cell">
+                    <div class="value" id="zk-txs">0</div>
+                    <div class="label">Transactions</div>
+                </div>
+                <div class="metric-cell">
+                    <div class="value" id="zk-batches">0</div>
+                    <div class="label">Batches</div>
+                    <div class="sub">100 tx / batch</div>
+                </div>
+                <div class="metric-cell">
+                    <div class="value" id="zk-tps">0.0</div>
+                    <div class="label">TPS</div>
+                </div>
+                <div class="metric-cell">
+                    <div class="value">~15s</div>
+                    <div class="label">Finality</div>
+                    <div class="sub">cryptographic</div>
                 </div>
             </div>
-            <div class="rollup-section optimistic">
-                <h2>Optimistic Rollup <span class="badge opt">FRAUD PROOF</span></h2>
-                <div class="metrics">
-                    <div class="metric">
-                        <div class="metric-value" id="opt-txs">0</div>
-                        <div class="metric-label">Transactions</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value" id="opt-batches">0</div>
-                        <div class="metric-label">Batches</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value" id="opt-tps">0.0</div>
-                        <div class="metric-label">TPS</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value">10 blocks</div>
-                        <div class="metric-label">Challenge</div>
-                    </div>
+        </div>
+        <div class="panel opt">
+            <div class="panel-header">
+                <h2>Optimistic Rollup <span class="tag">Fraud Proof</span></h2>
+                <span class="port">:5001</span>
+            </div>
+            <div class="metric-grid">
+                <div class="metric-cell">
+                    <div class="value" id="opt-txs">0</div>
+                    <div class="label">Transactions</div>
+                </div>
+                <div class="metric-cell">
+                    <div class="value" id="opt-batches">0</div>
+                    <div class="label">Batches</div>
+                    <div class="sub">200 tx / batch</div>
+                </div>
+                <div class="metric-cell">
+                    <div class="value" id="opt-tps">0.0</div>
+                    <div class="label">TPS</div>
+                </div>
+                <div class="metric-cell">
+                    <div class="value">10 blk</div>
+                    <div class="label">Finality</div>
+                    <div class="sub">challenge window</div>
                 </div>
             </div>
-        </div>
-        <div class="comparison">
-            <h3>Key Differences</h3>
-            <div class="comparison-grid">
-                <div class="comparison-item"><strong>Finality</strong><div>ZK: ~15s</div><div class="vs">vs</div><div>Opt: 10 blocks</div></div>
-                <div class="comparison-item"><strong>Batch Size</strong><div>ZK: 100 txs</div><div class="vs">vs</div><div>Opt: 200 txs</div></div>
-                <div class="comparison-item"><strong>Proof</strong><div>ZK: Validity</div><div class="vs">vs</div><div>Opt: Fraud</div></div>
-            </div>
-        </div>
-        <div class="controls">
-            <h3>Demo Scenarios</h3>
-            <div class="button-group">
-                <button onclick="runDemo('normal','zk')">ZK: Normal (150)</button>
-                <button onclick="runDemo('highload','zk')">ZK: High (500)</button>
-                <button onclick="runDemo('batch','zk')">ZK: Batch (250)</button>
-            </div>
-            <div class="button-group">
-                <button class="optimistic-btn" onclick="runDemo('normal','optimistic')">OPT: Normal (150)</button>
-                <button class="optimistic-btn" onclick="runDemo('highload','optimistic')">OPT: High (500)</button>
-                <button class="optimistic-btn" onclick="runDemo('batch','optimistic')">OPT: Batch (250)</button>
-            </div>
-        </div>
-        <div class="controls">
-            <h3>Activity Log</h3>
-            <div id="log">[Ready] Both rollups on ports 5000 (ZK) and 5001 (Optimistic)</div>
         </div>
     </div>
-    <script>
-        function updateMetrics(){fetch('http://localhost:5000/metrics').then(r=>r.json()).then(d=>{document.getElementById('zk-txs').textContent=d.txs;document.getElementById('zk-batches').textContent=d.batches;document.getElementById('zk-tps').textContent=d.tps.toFixed(1)}).catch(()=>{});fetch('http://localhost:5001/metrics').then(r=>r.json()).then(d=>{document.getElementById('opt-txs').textContent=d.txs;document.getElementById('opt-batches').textContent=d.batches;document.getElementById('opt-tps').textContent=d.tps.toFixed(1)}).catch(()=>{})}
-        async function runDemo(type,rollup){const counts={normal:150,highload:500,batch:250};const count=counts[type];const port=rollup==='zk'?5000:5001;const badge=rollup==='zk'?'ZK':'OPT';const log=document.getElementById('log');const ts=()=>new Date().toLocaleTimeString();log.innerHTML+='\\n['+ts()+'] ['+badge+'] Starting '+type+' ('+count+' txs)...';log.scrollTop=log.scrollHeight;const delay=type==='highload'?10:50;for(let i=0;i<count;i++){try{await fetch('http://localhost:'+port+'/tx',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:'user'+i,to:'user'+(i+1),value:10})})}catch(e){}if(i%50===0&&i>0){log.innerHTML+='\\n['+ts()+'] ['+badge+'] Sent '+i+' txs';log.scrollTop=log.scrollHeight}if(i%10===0){await new Promise(resolve=>setTimeout(resolve,delay))}}log.innerHTML+='\\n['+ts()+'] ['+badge+'] Complete!';log.scrollTop=log.scrollHeight}
-        setInterval(updateMetrics,2000);updateMetrics()
-    </script>
+
+    <!-- Comparison table -->
+    <div class="comparison-section">
+        <div class="section-header">Architectural Comparison</div>
+        <table class="comp-table">
+            <thead>
+                <tr>
+                    <th>Property</th>
+                    <th>ZK Rollup</th>
+                    <th>Optimistic Rollup</th>
+                    <th>Advantage</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="property">Finality Time</td>
+                    <td class="zk-val">~15 seconds</td>
+                    <td class="opt-val">10 blocks (~2 min demo)</td>
+                    <td><span class="winner zk-win">ZK</span></td>
+                </tr>
+                <tr>
+                    <td class="property">Batch Size</td>
+                    <td class="zk-val">100 tx</td>
+                    <td class="opt-val">200 tx</td>
+                    <td><span class="winner opt-win">OPT</span></td>
+                </tr>
+                <tr>
+                    <td class="property">Proof Type</td>
+                    <td class="zk-val">Groth16 (SHA-256 stub)</td>
+                    <td class="opt-val">None (post-hoc fraud)</td>
+                    <td><span class="winner draw">Trade-off</span></td>
+                </tr>
+                <tr>
+                    <td class="property">Security Model</td>
+                    <td class="zk-val">Cryptographic</td>
+                    <td class="opt-val">Economic (1-of-N honest)</td>
+                    <td><span class="winner zk-win">ZK</span></td>
+                </tr>
+                <tr>
+                    <td class="property">L1 Gas per Batch</td>
+                    <td class="zk-val">Higher (proof verification)</td>
+                    <td class="opt-val">Lower (no proof)</td>
+                    <td><span class="winner opt-win">OPT</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Bottom: demo controls + log -->
+    <div class="bottom-row">
+        <div class="demo-section">
+            <div class="section-header">Demo Scenarios</div>
+            <div class="demo-group">
+                <div class="demo-group-label">ZK Rollup</div>
+                <div class="demo-btns">
+                    <button class="btn zk-btn" onclick="runDemo('normal','zk')">Normal 150</button>
+                    <button class="btn zk-btn" onclick="runDemo('highload','zk')">High 500</button>
+                    <button class="btn zk-btn" onclick="runDemo('batch','zk')">Batch 250</button>
+                </div>
+                <div class="demo-group-label">Optimistic Rollup</div>
+                <div class="demo-btns">
+                    <button class="btn opt-btn" onclick="runDemo('normal','optimistic')">Normal 150</button>
+                    <button class="btn opt-btn" onclick="runDemo('highload','optimistic')">High 500</button>
+                    <button class="btn opt-btn" onclick="runDemo('batch','optimistic')">Batch 250</button>
+                </div>
+            </div>
+            <div class="progress-wrap" id="progress-wrap">
+                <div class="progress-bar-outer">
+                    <div class="progress-bar-inner" id="progress-bar"></div>
+                </div>
+                <div class="progress-text" id="progress-text"></div>
+            </div>
+        </div>
+        <div class="log-section">
+            <div class="section-header">Activity Log</div>
+            <div id="log"><span class="log-ts">[ready]</span> Waiting for sequencer connections...</div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ---- Status indicators ----
+    function setStatus(id, alive) {
+        const dot = document.querySelector('#' + id + ' .status-dot');
+        dot.className = 'status-dot ' + (alive ? 'live' : 'off');
+    }
+
+    // ---- Metric updater (same fetch logic) ----
+    function updateMetrics() {
+        fetch('http://localhost:5000/metrics').then(r => r.json()).then(d => {
+            document.getElementById('zk-txs').textContent = d.txs;
+            document.getElementById('zk-batches').textContent = d.batches;
+            document.getElementById('zk-tps').textContent = d.tps.toFixed(1);
+            setStatus('status-zk', true);
+        }).catch(() => { setStatus('status-zk', false); });
+
+        fetch('http://localhost:5001/metrics').then(r => r.json()).then(d => {
+            document.getElementById('opt-txs').textContent = d.txs;
+            document.getElementById('opt-batches').textContent = d.batches;
+            document.getElementById('opt-tps').textContent = d.tps.toFixed(1);
+            setStatus('status-opt', true);
+        }).catch(() => { setStatus('status-opt', false); });
+
+        fetch('http://localhost:8545', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+        }).then(r => r.json()).then(() => {
+            setStatus('status-l1', true);
+        }).catch(() => { setStatus('status-l1', false); });
+    }
+
+    // ---- Demo runner (same logic, adds progress bar) ----
+    let running = false;
+    async function runDemo(type, rollup) {
+        if (running) return;
+        running = true;
+
+        const counts = { normal: 150, highload: 500, batch: 250 };
+        const count = counts[type];
+        const port = rollup === 'zk' ? 5000 : 5001;
+        const badge = rollup === 'zk' ? 'ZK' : 'OPT';
+        const cls = rollup === 'zk' ? 'log-zk' : 'log-opt';
+
+        const log = document.getElementById('log');
+        const ts = () => new Date().toLocaleTimeString();
+
+        // Disable buttons during run
+        document.querySelectorAll('.btn').forEach(b => b.disabled = true);
+
+        // Show progress
+        const wrap = document.getElementById('progress-wrap');
+        const bar = document.getElementById('progress-bar');
+        const pText = document.getElementById('progress-text');
+        wrap.className = 'progress-wrap active';
+        bar.className = 'progress-bar-inner ' + (rollup === 'zk' ? 'zk' : 'opt');
+        bar.style.width = '0%';
+
+        log.innerHTML += '\\n<span class="log-ts">[' + ts() + ']</span> <span class="' + cls + '">[' + badge + ']</span> Starting ' + type + ' — ' + count + ' txs';
+        log.scrollTop = log.scrollHeight;
+
+        const delay = type === 'highload' ? 10 : 50;
+        for (let i = 0; i < count; i++) {
+            try {
+                await fetch('http://localhost:' + port + '/tx', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ from: 'user' + i, to: 'user' + (i + 1), value: 10 })
+                });
+            } catch (e) {}
+
+            // Update progress
+            const pct = Math.round(((i + 1) / count) * 100);
+            bar.style.width = pct + '%';
+            pText.textContent = badge + ': ' + (i + 1) + ' / ' + count + '  (' + pct + '%)';
+
+            if (i % 50 === 0 && i > 0) {
+                log.innerHTML += '\\n<span class="log-ts">[' + ts() + ']</span> <span class="' + cls + '">[' + badge + ']</span> Sent ' + i + ' txs';
+                log.scrollTop = log.scrollHeight;
+            }
+            if (i % 10 === 0) {
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+
+        log.innerHTML += '\\n<span class="log-ts">[' + ts() + ']</span> <span class="log-ok">[' + badge + '] Complete!</span>';
+        log.scrollTop = log.scrollHeight;
+        pText.textContent = badge + ': done — ' + count + ' txs sent';
+
+        // Re-enable buttons
+        document.querySelectorAll('.btn').forEach(b => b.disabled = false);
+        running = false;
+    }
+
+    setInterval(updateMetrics, 2000);
+    updateMetrics();
+</script>
 </body>
 </html>"""
 
