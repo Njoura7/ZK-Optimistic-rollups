@@ -132,9 +132,12 @@ def test_dual_throughput_comparison():
     zk = _make_zk_seq()
     opt = _make_opt_seq()
 
-    # Spy on _batch so txs accumulate without hitting real L1.
-    zk._batch = MagicMock()
-    opt._batch = MagicMock()
+    # Spy on _batch while draining the pending queue (as the real _batch does),
+    # so the >=threshold check in add_tx does not re-trigger on every subsequent tx.
+    zk_batch_spy = MagicMock(side_effect=lambda: zk.pending.__delitem__(slice(0, 100)))
+    zk._batch = zk_batch_spy
+    opt_batch_spy = MagicMock(side_effect=lambda: opt.pending.__delitem__(slice(0, 200)))
+    opt._batch = opt_batch_spy
 
     TX_COUNT = 200
     for i in range(TX_COUNT):
@@ -263,10 +266,10 @@ def test_sequential_multi_batch_pipeline():
     stay in the pending queue and trigger the next batch at the correct threshold.
     """
     zk = _make_zk_seq()
-    zk._batch = MagicMock()
+    zk._batch = MagicMock(side_effect=lambda: zk.pending.__delitem__(slice(0, 100)))
 
     opt = _make_opt_seq()
-    opt._batch = MagicMock()
+    opt._batch = MagicMock(side_effect=lambda: opt.pending.__delitem__(slice(0, 200)))
 
     # 500 txs: ZK → 5 batches (500 / 100), Optimistic → 2 batches (500 / 200)
     # with 100 remaining below threshold.
