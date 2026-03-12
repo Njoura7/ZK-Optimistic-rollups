@@ -95,7 +95,12 @@ class OptimisticSequencer:
         state_root = hashlib.sha256(str(batch).encode()).digest()
         batch_duration = time.time() - batch_start
         batch_processing_time.observe(batch_duration)
-        
+
+        # Count the batch immediately — it has been assembled and hashed
+        with self.lock:
+            self.metrics['batches'] += 1
+        batch_counter.inc()
+
         # Submit to L1 optimistically
         l1_start = time.time()
         try:
@@ -118,14 +123,9 @@ class OptimisticSequencer:
             finality_duration = time.time() - l1_start
             finality_time_histogram.observe(finality_duration)
             
-            with self.lock:
-                self.metrics['batches'] += 1
-            
-            batch_counter.inc()
-            
             print(f"✓ Optimistic batch: {len(batch)} txs, Finality: {finality_duration:.2f}s, Total: {self.metrics['batches']}")
         except Exception as e:
-            print(f"Optimistic submit skipped: {e}")
+            print(f"Optimistic L1 submit skipped: {e}")
     
     def periodic_batch(self):
         """Batch every 8 seconds (faster than ZK)"""
