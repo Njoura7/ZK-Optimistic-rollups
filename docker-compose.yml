@@ -66,8 +66,6 @@ services:
       - L1_RPC=http://zk-rollup:8545
     networks:
       - zk-network
-    depends_on:
-      - zk-rollup
     profiles:
       - test # Only runs when explicitly called
 networks:

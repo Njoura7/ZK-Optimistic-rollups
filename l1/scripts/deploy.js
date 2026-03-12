@@ -60,6 +60,20 @@ async function main() {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // OptimisticVerifier — Optimism Bedrock architecture reference (MIT License)
+  // https://github.com/ethereum-optimism/optimism/blob/develop/packages/contracts-bedrock/src/L1/OptimismPortal2.sol
+  //
+  // The Optimistic model accepts state roots without an upfront validity proof.
+  // Correctness is enforced economically: any watcher can file a fraud proof
+  // during the CHALLENGE_PERIOD window.  If no valid challenge is raised, the
+  // commitment reaches HARD_FINAL status and is accepted as canonical.
+  //
+  // Key differences from ZKVerifier logged below:
+  //   • No proof bytes are submitted (lower L1 gas, no prover overhead)
+  //   • Finality delayed by the full challenge window (10 blocks in demo)
+  //   • Security relies on ≥1 honest verifier (economic, not cryptographic)
+  // ---------------------------------------------------------------------------
   console.log("Deploying OptimisticVerifier...");
   const OptimisticVerifier =
     await ethers.getContractFactory("OptimisticVerifier");
@@ -67,6 +81,38 @@ async function main() {
   await optVerifier.waitForDeployment();
   const optAddress = await optVerifier.getAddress();
   console.log("✓ OptimisticVerifier deployed:", optAddress);
+
+  // ---------------------------------------------------------------------------
+  // Demo submission — verifies the Optimistic contract works and logs fields
+  // Unlike ZK, no proof bytes needed — just the state root (optimistic assumption)
+  // ---------------------------------------------------------------------------
+  const optStateRoot = ethers.id("optimistic-genesis-state-root");
+  console.log("  Submitting demo Optimistic commitment...");
+  const optSubmitTx = await optVerifier.submit(optStateRoot);
+  const optReceipt = await optSubmitTx.wait();
+
+  // Parse the Committed(id, stateRoot, challengeDeadline, batchSize) event
+  for (const log of optReceipt.logs) {
+    try {
+      const parsed = optVerifier.interface.parseLog(log);
+      if (parsed && parsed.name === "Committed") {
+        console.log("  ✓ Optimistic Committed event:");
+        console.log("    id:                ", parsed.args.id.toString());
+        console.log("    stateRoot:         ", parsed.args.stateRoot);
+        console.log(
+          "    challengeDeadline: ",
+          parsed.args.challengeDeadline.toString(),
+        );
+        console.log(
+          "    batchSize:         ",
+          parsed.args.batchSize.toString(),
+        );
+        console.log("    sequencer:         ", optReceipt.from);
+      }
+    } catch (_) {
+      /* log belongs to a different contract */
+    }
+  }
 
   // Save both addresses
   const deployment = {
