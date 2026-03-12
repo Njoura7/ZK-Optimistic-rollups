@@ -32,6 +32,11 @@ jobs:
           docker compose --profile test run --rm test-runner \
             pytest tests/unit/ -v --tb=short
 
+      - name: Run integration tests
+        run: |
+          docker compose --profile test run --rm test-runner \
+            pytest tests/integration/ -v --tb=short
+
       - name: Run adversarial tests
         run: |
           docker compose --profile test run --rm test-runner \
