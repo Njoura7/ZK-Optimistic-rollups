@@ -1,0 +1,150 @@
+% =========================================
+% CHAPTER 2: BACKGROUND
+% =========================================
+\chapter{Background: Layer~2 Scaling Solutions}
+\label{ch:background}
+
+Before we can compare ZK~Rollups and Optimistic~Rollups in a controlled experiment, we need to understand what they are, why they exist, and how they differ at a conceptual level. This chapter walks through the necessary groundwork. We start with the blockchain fundamentals that make scaling difficult in the first place, then introduce the Layer~2 idea as a general strategy, and finally describe the two rollup families that form the focus of this thesis.
+
+\section{Blockchain Fundamentals}
+
+\subsection{Bitcoin and Ethereum as Layer~1 Baselines}
+
+Bitcoin, introduced by Nakamoto~\cite{nakamoto2008bitcoin}, gave the world the first working proof-of-work consensus system---a way for strangers to agree on a shared ledger without any central authority. Ethereum, designed by Wood~\cite{wood2014ethereum}, built on that foundation by adding a general-purpose execution layer: smart contracts that allow developers to encode arbitrary logic directly into the blockchain.
+
+Both networks, however, share a common limitation. Bitcoin produces a new block roughly every ten minutes, and each block holds about one megabyte of data, yielding approximately seven transactions per second. Ethereum is faster---a block every twelve seconds---but still manages only around fifteen transactions per second, because throughput is governed by a gas limit rather than a fixed block size. When demand exceeds these capacities, users bid against each other for block space, and fees climb accordingly. The total cost a user pays can be broken down as
+
+\begin{equation}
+\text{User Transaction Cost} = \text{Base Fee} + \text{Priority Fee} + \text{Execution Gas}
+\end{equation}
+
+\noindent where the base fee adjusts dynamically with network congestion, the priority fee is a tip to incentivize faster inclusion, and execution gas reflects the computational work the transaction requires.
+
+\subsection{State Transitions and Security}
+
+At its core, a blockchain is a state machine. At every block height~$t$ there exists a global state~$S_t$---the balances, contract storage, and all other on-chain data at that moment. When a new block arrives, the transactions it contains are applied one by one, producing a successor state:
+
+\begin{equation}
+S_{t+1} = \text{apply}(S_t, \text{txs}_t)
+\end{equation}
+
+Three mechanisms work together to keep this process trustworthy. First, \textit{consensus}---whether proof-of-work or proof-of-stake---ensures that the majority of nodes agree on which transactions are included and in what order. Second, \textit{finality} ensures that once a block has been confirmed by enough subsequent blocks, reversing it becomes computationally or economically infeasible. Third, \textit{data availability} ensures that every full node stores and independently verifies every transaction, so anyone can audit the chain's entire history.
+
+These three properties together form the security bedrock on which Layer~2 systems are built. The central question for any Layer~2 design is: how much of this security can we inherit without doing all the work ourselves?
+
+\section{Layer~2 Scaling: Core Concepts}
+
+\subsection{Off-Chain Execution with On-Chain Verification}
+
+The key insight behind Layer~2 scaling is a division of labor. Instead of executing every transaction on the slow, expensive base chain, a separate system---the Layer~2---handles execution off-chain and then posts a compact summary back to Layer~1 for verification. The workflow, at a high level, goes like this.
+
+A component called the \textit{sequencer} collects incoming transactions, puts them in order, and executes them to compute a new state. Once enough transactions have accumulated, the sequencer packages them into a \textit{batch}. It then constructs a cryptographic \textit{commitment}---either a validity proof or simply a state root, depending on the architecture---and submits that commitment to a smart contract on Layer~1. The Layer~1 contract checks the commitment. If everything is in order, the batch is accepted, and once the Layer~1 block that contains the commitment reaches finality, all the transactions in the batch are considered final as well.
+
+The economic appeal is straightforward. The cost of one Layer~1 verification is amortized across every transaction in the batch:
+
+\begin{equation}
+\text{L2 Cost Per Transaction} = \frac{\text{L1 Batch Cost} + \text{L2 Execution Cost}}{\text{Batch Size}}
+\end{equation}
+
+\noindent A batch of a hundred transactions means each one costs roughly a hundredth of an L1 submission. A batch of a thousand cuts the cost even further. This is the mechanism through which Layer~2 systems make blockchain transactions affordable.
+
+\section{ZK Rollups: Validity Proofs}
+
+\subsection{Architecture}
+
+A ZK~Rollup takes the ``trust no one'' approach to its logical conclusion. Instead of asking the network to trust that the sequencer computed the new state correctly, the system demands a cryptographic \textit{proof}---a compact mathematical certificate that anyone can verify but that is practically impossible to forge for an incorrect state transition. The architecture has three central elements.
+
+The \textit{prover} is the component responsible for generating a zero-knowledge proof for each batch. It takes the old state, the batch of transactions, and the resulting new state, and produces a proof~$\pi$ attesting that the transition is valid:
+
+\begin{equation}
+\pi = \text{ZK-SNARK}(\text{state}_{\text{old}}, \text{txs}, \text{state}_{\text{new}})
+\end{equation}
+
+The \textit{L1 verifier} is a smart contract deployed on the base chain. When the sequencer submits a commitment, the verifier checks the accompanying proof against the claimed state roots:
+
+\begin{equation}
+\text{Verify}(\pi, \text{state}_{\text{old}}, \text{state}_{\text{new}}) \rightarrow \{\text{ACCEPT}, \text{REJECT}\}
+\end{equation}
+
+\noindent If verification succeeds, the new state root is recorded on Layer~1 and the commitment becomes eligible for finality. If the proof is invalid---whether because the sequencer made an honest error or deliberately tried to cheat---the submission is rejected outright, and the chain continues from the last accepted state.
+
+The third element is the \textit{state commitment} itself. Because the proof uniquely determines the correct successor state for a given batch, there is exactly one valid outcome. There is no ambiguity, no room for dispute, and no need to wait and see whether someone objects.
+
+Production ZK~Rollups such as Scroll~\cite{zksync-paper} follow this pattern closely. Scroll's \texttt{ZkEvmVerifierV1} contract, for instance, stores a verifying key derived from a trusted setup ceremony and delegates proof checking to an on-chain Groth16 verifier that calls the BN254 elliptic-curve pairing precompile. Our framework's \texttt{ZKVerifier} contract (Chapter~\ref{ch:implementation}) mirrors this interface---it accepts a state root and a proof, binds the proof to a mock verifying key hash, and records the commitment for later finality checks.
+
+\subsection{Security Model}
+
+The security of a ZK~Rollup rests on what is often called the \textit{one-honest-prover assumption}. As long as at least one party in the network can generate a valid proof, the system remains safe. The reason is simple: the Layer~1 verifier enforces correctness by mathematics, not by reputation. A proof is either valid or it is not. A dishonest prover cannot produce a valid proof for an invalid state transition (assuming the underlying cryptographic scheme is sound), and an honest prover can always produce a valid proof for a correct one.
+
+If a malicious prover does submit an invalid proof, the Layer~1 verifier detects the mismatch and rejects the commitment. The system keeps running from the last verified state. No user funds are put at risk, because the fraudulent state never takes effect on Layer~1. Detection is automatic and nearly instantaneous---there is no waiting period, no dispute game, and no reliance on economic incentives.
+
+Finality in a ZK~Rollup is achieved shortly after the proof is included in a Layer~1 block. On Ethereum, that means roughly twelve seconds of block time plus a short confirmation window. In our framework we use a five-block confirmation threshold (Section~\ref{ch:implementation}), which in a local Hardhat environment takes only a few seconds.
+
+\subsection{Challenges}
+
+For all their elegance, ZK~Rollups carry real practical burdens. Generating a zero-knowledge proof is computationally heavy---production systems require specialized hardware such as GPUs or FPGAs, and even then, proof generation for a complex batch can take hundreds of milliseconds to several seconds. On-chain verification is not free either: the elliptic-curve pairing operations at the heart of Groth16 verification consume between 200K and 500K gas on Ethereum. And perhaps the steepest barrier is the engineering effort: application logic must be expressed as arithmetic circuits, a paradigm quite removed from conventional programming and one that demands specialized expertise.
+
+Despite these hurdles, proof systems are improving rapidly. PLONK, STARK, and their successors promise shorter proof times, smaller proof sizes, and in some cases the elimination of the trusted setup ceremony altogether.
+
+\section{Optimistic Rollups: Fraud Proofs}
+
+\subsection{Architecture}
+
+Where ZK~Rollups prove correctness up front, Optimistic~Rollups take the opposite bet: they \textit{assume} the sequencer is honest and only intervene if someone can demonstrate otherwise. The name ``optimistic'' captures the philosophy---accept the sequencer's word by default, and only go to the trouble of checking if a watcher raises the alarm.
+
+The sequencer in an Optimistic~Rollup does the same job as in a ZK~Rollup: it collects transactions, orders them, and computes a new state root. The difference is in what it sends to Layer~1. Instead of attaching a cryptographic proof, it simply posts the state root on its own and opens a \textit{challenge period}---a window of time during which anyone can object. In production systems like Optimism and Arbitrum, this window is seven days long. In our framework's demo environment, we compress it to ten Layer~1 blocks (roughly two minutes on a local Hardhat node) to keep experiments responsive.
+
+If an observer believes the sequencer posted a wrong state root, they can submit a \textit{fraud proof}. Production systems implement this as an interactive dispute game: the challenger and the sequencer narrow the disagreement down to a single computational step, and then the Layer~1 contract re-executes that step to decide who is right. Optimism uses its Cannon virtual machine for this; Arbitrum uses a similar mechanism through its WAVM-based \texttt{OneStepProver} contracts. Our \texttt{OptimisticVerifier} contract models this flow at a structural level---it supports both a simple \texttt{challenge()} call and a more detailed \texttt{submitFraudProof()} function that records the challenger's claimed correct state root (Chapter~\ref{ch:implementation}).
+
+A commitment that survives its challenge period unchallenged transitions from a ``soft-final'' state (optimistically accepted, but still revocable) to ``hard-final'' (irreversibly settled on Layer~1). Our contract exposes this lifecycle explicitly through a \texttt{getFinalityStatus()} function that returns one of four states: \texttt{PENDING}, \texttt{SOFT\_FINAL}, \texttt{HARD\_FINAL}, or \texttt{CHALLENGED}.
+
+Formally, a state commitment takes the shape
+
+\begin{equation}
+C_i = (S_{\text{root}}, \text{batch}_i, L1_{\text{block}_i})
+\end{equation}
+
+\noindent and if the challenge window closes with no valid fraud proof, the commitment reaches finality:
+
+\begin{equation}
+S_{\text{root}_i} \rightarrow \text{FINALIZED}
+\end{equation}
+
+\subsection{Security Model}
+
+The security guarantee of an Optimistic~Rollup is sometimes described as the \textit{at-least-one-honest-challenger assumption}. The system stays safe as long as there exists at least one participant who is both watching the chain and willing to submit a fraud proof when something is wrong.
+
+Consider a scenario where the sequencer posts a fraudulent state root. An honest challenger, running their own copy of the Layer~2 execution, notices that the root does not match the state they computed independently. They submit a fraud proof. The Layer~1 contract resolves the dispute by re-executing the contested step. If the challenger is right, the fraudulent state is thrown out and the sequencer is penalized---typically by having posted collateral slashed.
+
+The critical difference from a ZK~Rollup is that this entire process plays out over the challenge period. Until that window closes, the state is not truly final. Users who want to withdraw funds to Layer~1 must either wait out the full window or pay a fee to a third-party liquidity provider who offers an instant exit in exchange for bearing the finality risk.
+
+\subsection{Challenges}
+
+The most visible drawback of an Optimistic~Rollup is the waiting time. Seven days is a long time to withdraw funds, and while liquidity providers can bridge the gap, their fees erode the cost savings that Layer~2 was supposed to deliver---especially for small transactions. Beyond that, the challenge mechanism only works if the full transaction data is published to Layer~1, so that independent observers can reconstruct the state and verify it. This data publication requirement adds cost. And building a correct, secure interactive dispute game for general-purpose smart contract execution is an extraordinary engineering challenge. The teams behind Cannon and the WAVM one-step provers have invested years of work into code that is still evolving.
+
+\section{Comparative Overview}
+
+Table~\ref{tab:comparison-overview} draws the key contrasts between the two architectures at a glance. The ZK~Rollup trades computational overhead for instant, cryptographic finality. The Optimistic~Rollup trades fast finality for cheaper, simpler submissions. Neither dominates the other in every dimension, and the right choice depends on what the application values most. The rest of this thesis is devoted to measuring these trade-offs concretely rather than reasoning about them in the abstract.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|c|c|c}
+        \hline
+        \textbf{Aspect} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Trade-off} \\
+        \hline
+        Finality & Fast ($\sim$15s) & Delayed (7 days) & ZK favors speed \\
+        \hline
+        Proof type & Validity (ZK-SNARK) & Fraud (execution) & Different trust models \\
+        \hline
+        Proof at submission & Yes & No & Optimistic simpler \\
+        \hline
+        Security model & 1-of-N honest prover & 1-of-N honest challenger & Both need one honest party \\
+        \hline
+        L1 gas per batch & Higher & Lower & Optimistic cheaper \\
+        \hline
+        Withdrawal time & Instant & 7 days (or pay a fee) & ZK favors UX \\
+        \hline
+    \end{tabular}
+    \caption{High-level comparison of ZK and Optimistic Rollup architectures}
+    \label{tab:comparison-overview}
+\end{table}

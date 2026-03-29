@@ -1,0 +1,419 @@
+% =========================================
+% CHAPTER 5: IMPLEMENTATION
+% =========================================
+\chapter{Implementation Details}
+\label{ch:implementation}
+
+This chapter presents the implementation of the framework components introduced in Chapter~\ref{ch:framework}. We walk through each layer of the system---the Layer~1 smart contracts, the Layer~2 sequencer processes, the web dashboard, and the metrics infrastructure---highlighting the key design decisions at each level. Where the implementation simplifies production-grade behavior for the purposes of this evaluation, we note the simplification explicitly and explain how a production system would differ.
+
+\section{Layer~1: Smart Contracts}
+
+\subsection{ZKVerifier Contract}
+
+The \texttt{ZKVerifier} contract is the on-chain anchor for the ZK~Rollup path. Its responsibility is to accept validity proofs submitted by the sequencer, record the resulting state commitments, and enforce a finality delay before any commitment is considered irreversible. The contract is written in Solidity~0.8.20 and draws structural inspiration from Scroll's \texttt{ZkEvmVerifierV1}, which follows a Groth16 verification pattern with a stored verifying key hash. Listing~\ref{lst:zkverifier} shows the core implementation.
+
+\begin{listing}[H]
+    \begin{minted}{solidity}
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract ZKVerifier {
+    struct Commitment {
+        bytes32 stateRoot;
+        uint256 blockNumber;
+        bool verified;
+    }
+
+    mapping(uint256 => Commitment) public commitments;
+    uint256 public commitmentCount;
+    
+    event Committed(uint256 id, bytes32 stateRoot);
+
+    /// @notice Submit ZK proof of state transition
+    /// @param stateRoot The post-execution state root
+    /// @param proof The zero-knowledge proof
+    function submit(bytes32 stateRoot, bytes calldata proof) 
+        external 
+        returns (uint256) 
+    {
+        require(proof.length > 0, "Invalid proof");
+        
+        commitmentCount++;
+        commitments[commitmentCount] = Commitment({
+            stateRoot: stateRoot,
+            blockNumber: block.number,
+            verified: true
+        });
+        
+        emit Committed(commitmentCount, stateRoot);
+        return commitmentCount;
+    }
+
+    /// @notice Check if commitment is finalized (after 5 block confirmation)
+    function isFinalized(uint256 id) external view returns (bool) {
+        return commitments[id].verified && 
+               (block.number >= commitments[id].blockNumber + 5);
+    }
+}
+    \end{minted}
+    \caption{ZKVerifier.sol - Solidity implementation}
+    \label{lst:zkverifier}
+\end{listing}
+
+Several aspects of this contract are intentionally simplified relative to a production deployment. The most significant simplification concerns proof verification: the listing above accepts any non-empty byte sequence as a valid proof, whereas the full contract in the repository includes a \texttt{MOCK\_VK\_HASH} constant and an internal \texttt{verifyProof()} stub that checks for a non-zero prefix and verifies a binding between the proof and the mock verifying key via \texttt{keccak256}. In a production Groth16-based system such as Scroll's, this function would delegate to a precompiled BN254 elliptic-curve pairing check. The \texttt{Commitment} struct in the repository also carries additional fields---\texttt{proofHash}, \texttt{batchSize}, and \texttt{timestamp}---that are omitted from the listing for clarity.
+
+The finality threshold is set at five block confirmations. After a commitment is recorded, the \texttt{isFinalized} view function returns \texttt{true} only once at least five additional Layer~1 blocks have been mined. This simulates the confirmation delay present in real Ethereum deployments. Finally, the contract emits a \texttt{Committed} event for each new submission, enabling the sequencer and dashboard to track state updates through event subscriptions rather than expensive polling.
+
+\subsection{OptimisticVerifier Contract}
+
+The \texttt{OptimisticVerifier} contract implements the fraud proof challenge model that defines Optimistic~Rollups. Its design draws on patterns from both the Optimism Bedrock \texttt{OptimismPortal2} dispute game and the Arbitrum Nitro staker model. Listing~\ref{lst:optverifier} shows the core implementation.
+
+\begin{listing}[H]
+    \begin{minted}{solidity}
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract OptimisticVerifier {
+    struct Commitment {
+        bytes32 stateRoot;
+        uint256 blockNumber;
+        uint256 challengeDeadline;
+        bool challenged;
+        bool finalized;
+    }
+
+    mapping(uint256 => Commitment) public commitments;
+    uint256 public commitmentCount;
+    uint256 public constant CHALLENGE_PERIOD = 10; // blocks
+    
+    event Committed(uint256 id, bytes32 stateRoot, 
+                   uint256 challengeDeadline);
+    event Challenged(uint256 id);
+    event Finalized(uint256 id);
+
+    /// @notice Submit optimistic state commitment (no proof required)
+    function submit(bytes32 stateRoot) external returns (uint256) {
+        commitmentCount++;
+        uint256 deadline = block.number + CHALLENGE_PERIOD;
+        
+        commitments[commitmentCount] = Commitment({
+            stateRoot: stateRoot,
+            blockNumber: block.number,
+            challengeDeadline: deadline,
+            challenged: false,
+            finalized: false
+        });
+        
+        emit Committed(commitmentCount, stateRoot, deadline);
+        return commitmentCount;
+    }
+
+    /// @notice Challenge a commitment if it's invalid
+    function challenge(uint256 id) external {
+        require(id > 0 && id <= commitmentCount, "Invalid ID");
+        Commitment storage c = commitments[id];
+        require(!c.finalized, "Already finalized");
+        require(block.number < c.challengeDeadline, 
+               "Challenge period ended");
+        
+        c.challenged = true;
+        emit Challenged(id);
+    }
+
+    /// @notice Finalize after challenge period expires
+    function finalize(uint256 id) external {
+        require(id > 0 && id <= commitmentCount, "Invalid ID");
+        Commitment storage c = commitments[id];
+        require(!c.finalized, "Already finalized");
+        require(block.number >= c.challengeDeadline, 
+               "Challenge period active");
+        require(!c.challenged, "Was challenged");
+        
+        c.finalized = true;
+        emit Finalized(id);
+    }
+
+    /// @notice Check if commitment is effectively finalized
+    function isFinalized(uint256 id) external view returns (bool) {
+        Commitment memory c = commitments[id];
+        return c.finalized || 
+               (!c.challenged && 
+                block.number >= c.challengeDeadline);
+    }
+
+    /// @notice Get blocks remaining in challenge period
+    function blocksUntilFinality(uint256 id) 
+        external 
+        view 
+        returns (uint256) 
+    {
+        Commitment memory c = commitments[id];
+        if (block.number >= c.challengeDeadline) return 0;
+        return c.challengeDeadline - block.number;
+    }
+}
+    \end{minted}
+    \caption{OptimisticVerifier.sol - Optimistic contract implementation}
+    \label{lst:optverifier}
+\end{listing}
+
+The listing above shows the core lifecycle of an Optimistic commitment, but the full contract in the repository contains additional functionality that merits discussion. The challenge window is set to ten blocks, which translates to roughly two minutes in the local Hardhat environment. Production systems such as Arbitrum and Optimism use a seven-day window; we compress it deliberately to keep experimental turnaround times manageable while preserving the architectural semantics.
+
+Beyond the simple \texttt{challenge()} function shown above, the full contract also exposes a \texttt{submitFraudProof()} function that accepts a commitment identifier and a \texttt{claimedRoot} representing the challenger's own computed state root. This creates a \texttt{FraudProof} struct on-chain, providing a richer record of disputes than a simple boolean flag. In a production system, this would be the entry point to an interactive dispute game; in our framework, it serves as a structural placeholder that captures the challenger's claim for post-hoc analysis.
+
+The contract also provides a \texttt{getFinalityStatus()} view function that returns one of four string values: \texttt{PENDING} for commitments still within the challenge window, \texttt{SOFT\_FINAL} for commitments whose deadline has passed but that have not yet been explicitly finalized on-chain, \texttt{HARD\_FINAL} for commitments that have been finalized, and \texttt{CHALLENGED} for commitments that received a dispute. This four-state model allows the dashboard and test suite to distinguish between the different stages of the Optimistic finality lifecycle, which is essential for the comparative analysis presented in Chapter~\ref{ch:evaluation}.
+
+Once the challenge period expires without a dispute, the commitment is treated as finalized. The \texttt{finalize()} function makes this explicit on-chain by setting the \texttt{finalized} flag, though the \texttt{isFinalized()} view function also returns \texttt{true} implicitly if the deadline has passed without a challenge. This dual path ensures that finality is recognized regardless of whether anyone calls \texttt{finalize()}, which is important for the metrics collection layer.
+
+\section{Layer~2: Sequencer Implementation}
+
+Both sequencers share a common structure: they maintain a pending transaction pool, periodically create batches, and submit commitments to the Layer~1 contract. The key difference lies in the commitment step---the ZK sequencer generates a proof alongside the state root, while the Optimistic sequencer submits only the state root. Both are implemented as single-threaded Python processes using Flask for the HTTP interface and the \texttt{web3.py} library for Layer~1 interaction.
+
+\subsection{ZK Rollup Sequencer}
+
+The ZK sequencer listens on port~5000 and exports Prometheus metrics on port~9100. It uses the first Hardhat account (index~0) as the signing identity for all Layer~1 transactions. Listing~\ref{lst:zk-sequencer} shows the core implementation.
+
+\begin{listing}[H]
+    \begin{minted}{python}
+class Sequencer:
+    def __init__(self):
+        self.w3 = Web3(Web3.HTTPProvider('http://localhost:8545'))
+        self.pending = []
+        self.metrics = {'txs': 0, 'batches': 0, 'tps': 0}
+        self.lock = Lock()
+        self.running = True
+        
+    def add_tx(self, tx):
+        """Accept transaction into mempool"""
+        with self.lock:
+            self.pending.append(tx)
+            self.metrics['txs'] += 1
+        tx_counter.inc()
+        
+        # Batch when threshold reached
+        if len(self.pending) >= 100:
+            self._batch()
+    
+    def _batch(self):
+        """Create and submit ZK batch to L1"""
+        with self.lock:
+            if not self.pending:
+                return
+            batch = self.pending[:100]
+            self.pending = self.pending[100:]
+        
+        # Step 1: Generate proof
+        proof_start = time.time()
+        state_root = hashlib.sha256(
+            str(batch).encode()
+        ).digest()
+        proof = hashlib.sha256(state_root).digest()
+        proof_duration = time.time() - proof_start
+        proof_generation_time.observe(proof_duration)
+        
+        # Step 2: Submit to L1 with proof
+        l1_start = time.time()
+        try:
+            contract = self.w3.eth.contract(
+                address=contract_addr,
+                abi=[ZK_SUBMIT_ABI]
+            )
+            
+            account = self.w3.eth.accounts[0]
+            tx = contract.functions.submit(
+                state_root, 
+                proof
+            ).build_transaction({
+                'from': account,
+                'nonce': self.w3.eth.get_transaction_count(
+                    account
+                ),
+                'gas': 200000
+            })
+            
+            signed = self.w3.eth.account.sign_transaction(
+                tx, 
+                private_key=SEQUENCER_KEY
+            )
+            tx_hash = self.w3.eth.send_raw_transaction(
+                signed.rawTransaction
+            )
+            receipt = self.w3.eth.wait_for_transaction_receipt(
+                tx_hash
+            )
+            
+            finality_duration = time.time() - l1_start
+            finality_time_histogram.observe(
+                finality_duration
+            )
+            
+            with self.lock:
+                self.metrics['batches'] += 1
+            batch_counter.inc()
+            
+            logger.info(
+                f"ZK Batch: {len(batch)} txs, "
+                f"Proof: {proof_duration:.3f}s, "
+                f"Finality: {finality_duration:.2f}s"
+            )
+        except Exception as e:
+            logger.error(f"Batch failed: {e}")
+
+if __name__ == '__main__':
+    start_http_server(9100)  # Prometheus metrics
+    Thread(target=seq.periodic_batch, daemon=True).start()
+    Thread(target=seq.calculate_tps, daemon=True).start()
+    app.run(host='0.0.0.0', port=5000)
+    \end{minted}
+    \caption{ZK Rollup sequencer - Python implementation}
+    \label{lst:zk-sequencer}
+\end{listing}
+
+The batch creation logic illustrates the two-step process that distinguishes the ZK path. First, the sequencer computes a SHA-256 hash of the batch to derive the state root, then computes a second SHA-256 hash of that state root to produce a mock proof. This double-hash pattern mirrors the structure of a real prover---one computation for state derivation, another for proof generation---while remaining fast enough for rapid iteration. The proof generation duration is recorded in a Prometheus histogram for later analysis. Second, the sequencer calls the \texttt{ZKVerifier.submit()} function on Layer~1, passing both the state root and the proof. The Layer~1 inclusion latency is also recorded, providing a complete picture of the end-to-end batch lifecycle.
+
+A background thread runs the \texttt{periodic\_batch()} function, which checks the pending pool every five seconds. If the pool contains at least one hundred transactions, a batch is assembled and submitted. A separate thread computes a rolling throughput metric (transactions per second) at regular intervals.
+
+\subsection{Optimistic Rollup Sequencer}
+
+The Optimistic sequencer listens on port~5001 and exports Prometheus metrics on port~9101. It uses the second Hardhat account (index~1) as its signing identity, ensuring that the two sequencers do not compete for the same nonce space on the shared Layer~1 node.
+
+The principal differences from the ZK sequencer are architectural rather than incidental. The Optimistic sequencer does not generate a proof at submission time, because its security model defers verification to the challenge period. This means the batch creation function performs a single SHA-256 hash to derive the state root---compared to the ZK sequencer's two---and then calls \texttt{OptimisticVerifier.submit()} with only the state root as an argument. The gas allocation per submission is correspondingly lower (150,000 versus 200,000) because the Layer~1 contract does less work on each call.
+
+The batching parameters are also tuned differently. The Optimistic sequencer uses a threshold of two hundred transactions and a polling interval of eight seconds, compared to one hundred transactions and five seconds for the ZK sequencer. The larger batch and longer interval reflect the economic logic of the Optimistic model: without the computational bottleneck of proof generation, the sequencer can afford to accumulate more transactions per batch, thereby amortizing the fixed gas cost of each Layer~1 submission over a greater number of items. The Optimistic sequencer also exposes a \texttt{/health} endpoint that reports liveness status, uptime, and sequencer type---a feature that the ZK sequencer omits.
+
+Listing~\ref{lst:opt-sequencer} shows the relevant portion of the batch submission logic, highlighting the absence of proof generation and the adjusted parameters.
+
+\begin{listing}[H]
+    \begin{minted}{python}
+def _batch(self):
+    """Optimistic batch - state root only, no proof"""
+    with self.lock:
+        if not self.pending:
+            return
+        
+        # Larger batch size (200 vs 100)
+        batch = self.pending[:200]
+        self.pending = self.pending[200:]
+    
+    # Generate state root only (no proof!)
+    state_root = hashlib.sha256(
+        str(batch).encode()
+    ).digest()
+    
+    # Submit to L1 optimistically
+    l1_start = time.time()
+    try:
+        contract = self.w3.eth.contract(
+            address=contract_addr,
+            abi=[OPT_SUBMIT_ABI]
+        )
+        
+        account = self.w3.eth.accounts[0]
+        tx = contract.functions.submit(
+            state_root
+        ).build_transaction({
+            'from': account,
+            'nonce': self.w3.eth.get_transaction_count(
+                account
+            ),
+            'gas': 150000  # Less gas (no proof)
+        })
+        
+        signed = self.w3.eth.account.sign_transaction(
+            tx, 
+            private_key=SEQUENCER_KEY
+        )
+        tx_hash = self.w3.eth.send_raw_transaction(
+            signed.rawTransaction
+        )
+        receipt = self.w3.eth.wait_for_transaction_receipt(
+            tx_hash
+        )
+        
+        finality_duration = time.time() - l1_start
+        finality_time_histogram.observe(
+            finality_duration
+        )
+        
+        with self.lock:
+            self.metrics['batches'] += 1
+        batch_counter.inc()
+        
+        logger.info(
+            f"Optimistic Batch: {len(batch)} txs, "
+            f"Finality: {finality_duration:.2f}s"
+        )
+    except Exception as e:
+        logger.error(f"Submission failed: {e}")
+    \end{minted}
+    \caption{Optimistic rollup sequencer differences}
+    \label{lst:opt-sequencer}
+\end{listing}
+
+\section{Web Dashboard}
+
+The framework includes a Flask-based web dashboard that serves two purposes: it provides real-time visualization of key metrics from both sequencers, and it exposes HTTP endpoints that allow automated test scenarios to submit transactions and query system state programmatically. The dashboard runs on port~3000 and serves an HTML interface styled with a dedicated CSS file. Listing~\ref{lst:flask-api} shows the core API endpoints shared by the sequencer processes.
+
+\begin{listing}[H]
+    \begin{minted}{python}
+@app.route('/tx', methods=['POST'])
+def submit_tx():
+    """Accept transaction submission"""
+    seq.add_tx(request.json)
+    return jsonify({'status': 'ok'}), 202
+
+@app.route('/metrics', methods=['GET'])
+def get_metrics():
+    """Return current metrics snapshot"""
+    with seq.lock:
+        return jsonify(seq.metrics)
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Liveness check"""
+    return jsonify({
+        'status': 'healthy',
+        'type': 'optimistic',
+        'uptime': seq.get_uptime()
+    }), 200
+    \end{minted}
+    \caption{Flask API endpoints}
+    \label{lst:flask-api}
+\end{listing}
+
+The \texttt{/tx} endpoint accepts a JSON payload via HTTP POST and adds the transaction to the sequencer's pending pool, returning a 202~Accepted status immediately. The \texttt{/metrics} endpoint returns a JSON snapshot of the current internal counters---transaction count, batch count, and throughput---under the protection of the sequencer's thread lock to avoid read-tearing. The \texttt{/health} endpoint, present only on the Optimistic sequencer, reports the process's liveness status and uptime, which the adversarial test suite uses to verify recovery after simulated crashes.
+
+\section{Metrics and Observability}
+
+Quantitative evaluation requires consistent, structured measurement. Both sequencers export metrics to a Prometheus instance that scrapes their dedicated HTTP endpoints at regular intervals. The collected time-series data is then rendered through pre-configured Grafana dashboards that are automatically provisioned when the framework's Docker Compose stack starts.
+
+\subsection{Prometheus Metrics}
+
+Each sequencer exposes its metrics on a dedicated port: the ZK sequencer on port~9100 and the Optimistic sequencer on port~9101. Table~\ref{tab:prometheus-metrics} lists the metrics collected, along with their types and purposes. The ZK sequencer exports one additional histogram (\texttt{l2\_proof\_generation\_seconds}) that the Optimistic sequencer does not, because the latter does not perform proof generation.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{p{4cm}|p{3cm}|p{3cm}}
+        \hline
+        \textbf{Metric Name} & \textbf{Type} & \textbf{Purpose} \\
+        \hline
+        l2\_transactions\_total & Counter & Cumulative TX count \\
+        \hline
+        l2\_batches\_total & Counter & Cumulative batch count \\
+        \hline
+        l2\_tps & Gauge & Current throughput \\
+        \hline
+        l2\_finality\_time\_seconds & Histogram & L1 inclusion latency \\
+        \hline
+        l2\_proof\_generation\_seconds & Histogram & ZK proof time (ZK only) \\
+        \hline
+        l2\_pending\_transactions & Gauge & Current mempool size \\
+        \hline
+    \end{tabular}
+    \caption{Prometheus metrics exported}
+    \label{tab:prometheus-metrics}
+\end{table}
+
+\subsection{Grafana Dashboards}
+
+The framework ships with a pre-configured Grafana dashboard definition stored as a JSON provisioning file. When the Docker Compose stack launches, Grafana automatically imports this file and connects to the Prometheus data source, so no manual configuration is required. The dashboard is organized into four categories of panels. Status panels display the current cumulative transaction count, batch count, and real-time throughput for each sequencer. Time-series graphs plot throughput over time and finality latency as continuous lines, making trends and anomalies visible at a glance. Comparison panels place the ZK and Optimistic metrics side by side on shared axes, enabling direct visual comparison. Finally, histogram panels break down proof generation time and finality latency by percentile (P50, P95, P99), which supports the statistical analysis presented in Chapter~\ref{ch:evaluation}.

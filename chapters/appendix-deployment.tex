@@ -1,0 +1,57 @@
+% =========================================
+% APPENDIX A: FRAMEWORK DEPLOYMENT GUIDE
+% =========================================
+\chapter{Framework Deployment Guide}
+\label{app:deployment}
+
+\section{Quick Start}
+
+\subsection{Prerequisites}
+
+\begin{itemize}
+    \item Docker Desktop (any recent version)
+    \item 8GB RAM available
+    \item Ports 3000-9101 available
+\end{itemize}
+
+\subsection{Installation Steps}
+
+\begin{listing}[H]
+    \begin{minted}{bash}
+# Clone repository
+git clone https://github.com/yourusername/zk-rollup-mvp.git
+cd zk-rollup-mvp
+
+# Build and start all services
+docker-compose up --build
+
+# Wait 2-3 minutes for initialization
+    \end{minted}
+    \caption{Basic deployment commands}
+    \label{lst:deploy-commands}
+\end{listing}
+
+\subsection{Accessing Services}
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|c|p{5cm}}
+        \hline
+        \textbf{Service} & \textbf{URL/Port} & \textbf{Purpose} \\
+        \hline
+        Flask Dashboard & http://localhost:3000 & Real-time monitoring \\
+        \hline
+        L1 RPC & http://localhost:8545 & Ethereum simulation \\
+        \hline
+        ZK Sequencer & http://localhost:5000 & Submit ZK transactions \\
+        \hline
+        Optimistic Sequencer & http://localhost:5001 & Submit Optimistic transactions \\
+        \hline
+        Prometheus & http://localhost:9090 & Metrics storage \\
+        \hline
+        Grafana & http://localhost:3001 & Visualization (admin/admin) \\
+        \hline
+    \end{tabular}
+    \caption{Service access points}
+    \label{tab:services}
+\end{table}

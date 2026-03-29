@@ -1,0 +1,114 @@
+% =========================================
+% CHAPTER 8: CONCLUSIONS
+% =========================================
+\chapter{Conclusions and Future Work}
+\label{ch:conclusion}
+
+This chapter summarizes the main findings of the thesis, lists the contributions, offers practical recommendations for selecting a rollup architecture, and identifies directions for future research.
+
+\section{Summary of Findings}
+
+This thesis presented a comparative testing framework for evaluating blockchain Layer~2 scaling solutions under both normal and adversarial conditions. Through the implementation and measurement of a ZK~Rollup and an Optimistic~Rollup within a shared testbed, we quantified key differences in performance, finality, and security behavior. The principal findings are summarized below.
+
+\subsection{Key Results}
+
+\textbf{Throughput.}
+The ZK~Rollup achieved 39--43\% higher peak throughput than the Optimistic~Rollup, due to its smaller batch size and shorter batching interval. However, the Optimistic~Rollup produced 43\% fewer L1 submissions by using larger batches, resulting in lower per-transaction L1 gas costs. This illustrates a fundamental trade-off between throughput and L1 cost efficiency.
+
+\textbf{Finality.}
+Both architectures achieved L1 inclusion in approximately 4.75~seconds, confirming that L1 block production is the dominant latency factor. However, true finality---the point at which a transaction becomes irreversible---differs dramatically: approximately 15~seconds for the ZK~Rollup versus approximately 7~days for the Optimistic~Rollup in a production setting, a difference of roughly 672$\times$.
+
+\textbf{Security.}
+The ZK~Rollup provides cryptographic safety guarantees under a 1-of-N honest prover assumption, while the Optimistic~Rollup relies on economic guarantees under an at-least-one-honest-challenger assumption. Both architectures inherit the security of the underlying L1 through their anchoring mechanisms.
+
+\textbf{Computational overhead.}
+ZK proof generation incurs a P95 latency of 95~ms per batch, representing approximately 1.9\% of the batch interval. This overhead is manageable with current hardware and is expected to decrease as proof systems continue to improve.
+
+\subsection{Contributions}
+
+The specific contributions of this thesis are:
+
+\begin{enumerate}
+    \item A \textbf{systematic failure-mode analysis} that quantifies rollup behavior under adversarial conditions, going beyond the ideal-state metrics reported in most existing work.
+    
+    \item A \textbf{reproducible, open-source framework} that enables other researchers to replicate and extend the experiments presented here.
+    
+    \item \textbf{Quantified trade-offs} across throughput, batching efficiency, finality latency, proof generation cost, and security properties.
+    
+    \item A \textbf{practical decision framework} that maps application requirements to the most suitable rollup architecture.
+    
+    \item A contribution toward \textbf{bridging the gap} between theoretical Layer~2 models and practical deployment considerations.
+\end{enumerate}
+
+\section{Practical Recommendations}
+
+Based on the experimental results and security analysis, we offer the following guidance for selecting a rollup architecture.
+
+\subsection{When to Prefer a ZK~Rollup}
+
+A ZK~Rollup is well suited to applications where:
+\begin{itemize}
+    \item fast finality is critical, such as decentralized exchanges or derivatives platforms;
+    \item withdrawal latency must be minimized to provide an acceptable user experience;
+    \item the application can afford the computational overhead of proof generation;
+    \item strong cryptographic safety guarantees are preferred over economic ones.
+\end{itemize}
+
+Typical use cases include automated market makers, cross-chain bridges (where fast settlement prevents double-spending), and payment applications.
+
+\subsection{When to Prefer an Optimistic~Rollup}
+
+An Optimistic~Rollup is better suited to applications where:
+\begin{itemize}
+    \item minimizing L1 gas costs is a top priority;
+    \item the application can tolerate a 7-day withdrawal delay (or users are willing to use liquidity providers);
+    \item full EVM compatibility is required, avoiding the need to redesign application logic as arithmetic circuits;
+    \item computational resources are constrained.
+\end{itemize}
+
+Typical use cases include general-purpose smart contract platforms, gaming with infrequent settlements, governance applications, and migrations of existing decentralized applications.
+
+\section{Future Research Directions}
+
+Several promising directions for future work emerge from this thesis.
+
+\subsection{Short-Term Extensions}
+
+\begin{enumerate}
+    \item \textbf{Additional L2 architectures}: extending the framework to include Plasma and Validium implementations would broaden the scope of the comparison.
+    \item \textbf{Public testnet integration}: running the experiments against public Ethereum testnets (e.g., Sepolia) would provide more realistic L1 conditions.
+    \item \textbf{Adversarial scenario automation}: implementing automated sequencer failover, malicious proposer injection, and censorship simulation would strengthen the failure-mode analysis.
+    \item \textbf{Gas cost modeling}: analyzing L1 gas costs under different fee regimes (e.g., EIP-1559 base fee fluctuations) would add an economic dimension to the evaluation.
+\end{enumerate}
+
+\subsection{Medium-Term Directions}
+
+\begin{enumerate}
+    \item \textbf{Data availability sampling}: evaluating the impact of data availability sampling (DAS) techniques on rollup data availability and cost.
+    \item \textbf{Cross-rollup interoperability}: studying how L2-to-L2 transfers and message passing affect finality guarantees.
+    \item \textbf{Proof system comparison}: benchmarking different ZK proof families (PLONK, STARK, Groth16) within the same framework.
+    \item \textbf{Sequencer economics}: modeling the effects of MEV extraction and sequencer competition on system fairness.
+\end{enumerate}
+
+\subsection{Long-Term Research}
+
+\begin{enumerate}
+    \item \textbf{Hybrid rollups}: exploring architectures that combine ZK proofs for finality with Optimistic mechanisms for general computation.
+    \item \textbf{Recursive proofs}: investigating L2-of-L2 constructions enabled by recursive proof composition.
+    \item \textbf{Post-quantum security}: evaluating the resilience of current proof systems to quantum computing advances and assessing post-quantum alternatives.
+    \item \textbf{Privacy-preserving Layer~2}: integrating privacy-preserving techniques into the rollup architecture without sacrificing verifiability.
+\end{enumerate}
+
+\section{Broader Impact}
+
+From an \textbf{academic perspective}, this work contributes an open-source, reproducible testbed and a systematic comparison methodology that future researchers can build upon, rather than constructing evaluation infrastructure from scratch.
+
+From an \textbf{industry perspective}, the decision framework and quantified trade-offs reported here can assist development teams in selecting an appropriate L2 architecture, understanding potential failure scenarios, and planning migration strategies from L1 to L2.
+
+From a \textbf{societal perspective}, Layer~2 scaling has the potential to reduce transaction costs (improving financial inclusion), decrease the computational burden of blockchain networks (contributing to sustainability), and improve the overall user experience (accelerating adoption of decentralized technologies).
+
+\section{Closing Remarks}
+
+Layer~2 scaling is not a single solution but a spectrum of trade-offs. ZK~Rollups prioritize finality and cryptographic security; Optimistic~Rollups prioritize cost efficiency and EVM compatibility. Neither architecture is universally superior---the appropriate choice depends on the specific requirements of the application.
+
+This thesis provides a quantitative basis for making that choice. As Layer~2 technology continues to mature, we expect the landscape to evolve toward greater diversity, with multiple architectures coexisting, each optimized for different workloads, and connected through interoperability protocols. The framework presented here is designed to evolve alongside the technology it evaluates.
