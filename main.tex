@@ -56,90 +56,55 @@
 \chapter{Introduction}
 \label{ch:intro}
 
-Blockchain technology has emerged as a foundational infrastructure for decentralized applications, digital finance, and trustless coordination. However, the most widely adopted blockchain networks---Bitcoin and Ethereum---face inherent scalability limitations that restrict their ability to support high-throughput workloads. This chapter introduces the motivation behind this thesis, outlines the research questions we aim to address, summarizes our contributions, and describes the structure of the remaining chapters.
+Blockchain networks promised a world where trust is built through mathematics rather than institutions. Bitcoin showed that strangers could exchange value without a bank, and Ethereum went further by allowing them to run programs on a shared, tamper-proof computer. Yet both networks hit the same wall: they are painfully slow. Bitcoin handles roughly seven transactions every second, Ethereum around fifteen. For comparison, the Visa network processes thousands. This speed gap keeps fees high, frustrates users, and stands in the way of wider adoption.
+
+Layer~2 solutions were conceived as a way around this bottleneck. Instead of forcing every transaction through the congested main chain, they move the heavy work to a faster second layer while keeping the security anchored to Layer~1. The idea is elegant, but the details matter enormously---and those details are what this thesis sets out to examine.
 
 \section{Motivation}
 
-Bitcoin processes approximately 7 transactions per second (TPS), while Ethereum achieves roughly 15~TPS on its base layer, commonly referred to as Layer~1 (L1)~\cite{nakamoto2008bitcoin, wood2014ethereum}. These throughput constraints cause transaction fees to rise during periods of high demand and present a significant barrier to mainstream adoption. Layer~2 (L2) scaling solutions have been proposed to alleviate this bottleneck by moving transaction execution off the main chain while preserving the security guarantees of L1.
-
 \subsection{The Scalability Trilemma}
 
-Buterin~\cite{scalability-trilemma} formulated the blockchain scalability trilemma, which states that a blockchain system can efficiently optimize for at most two of the following three properties:
-\begin{itemize}
-    \item \textbf{Decentralization}: the system does not rely on a small, trusted set of nodes for its security;
-    \item \textbf{Security}: the system provides resistance to attacks (such as 51\% attacks) and guarantees transaction finality;
-    \item \textbf{Scalability}: the system achieves high transaction throughput relative to its base layer.
-\end{itemize}
+Buterin~\cite{scalability-trilemma} captured the core tension in blockchain design with what he called the scalability trilemma. A blockchain, he argued, can realistically achieve two of three desirable properties, but not all three at once. The first is \textit{decentralization}---the guarantee that no small group of nodes controls the system. The second is \textit{security}---the ability to resist attacks and ensure that confirmed transactions stay confirmed. The third is \textit{scalability}---the capacity to process a high volume of transactions quickly.
 
-Layer~2 solutions attempt to overcome this trilemma by anchoring their security to L1 consensus while performing the bulk of transaction processing off-chain.
+Layer~2 systems attempt to escape this trilemma rather than solve it head-on. They borrow security from the base chain, which is already decentralized and secure, and focus their own resources on processing transactions as fast as possible. Whether they succeed depends on the specific design choices each system makes---and how those choices hold up when things go wrong.
 
-\subsection{The Problem: Incomplete Evaluation of Layer~2 Systems}
+\subsection{The Problem: Evaluating Only the Happy Path}
 
-The majority of existing research and industry documentation on L2 systems focuses on \textbf{ideal-state performance metrics}, including:
-\begin{itemize}
-    \item maximum achievable throughput (TPS),
-    \item best-case latency (time to finality),
-    \item gas costs under normal operating conditions.
-\end{itemize}
+Most existing research on Layer~2 systems tells a rosy story. Papers and whitepapers report peak throughput under ideal conditions, best-case latency when everything runs smoothly, and gas costs when the network is calm. These numbers are useful, but they paint an incomplete picture.
 
-While these metrics are useful, they do not capture system behavior under adverse conditions. Several critical questions about \textbf{failure modes and recovery behavior} remain largely unanswered in the literature:
-\begin{itemize}
-    \item How does L1 chain reorganization affect L2 finality guarantees?
-    \item What happens when sequencers fail or behave maliciously?
-    \item To what extent can users enforce censorship resistance?
-    \item How do different security models---validity proofs versus fraud proofs---affect recovery time and cost?
-\end{itemize}
+What happens when the Layer~1 chain reorganizes and the ground shifts beneath a Layer~2 commitment? What does the system do when its sequencer crashes, or worse, when the sequencer deliberately lies about the state? Can ordinary users still get their funds out when the operator is censoring transactions? And how do the two dominant security models---validity proofs in ZK~Rollups and fraud proofs in Optimistic~Rollups---actually compare when the pressure is on?
 
-These gaps motivate the need for a systematic, empirical framework that evaluates L2 systems not only under normal conditions but also under realistic failure scenarios.
+These are not hypothetical concerns. Chain reorganizations happen, sequencer outages have occurred in production systems, and the question of censorship resistance is central to the entire promise of decentralization. Yet the literature offers surprisingly few concrete answers on how different Layer~2 architectures behave under stress.
 
-\subsection{Contributions}
+\subsection{What This Thesis Contributes}
 
-This thesis presents a comparative testing framework for evaluating L2 scaling solutions under both normal and adversarial conditions. We implement two representative L2 architectures---ZK~Rollups and Optimistic~Rollups---within a reproducible testbed and assess the following dimensions:
+This thesis addresses that gap. We design and implement a comparative testing framework that places a ZK~Rollup and an Optimistic~Rollup side by side in the same controlled environment and measures how they perform---not only under normal conditions, but also when we deliberately introduce failures. Specifically, we measure finality guarantees (how long it takes for a transaction to become irreversible under various Layer~1 conditions), security mechanisms (the concrete differences between validity proofs and fraud proofs), recovery behavior (how each system responds to sequencer failures and malicious state proposals), and performance trade-offs (the relationship between security strength, throughput, and cost).
 
-\begin{enumerate}
-    \item \textbf{Finality guarantees}: the time required to achieve cryptographic finality under varying L1 conditions;
-    \item \textbf{Security mechanisms}: quantified differences between validity proofs and fraud proofs;
-    \item \textbf{Recovery behavior}: system resilience to sequencer failures and malicious state proposals;
-    \item \textbf{Performance trade-offs}: concrete measurements relating security, throughput, and cost.
-\end{enumerate}
-
-To the best of our knowledge, this is the first work to provide a side-by-side empirical comparison of these architectures under identical experimental conditions, with a focus on failure-mode analysis.
+To the best of our knowledge, no prior work has provided this kind of side-by-side empirical comparison under identical experimental conditions with an explicit focus on failure modes.
 
 \section{Research Questions}
 
-The research conducted in this thesis is guided by one primary question and several supporting sub-questions.
-
 \subsection{Primary Question}
 
-\textit{How do different Layer~2 scaling architectures---specifically ZK~Rollups and Optimistic~Rollups---compare in terms of security guarantees, finality mechanisms, and recovery behavior under L1 disruptions, sequencer failures, and malicious state proposals?}
+The central question guiding this thesis is: \textit{How do ZK~Rollups and Optimistic~Rollups compare in terms of security guarantees, finality mechanisms, and recovery behavior when subjected to Layer~1 disruptions, sequencer failures, and malicious state proposals?}
 
 \subsection{Sub-Questions}
 
-\begin{enumerate}
-    \item \label{rq:finality} How does time-to-finality differ between optimistic systems (which rely on a fraud proof window) and ZK systems (which rely on proof verification)? What is the practical impact of this difference?
-    
-    \item \label{rq:l1congestion} How does L1 congestion or chain reorganization affect L2 security and finality propagation? What safeguards exist to prevent L2 security regression?
-    
-    \item \label{rq:censorship} How can users enforce censorship resistance during sequencer failures? What recovery mechanisms are available, and what are their associated costs?
-    
-    \item \label{rq:mechanisms} What are the costs and behaviors of fault-escape hatches and forced transaction inclusion mechanisms?
-    
-    \item \label{rq:dataavailability} How do on-chain versus off-chain data availability strategies affect system safety under L1 stress?
-\end{enumerate}
+To answer that broad question, we break it into five more specific ones.
+
+First (\ref{rq:finality}), \label{rq:finality} we ask how time-to-finality differs between the two architectures. The Optimistic approach relies on a fraud-proof window that can last days; the ZK approach relies on cryptographic proof verification that takes seconds. We seek to quantify the practical impact of that difference.
+
+Second (\ref{rq:l1congestion}), \label{rq:l1congestion} we investigate how Layer~1 congestion or chain reorganization affects Layer~2 security and finality propagation. When the foundation shakes, what safeguards prevent the upper floors from collapsing?
+
+Third (\ref{rq:censorship}), \label{rq:censorship} we examine censorship resistance during sequencer failures. If the operator goes offline or refuses to include certain transactions, what mechanisms allow users to recover, and what do those mechanisms cost?
+
+Fourth (\ref{rq:mechanisms}), \label{rq:mechanisms} we explore the costs and behaviors of fault-escape hatches and forced transaction inclusion---the safety valves built into each design.
+
+Fifth (\ref{rq:dataavailability}), \label{rq:dataavailability} we consider how the choice between on-chain and off-chain data availability affects system safety when Layer~1 is under stress.
 
 \section{Thesis Structure}
 
-The remainder of this thesis is organized as follows:
-
-\begin{itemize}
-    \item \textbf{Chapter~\ref{ch:background}} provides background on blockchain scaling, Layer~2 architectures, and the security models underlying ZK and Optimistic~Rollups.
-    \item \textbf{Chapter~\ref{ch:relatedwork}} reviews related work in Layer~2 research and identifies gaps in the existing literature.
-    \item \textbf{Chapter~\ref{ch:framework}} describes the design objectives and architecture of the proposed testing framework.
-    \item \textbf{Chapter~\ref{ch:implementation}} presents the implementation details of the ZK and Optimistic~Rollup sequencers and smart contracts.
-    \item \textbf{Chapter~\ref{ch:evaluation}} reports on the experimental setup, results, and performance comparison.
-    \item \textbf{Chapter~\ref{ch:security}} provides a security analysis covering threat models and failure-mode evaluation.
-    \item \textbf{Chapter~\ref{ch:conclusion}} summarizes the findings, offers practical recommendations, and outlines directions for future research.
-\end{itemize}
+The rest of this document is organized into seven chapters. Chapter~\ref{ch:background} lays the technical groundwork, covering blockchain fundamentals, Layer~2 scaling concepts, and the security models behind ZK and Optimistic~Rollups. Chapter~\ref{ch:relatedwork} surveys the existing literature and pinpoints the gaps our work aims to fill. Chapter~\ref{ch:framework} presents the design goals and architecture of our testing framework. Chapter~\ref{ch:implementation} walks through the implementation of the smart contracts, sequencers, dashboard, and metrics infrastructure. Chapter~\ref{ch:evaluation} reports our experimental results and discusses the measured trade-offs. Chapter~\ref{ch:security} analyzes the security properties of both architectures under the adversarial scenarios defined in our threat model. Finally, Chapter~\ref{ch:conclusion} draws conclusions, offers practical guidance for choosing a rollup architecture, and sketches directions for future research.
 
 \cleardoublepage
 
@@ -149,162 +114,127 @@ The remainder of this thesis is organized as follows:
 \chapter{Background: Layer~2 Scaling Solutions}
 \label{ch:background}
 
-This chapter provides the technical background necessary for understanding the remainder of the thesis. We begin with basic blockchain concepts, then introduce Layer~2 scaling as a general paradigm, and finally describe the two rollup architectures that form the focus of this work: ZK~Rollups and Optimistic~Rollups.
+Before we can compare ZK~Rollups and Optimistic~Rollups in a controlled experiment, we need to understand what they are, why they exist, and how they differ at a conceptual level. This chapter walks through the necessary groundwork. We start with the blockchain fundamentals that make scaling difficult in the first place, then introduce the Layer~2 idea as a general strategy, and finally describe the two rollup families that form the focus of this thesis.
 
 \section{Blockchain Fundamentals}
 
 \subsection{Bitcoin and Ethereum as Layer~1 Baselines}
 
-Bitcoin, introduced by Nakamoto~\cite{nakamoto2008bitcoin}, established the first practical proof-of-work consensus mechanism for a decentralized digital currency. Ethereum, designed by Wood~\cite{wood2014ethereum}, extended this model by adding support for Turing-complete smart contracts, enabling a wide range of decentralized applications to run on a shared global state machine.
+Bitcoin, introduced by Nakamoto~\cite{nakamoto2008bitcoin}, gave the world the first working proof-of-work consensus system---a way for strangers to agree on a shared ledger without any central authority. Ethereum, designed by Wood~\cite{wood2014ethereum}, built on that foundation by adding a general-purpose execution layer: smart contracts that allow developers to encode arbitrary logic directly into the blockchain.
 
-Despite their wide adoption, both networks are constrained by low transaction throughput:
-\begin{itemize}
-    \item Bitcoin produces a block approximately every 10~minutes, with each block limited to roughly 1~MB of data, yielding approximately 7~TPS.
-    \item Ethereum produces a block every 12~seconds, with throughput governed by gas limits rather than a fixed block size, achieving roughly 15~TPS.
-\end{itemize}
+Both networks, however, share a common limitation. Bitcoin produces a new block roughly every ten minutes, and each block holds about one megabyte of data, yielding approximately seven transactions per second. Ethereum is faster---a block every twelve seconds---but still manages only around fifteen transactions per second, because throughput is governed by a gas limit rather than a fixed block size. When demand exceeds these capacities, users bid against each other for block space, and fees climb accordingly. The total cost a user pays can be broken down as
 
-As demand increases, users compete for block space, which causes transaction fees to rise. The resulting cost structure can be expressed as:
 \begin{equation}
 \text{User Transaction Cost} = \text{Base Fee} + \text{Priority Fee} + \text{Execution Gas}
 \end{equation}
 
-This cost pressure has motivated the development of Layer~2 scaling solutions, which aim to increase throughput without modifying the base-layer protocol.
+\noindent where the base fee adjusts dynamically with network congestion, the priority fee is a tip to incentivize faster inclusion, and execution gas reflects the computational work the transaction requires.
 
 \subsection{State Transitions and Security}
 
-A blockchain can be modeled as a state machine. At each block height~$t$, the network maintains a global state~$S_t$. Transactions included in block~$t$ are applied sequentially to produce the next state:
+At its core, a blockchain is a state machine. At every block height~$t$ there exists a global state~$S_t$---the balances, contract storage, and all other on-chain data at that moment. When a new block arrives, the transactions it contains are applied one by one, producing a successor state:
 
 \begin{equation}
 S_{t+1} = \text{apply}(S_t, \text{txs}_t)
 \end{equation}
 
-The correctness and immutability of these state transitions are ensured through three complementary mechanisms:
-\begin{enumerate}
-    \item \textbf{Consensus}: nodes reach majority agreement on the ordering and validity of state transitions, typically through proof-of-work or proof-of-stake protocols;
-    \item \textbf{Finality}: once a block is sufficiently confirmed, it becomes practically irreversible, providing a cryptographic guarantee against reorganization;
-    \item \textbf{Data availability}: full nodes store and independently validate all transactions, ensuring that anyone can verify the chain's history.
-\end{enumerate}
+Three mechanisms work together to keep this process trustworthy. First, \textit{consensus}---whether proof-of-work or proof-of-stake---ensures that the majority of nodes agree on which transactions are included and in what order. Second, \textit{finality} ensures that once a block has been confirmed by enough subsequent blocks, reversing it becomes computationally or economically infeasible. Third, \textit{data availability} ensures that every full node stores and independently verifies every transaction, so anyone can audit the chain's entire history.
 
-These properties form the security foundation that Layer~2 systems seek to inherit.
+These three properties together form the security bedrock on which Layer~2 systems are built. The central question for any Layer~2 design is: how much of this security can we inherit without doing all the work ourselves?
 
 \section{Layer~2 Scaling: Core Concepts}
 
 \subsection{Off-Chain Execution with On-Chain Verification}
 
-The central idea behind Layer~2 scaling is to move the execution of transactions \textit{off-chain}---to a separate system---while retaining verification and settlement \textit{on-chain}. The general operating model proceeds as follows:
+The key insight behind Layer~2 scaling is a division of labor. Instead of executing every transaction on the slow, expensive base chain, a separate system---the Layer~2---handles execution off-chain and then posts a compact summary back to Layer~1 for verification. The workflow, at a high level, goes like this.
 
-\begin{enumerate}
-    \item A \textbf{sequencer} collects user transactions, determines their order, and executes the corresponding state transitions.
-    \item The sequencer groups many L2 transactions into a single \textbf{batch}.
-    \item A cryptographic \textbf{commitment} (either a proof or a state root) is posted to L1.
-    \item The L1 smart contract \textbf{verifies} the commitment's authenticity.
-    \item Once the L1 block containing the commitment reaches finality, the underlying L2 transactions are considered final as well.
-\end{enumerate}
+A component called the \textit{sequencer} collects incoming transactions, puts them in order, and executes them to compute a new state. Once enough transactions have accumulated, the sequencer packages them into a \textit{batch}. It then constructs a cryptographic \textit{commitment}---either a validity proof or simply a state root, depending on the architecture---and submits that commitment to a smart contract on Layer~1. The Layer~1 contract checks the commitment. If everything is in order, the batch is accepted, and once the Layer~1 block that contains the commitment reaches finality, all the transactions in the batch are considered final as well.
 
-The key scaling benefit arises from \textit{amortization}: the cost of a single L1 verification is shared across all transactions in the batch:
+The economic appeal is straightforward. The cost of one Layer~1 verification is amortized across every transaction in the batch:
+
 \begin{equation}
 \text{L2 Cost Per Transaction} = \frac{\text{L1 Batch Cost} + \text{L2 Execution Cost}}{\text{Batch Size}}
 \end{equation}
 
-As the batch size grows, the per-transaction cost decreases, making L2 transactions significantly cheaper than equivalent L1 transactions.
+\noindent A batch of a hundred transactions means each one costs roughly a hundredth of an L1 submission. A batch of a thousand cuts the cost even further. This is the mechanism through which Layer~2 systems make blockchain transactions affordable.
 
 \section{ZK Rollups: Validity Proofs}
 
 \subsection{Architecture}
 
-A ZK~Rollup uses zero-knowledge cryptographic proofs to assert the correctness of state transitions. Rather than relying on any trust assumption about the sequencer's honesty, the system requires a mathematical proof that the proposed state change is valid. The key components are:
+A ZK~Rollup takes the ``trust no one'' approach to its logical conclusion. Instead of asking the network to trust that the sequencer computed the new state correctly, the system demands a cryptographic \textit{proof}---a compact mathematical certificate that anyone can verify but that is practically impossible to forge for an incorrect state transition. The architecture has three central elements.
 
-\begin{itemize}
-    \item \textbf{Prover}: a component that generates a zero-knowledge proof for each batch of transactions;
-    \item \textbf{L1 Verifier}: a smart contract deployed on L1 that checks the cryptographic validity of the submitted proof;
-    \item \textbf{State commitment}: only one valid successor state exists for each batch, as determined by the proof.
-\end{itemize}
+The \textit{prover} is the component responsible for generating a zero-knowledge proof for each batch. It takes the old state, the batch of transactions, and the resulting new state, and produces a proof~$\pi$ attesting that the transition is valid:
 
-Formally, the prover constructs a proof~$\pi$ attesting that a batch of transactions transforms the old state into the new state:
 \begin{equation}
 \pi = \text{ZK-SNARK}(\text{state}_{\text{old}}, \text{txs}, \text{state}_{\text{new}})
 \end{equation}
 
-The L1 verifier contract then checks the proof:
+The \textit{L1 verifier} is a smart contract deployed on the base chain. When the sequencer submits a commitment, the verifier checks the accompanying proof against the claimed state roots:
+
 \begin{equation}
 \text{Verify}(\pi, \text{state}_{\text{old}}, \text{state}_{\text{new}}) \rightarrow \{\text{ACCEPT}, \text{REJECT}\}
 \end{equation}
 
-If verification succeeds, the new state is accepted on L1. Otherwise, the submission is rejected and the previous valid state is retained.
+\noindent If verification succeeds, the new state root is recorded on Layer~1 and the commitment becomes eligible for finality. If the proof is invalid---whether because the sequencer made an honest error or deliberately tried to cheat---the submission is rejected outright, and the chain continues from the last accepted state.
+
+The third element is the \textit{state commitment} itself. Because the proof uniquely determines the correct successor state for a given batch, there is exactly one valid outcome. There is no ambiguity, no room for dispute, and no need to wait and see whether someone objects.
+
+Production ZK~Rollups such as Scroll~\cite{zksync-paper} follow this pattern closely. Scroll's \texttt{ZkEvmVerifierV1} contract, for instance, stores a verifying key derived from a trusted setup ceremony and delegates proof checking to an on-chain Groth16 verifier that calls the BN254 elliptic-curve pairing precompile. Our framework's \texttt{ZKVerifier} contract (Chapter~\ref{ch:implementation}) mirrors this interface---it accepts a state root and a proof, binds the proof to a mock verifying key hash, and records the commitment for later finality checks.
 
 \subsection{Security Model}
 
-The security of a ZK~Rollup rests on what is often called the \textit{one-honest-prover assumption}: as long as at least one party is capable of generating a valid proof, the system remains secure. This is because the L1 verifier contract enforces correctness cryptographically---an invalid proof will always be rejected, regardless of who submitted it.
+The security of a ZK~Rollup rests on what is often called the \textit{one-honest-prover assumption}. As long as at least one party in the network can generate a valid proof, the system remains safe. The reason is simple: the Layer~1 verifier enforces correctness by mathematics, not by reputation. A proof is either valid or it is not. A dishonest prover cannot produce a valid proof for an invalid state transition (assuming the underlying cryptographic scheme is sound), and an honest prover can always produce a valid proof for a correct one.
 
-In the event that a malicious prover submits an invalid proof:
-\begin{itemize}
-    \item the L1 verifier detects the invalidity and rejects the state commitment;
-    \item the system continues operating from the last accepted valid state;
-    \item no user funds are at risk, since the invalid state never takes effect on L1.
-\end{itemize}
+If a malicious prover does submit an invalid proof, the Layer~1 verifier detects the mismatch and rejects the commitment. The system keeps running from the last verified state. No user funds are put at risk, because the fraudulent state never takes effect on Layer~1. Detection is automatic and nearly instantaneous---there is no waiting period, no dispute game, and no reliance on economic incentives.
 
-A key advantage of this model is that finality is achieved shortly after L1 block inclusion. On Ethereum, this corresponds to approximately 12~seconds of block time plus the time needed for sufficient confirmations, yielding a total finality time of roughly 15~seconds.
+Finality in a ZK~Rollup is achieved shortly after the proof is included in a Layer~1 block. On Ethereum, that means roughly twelve seconds of block time plus a short confirmation window. In our framework we use a five-block confirmation threshold (Section~\ref{ch:implementation}), which in a local Hardhat environment takes only a few seconds.
 
 \subsection{Challenges}
 
-Despite their strong security properties, ZK~Rollups face several practical challenges:
-\begin{itemize}
-    \item \textbf{Proof generation cost}: generating a zero-knowledge proof is computationally expensive, typically requiring 50--500~ms per batch depending on complexity;
-    \item \textbf{Prover scalability}: production deployments often require specialized hardware (GPUs or FPGAs) to generate proofs at scale;
-    \item \textbf{Verification gas cost}: on-chain proof verification involves elliptic curve pairing operations, which consume between 200K and 500K gas;
-    \item \textbf{Circuit complexity}: application logic must be expressed as arithmetic circuits, which requires specialized expertise.
-\end{itemize}
+For all their elegance, ZK~Rollups carry real practical burdens. Generating a zero-knowledge proof is computationally heavy---production systems require specialized hardware such as GPUs or FPGAs, and even then, proof generation for a complex batch can take hundreds of milliseconds to several seconds. On-chain verification is not free either: the elliptic-curve pairing operations at the heart of Groth16 verification consume between 200K and 500K gas on Ethereum. And perhaps the steepest barrier is the engineering effort: application logic must be expressed as arithmetic circuits, a paradigm quite removed from conventional programming and one that demands specialized expertise.
+
+Despite these hurdles, proof systems are improving rapidly. PLONK, STARK, and their successors promise shorter proof times, smaller proof sizes, and in some cases the elimination of the trusted setup ceremony altogether.
 
 \section{Optimistic Rollups: Fraud Proofs}
 
 \subsection{Architecture}
 
-An Optimistic~Rollup takes a fundamentally different approach: it assumes that the sequencer is honest by default and allows any observer to dispute invalid state proposals after the fact. The key components are:
+Where ZK~Rollups prove correctness up front, Optimistic~Rollups take the opposite bet: they \textit{assume} the sequencer is honest and only intervene if someone can demonstrate otherwise. The name ``optimistic'' captures the philosophy---accept the sequencer's word by default, and only go to the trouble of checking if a watcher raises the alarm.
 
-\begin{itemize}
-    \item \textbf{Sequencer}: orders and executes transactions, then posts a state root to L1 without an accompanying proof;
-    \item \textbf{Challenge period}: a fixed time window (typically 7~days in production systems) during which any party may submit a fraud proof;
-    \item \textbf{Fraud prover}: an observer who provides an execution trace demonstrating that a posted state root is invalid;
-    \item \textbf{Dispute resolution}: the L1 contract re-executes the disputed portion of the state transition to determine which party is correct.
-\end{itemize}
+The sequencer in an Optimistic~Rollup does the same job as in a ZK~Rollup: it collects transactions, orders them, and computes a new state root. The difference is in what it sends to Layer~1. Instead of attaching a cryptographic proof, it simply posts the state root on its own and opens a \textit{challenge period}---a window of time during which anyone can object. In production systems like Optimism and Arbitrum, this window is seven days long. In our framework's demo environment, we compress it to ten Layer~1 blocks (roughly two minutes on a local Hardhat node) to keep experiments responsive.
 
-A state commitment in this model takes the form:
+If an observer believes the sequencer posted a wrong state root, they can submit a \textit{fraud proof}. Production systems implement this as an interactive dispute game: the challenger and the sequencer narrow the disagreement down to a single computational step, and then the Layer~1 contract re-executes that step to decide who is right. Optimism uses its Cannon virtual machine for this; Arbitrum uses a similar mechanism through its WAVM-based \texttt{OneStepProver} contracts. Our \texttt{OptimisticVerifier} contract models this flow at a structural level---it supports both a simple \texttt{challenge()} call and a more detailed \texttt{submitFraudProof()} function that records the challenger's claimed correct state root (Chapter~\ref{ch:implementation}).
+
+A commitment that survives its challenge period unchallenged transitions from a ``soft-final'' state (optimistically accepted, but still revocable) to ``hard-final'' (irreversibly settled on Layer~1). Our contract exposes this lifecycle explicitly through a \texttt{getFinalityStatus()} function that returns one of four states: \texttt{PENDING}, \texttt{SOFT\_FINAL}, \texttt{HARD\_FINAL}, or \texttt{CHALLENGED}.
+
+Formally, a state commitment takes the shape
+
 \begin{equation}
 C_i = (S_{\text{root}}, \text{batch}_i, L1_{\text{block}_i})
 \end{equation}
 
-If the challenge period expires without a valid fraud proof being submitted, the state commitment is finalized:
+\noindent and if the challenge window closes with no valid fraud proof, the commitment reaches finality:
+
 \begin{equation}
 S_{\text{root}_i} \rightarrow \text{FINALIZED}
 \end{equation}
 
 \subsection{Security Model}
 
-The security of an Optimistic~Rollup relies on the \textit{at-least-one-honest-challenger assumption}: the system is secure as long as at least one participant is both willing and able to detect and challenge invalid state proposals within the challenge period.
+The security guarantee of an Optimistic~Rollup is sometimes described as the \textit{at-least-one-honest-challenger assumption}. The system stays safe as long as there exists at least one participant who is both watching the chain and willing to submit a fraud proof when something is wrong.
 
-If a malicious sequencer submits an invalid state root:
-\begin{itemize}
-    \item an honest challenger detects the discrepancy by independently re-executing the transactions;
-    \item the challenger submits a fraud proof containing the relevant execution trace;
-    \item the L1 contract verifies the fraud proof by re-executing the disputed transaction;
-    \item upon confirmation of fraud, the invalid state is reverted and the dishonest sequencer is penalized (typically through collateral slashing).
-\end{itemize}
+Consider a scenario where the sequencer posts a fraudulent state root. An honest challenger, running their own copy of the Layer~2 execution, notices that the root does not match the state they computed independently. They submit a fraud proof. The Layer~1 contract resolves the dispute by re-executing the contested step. If the challenger is right, the fraudulent state is thrown out and the sequencer is penalized---typically by having posted collateral slashed.
 
-Unlike ZK~Rollups, finality in an Optimistic~Rollup is delayed: a state commitment is not considered final until the entire challenge period has elapsed without dispute. In production, this means that true finality requires approximately 7~days.
+The critical difference from a ZK~Rollup is that this entire process plays out over the challenge period. Until that window closes, the state is not truly final. Users who want to withdraw funds to Layer~1 must either wait out the full window or pay a fee to a third-party liquidity provider who offers an instant exit in exchange for bearing the finality risk.
 
 \subsection{Challenges}
 
-Optimistic~Rollups present their own set of practical challenges:
-\begin{itemize}
-    \item \textbf{Withdrawal latency}: users who wish to move funds back to L1 must wait for the full challenge period to expire;
-    \item \textbf{Data publication requirements}: all transaction data must be posted to L1 so that challengers can independently reconstruct and verify the state;
-    \item \textbf{Fraud proof complexity}: implementing correct interactive dispute games for general-purpose computation (such as the Cannon~VM used by Optimism) is technically demanding;
-    \item \textbf{Liquidity fragmentation}: to avoid the 7-day wait, users often rely on third-party liquidity providers who charge a fee for instant exits.
-\end{itemize}
+The most visible drawback of an Optimistic~Rollup is the waiting time. Seven days is a long time to withdraw funds, and while liquidity providers can bridge the gap, their fees erode the cost savings that Layer~2 was supposed to deliver---especially for small transactions. Beyond that, the challenge mechanism only works if the full transaction data is published to Layer~1, so that independent observers can reconstruct the state and verify it. This data publication requirement adds cost. And building a correct, secure interactive dispute game for general-purpose smart contract execution is an extraordinary engineering challenge. The teams behind Cannon and the WAVM one-step provers have invested years of work into code that is still evolving.
 
 \section{Comparative Overview}
 
-Table~\ref{tab:comparison-overview} summarizes the key differences between ZK~Rollups and Optimistic~Rollups across several important dimensions. These differences motivate the need for a systematic empirical comparison, which is the goal of this thesis.
+Table~\ref{tab:comparison-overview} draws the key contrasts between the two architectures at a glance. The ZK~Rollup trades computational overhead for instant, cryptographic finality. The Optimistic~Rollup trades fast finality for cheaper, simpler submissions. Neither dominates the other in every dimension, and the right choice depends on what the application values most. The rest of this thesis is devoted to measuring these trade-offs concretely rather than reasoning about them in the abstract.
 
 \begin{table}[h]
     \centering
@@ -312,20 +242,20 @@ Table~\ref{tab:comparison-overview} summarizes the key differences between ZK~Ro
         \hline
         \textbf{Aspect} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Trade-off} \\
         \hline
-        Finality & Instant (~15s) & Delayed (7 days) & ZK favors speed \\
+        Finality & Fast ($\sim$15s) & Delayed (7 days) & ZK favors speed \\
         \hline
-        Proof Type & Validity (ZK-SNARK) & Fraud (execution) & ZK cryptographic \\
+        Proof type & Validity (ZK-SNARK) & Fraud (execution) & Different trust models \\
         \hline
-        Proof Required & Yes (95--500ms) & No & Optimistic faster \\
+        Proof at submission & Yes & No & Optimistic simpler \\
         \hline
-        Security Model & 1-of-N honest & N-of-1 honest & Different assumptions \\
+        Security model & 1-of-N honest prover & 1-of-N honest challenger & Both need one honest party \\
         \hline
-        L1 Gas & Higher & Lower & Optimistic cheaper \\
+        L1 gas per batch & Higher & Lower & Optimistic cheaper \\
         \hline
-        Withdrawal & Instant & 7 days & ZK favors UX \\
+        Withdrawal time & Instant & 7 days (or pay a fee) & ZK favors UX \\
         \hline
     \end{tabular}
-    \caption{ZK vs Optimistic Rollup comparison}
+    \caption{High-level comparison of ZK and Optimistic Rollup architectures}
     \label{tab:comparison-overview}
 \end{table}
 
@@ -337,67 +267,65 @@ Table~\ref{tab:comparison-overview} summarizes the key differences between ZK~Ro
 \chapter{Related Work}
 \label{ch:relatedwork}
 
-This chapter surveys the existing academic literature and industry implementations relevant to Layer~2 scaling. We first review key research contributions on rollup architectures, then examine prominent production systems, and conclude with a gap analysis that situates our work within the broader research landscape.
+This chapter surveys the academic literature and industry implementations that inform our comparative evaluation. We begin by reviewing key research contributions on rollup architectures, then examine the most prominent production systems deployed on Ethereum mainnet, and conclude with a gap analysis that positions our work within the broader research landscape.
 
 \section{Academic Research on Layer~2 Protocols}
 
 \subsection{Systematization of Knowledge}
 
-Thibault et al.~\cite{sok-layer2} provide what is, to our knowledge, the most comprehensive systematization of Layer~2 blockchain protocols. Their taxonomy categorizes solutions into four families:
-\begin{itemize}
-    \item \textbf{Payment channels}: bidirectional off-chain channels such as the Lightning Network and Raiden;
-    \item \textbf{Sidechains}: semi-independent chains such as Plasma and commit-chains;
-    \item \textbf{Rollups}: both ZK~Rollups and Optimistic~Rollups;
-    \item \textbf{Hybrid approaches}: designs such as Validium and Volition that combine on-chain and off-chain data availability.
-\end{itemize}
+Thibault et al.~\cite{sok-layer2} provide what is, to our knowledge, the most thorough systematization of Layer~2 blockchain protocols. Their taxonomy organizes the design space into four families. Payment channels, exemplified by the Lightning Network and Raiden, enable bidirectional off-chain transfers between fixed pairs of participants. Sidechains, including Plasma and various commit-chain designs, operate as semi-independent chains that periodically anchor their state to the parent chain. Rollups, encompassing both the ZK and Optimistic variants, post transaction data on-chain while moving execution off-chain. Finally, hybrid approaches such as Validium and Volition blend on-chain and off-chain data availability to offer users a configurable trade-off between cost and security.
 
-While their analysis covers security properties and theoretical throughput, it does not include empirical evaluation of behavior under failure conditions.
+While this systematization provides a valuable conceptual map and analyses security properties at a theoretical level, it does not include empirical measurement of how these systems behave when confronted with real failure conditions. The absence of controlled experimentation leaves open the question of whether the theoretical security guarantees translate into practical resilience.
 
 \subsection{ZK Rollup Research}
 
-B\"unz et al.~\cite{zk-efficient-proofs} introduced Bulletproofs, a proof system that enables efficient zero-knowledge range proofs without requiring a trusted setup ceremony. Subsequent work extended this line of research to SNARKs suitable for general computation verification.
+B\"unz et al.~\cite{zk-efficient-proofs} introduced Bulletproofs, a proof system that generates efficient zero-knowledge range proofs without requiring a trusted setup ceremony. By eliminating the trusted setup, Bulletproofs removed a significant barrier to deploying zero-knowledge schemes in decentralized settings. Subsequent research extended this line of work toward SNARKs capable of verifying general computation, enabling the construction of ZK~Rollups that can process arbitrary smart contract logic on Layer~2.
 
-Gluchowski et al.~\cite{zksync-paper} published the design of zkSync, a production-grade ZK~Rollup. Their work focuses primarily on proof system optimizations and compatibility with the Ethereum Virtual Machine (EVM).
+Gluchowski et al.~\cite{zksync-paper} published the architectural design of zkSync, a production-grade ZK~Rollup built on a PLONK-based proof system. Their contribution centers on proof generation optimizations and strategies for achieving compatibility with the Ethereum Virtual Machine, a challenge that has shaped the design of every major ZK~Rollup since. Our own \texttt{ZKVerifier} contract draws on similar patterns from the Scroll project's \texttt{ZkEvmVerifierV1}, which itself belongs to this lineage of Groth16 and PLONK-based verification architectures.
 
-However, neither of these works provides a systematic evaluation of ZK~Rollup finality behavior under conditions such as L1 chain reorganizations.
+Despite these advances in proof system design, neither body of work provides a systematic evaluation of ZK~Rollup finality behavior under adverse conditions such as Layer~1 chain reorganizations or sequencer outages. The performance characteristics of ZK~Rollups in the presence of failure remain largely uncharted territory.
 
 \subsection{Optimistic Rollup Research}
 
-Kalodner et al.~\cite{arbitrum-original} introduced Arbitrum, one of the first widely deployed Optimistic~Rollups. Their principal contribution is the \textit{interactive fault game}---a multi-round dispute protocol that reduces the amount of computation the L1 contract must re-execute to resolve a challenge.
+Kalodner et al.~\cite{arbitrum-original} introduced Arbitrum, one of the earliest and most widely deployed Optimistic~Rollups. Their principal contribution is the \textit{interactive fault game}, a multi-round dispute protocol that progressively narrows the scope of disagreement until the Layer~1 contract needs to re-execute only a single instruction to determine whether the challenged state transition was valid. This approach dramatically reduces the on-chain cost of dispute resolution compared to re-executing the entire batch.
 
-Although sequencer liveness and censorship resistance are discussed in their design documents, these properties have not been empirically evaluated in a controlled setting. Moreover, the costs associated with failure recovery mechanisms remain largely unquantified in the existing literature.
+Our framework's \texttt{OptimisticVerifier} contract incorporates patterns drawn from both the Optimism Bedrock \texttt{OptimismPortal2} and the Arbitrum Nitro \texttt{RollupCore}, including a configurable challenge period through which commitments must pass before reaching finality. In the thesis implementation, this period is set to ten blocks, a deliberately compressed value that preserves the architectural semantics of production systems while keeping experimental turnaround times manageable.
+
+Although Kalodner et al.\ discuss sequencer liveness and censorship resistance in their design documents, these properties have not been empirically evaluated in a controlled setting. The costs associated with failure recovery mechanisms---how long it takes a system to resume normal operation after a sequencer crash, and how much additional gas is consumed during the recovery process---remain largely unquantified in the existing literature.
 
 \section{Industry Implementations}
 
-Several production Layer~2 systems are currently deployed on Ethereum mainnet. We briefly review the most prominent ones, as they provide context for the design choices made in our framework.
+Several production Layer~2 systems are currently deployed on Ethereum mainnet. We review the most prominent ones here, as they provide direct context for the design choices made in our framework.
 
 \subsection{Arbitrum}
 
-Arbitrum is a production Optimistic~Rollup featuring an interactive fraud proof mechanism (implemented via the Cannon~VM), a 7-day challenge period, and sequencer failover to a decentralized validator set. It is widely used for decentralized finance (DeFi), NFT marketplaces, and gaming applications.
+Arbitrum is the most widely adopted Optimistic~Rollup to date. Its architecture features an interactive fraud proof mechanism, now implemented through the Cannon virtual machine, combined with a seven-day challenge period that gives honest validators ample time to detect and dispute invalid state transitions. The system includes sequencer failover capabilities that allow a decentralized validator set to take over transaction ordering if the centralized sequencer goes offline. Arbitrum hosts a broad ecosystem of decentralized finance protocols, NFT marketplaces, and gaming applications, and its transaction volume regularly approaches or exceeds that of Ethereum mainnet itself.
 
 \subsection{Optimism}
 
-Optimism is another production Optimistic~Rollup, optimized for EVM equivalence. Its OP~Stack initiative provides a modular framework for deploying custom rollup instances, and its governance roadmap includes plans for decentralized sequencer coordination.
+Optimism takes a different strategic approach within the same Optimistic~Rollup paradigm. Rather than focusing solely on a single chain, the project has developed the OP~Stack, a modular software framework that allows third parties to deploy custom rollup instances sharing a common security model and bridging infrastructure. This initiative, known as the Superchain vision, has spawned numerous independent chains including Base, Zora, and Mode. Optimism's emphasis on EVM equivalence means that existing Ethereum smart contracts can be deployed on its network with minimal or no modification. Our framework's \texttt{OptimisticVerifier} contract borrows structural patterns from Optimism's Bedrock upgrade, particularly the multi-state finality model that distinguishes between pending, soft-final, and hard-final commitments.
 
 \subsection{zkSync and StarkNet}
 
-zkSync and StarkNet represent two leading production ZK~Rollups. zkSync uses a PLONK-based proof system and aims for full EVM compatibility. StarkNet employs the Cairo programming language and its proprietary STARK proof system, and offers a Volition mode that allows users to choose between on-chain and off-chain data availability.
+zkSync and StarkNet represent two leading production ZK~Rollups, each pursuing a distinct proof system strategy. zkSync employs a PLONK-based proof system and targets full EVM compatibility, allowing developers to write and deploy contracts in Solidity without learning a new language. StarkNet, by contrast, uses the Cairo programming language and its proprietary STARK proof system. STARKs offer the advantage of requiring no trusted setup and scaling more efficiently for very large computations, though they produce larger proofs than their SNARK counterparts. StarkNet also offers a Volition mode that allows users to choose on a per-transaction basis whether their data should be stored on-chain for maximum security or off-chain for lower cost.
 
-A common observation across all of these production systems is that they are primarily optimized for normal-case performance. Behavior under failure scenarios---such as sequencer crashes, malicious state proposals, or L1 congestion---receives comparatively little attention in their public documentation.
+A recurring observation across all of these production systems is that they are primarily optimized for normal-case performance. Their documentation and public benchmarks focus overwhelmingly on throughput under ideal conditions, while behavior under failure scenarios---sequencer crashes, malicious state proposals, Layer~1 congestion events---receives comparatively little attention. This optimization bias toward the happy path is understandable from a product perspective, but it leaves a significant gap in our understanding of how these architectures perform when things go wrong.
 
 \section{Gap Analysis}
 
-Based on the review above, we identify five areas where current literature and production systems lack empirical evaluation:
+Drawing together the academic literature and industry implementations reviewed above, we identify five areas where the current body of knowledge lacks empirical evaluation.
 
-\begin{enumerate}
-    \item \label{gap:finality} Actual finality time measurements across a range of L1 conditions;
-    \item \label{gap:recovery} Concrete costs and durations of recovery mechanisms under various failure modes;
-    \item \label{gap:censorship} Empirical assessment of censorship resistance capabilities;
-    \item \label{gap:comparison} A quantified, head-to-head comparison of ZK and Optimistic~Rollups conducted under identical experimental conditions;
-    \item \label{gap:reproducibility} An open-source, reproducible testbed that enables other researchers to extend and replicate the evaluation.
-\end{enumerate}
+The first gap concerns \textit{finality time measurement} \label{gap:finality}. While the theoretical finality properties of both rollup families are well understood, actual finality latencies under varying Layer~1 conditions---including congestion, fluctuating gas prices, and chain reorganizations---have not been systematically measured. Our framework addresses this gap by recording the precise block number at which each commitment is submitted and the block number at which it reaches finality, enabling exact measurement across diverse scenarios.
 
-This thesis addresses gaps~\ref{gap:finality}, \ref{gap:recovery}, \ref{gap:comparison}, and~\ref{gap:reproducibility}. Gap~\ref{gap:censorship} is discussed qualitatively in our security analysis but is left for future empirical work.
+The second gap involves \textit{recovery cost quantification} \label{gap:recovery}. When a sequencer crashes or the Layer~1 connection is temporarily lost, the system must recover gracefully and resume normal operation. The time and gas costs associated with this recovery process have not been empirically studied. Our adversarial test suite includes dedicated crash-and-restart scenarios for both sequencer types, capturing the resources consumed during recovery.
+
+The third gap relates to \textit{censorship resistance} \label{gap:censorship}. The ability of honest users to force-include their transactions when a sequencer attempts to censor them is a critical property that existing research discusses primarily in theoretical terms. While our framework does not include a full empirical censorship resistance evaluation, we address this gap qualitatively in our security analysis and identify it as a direction for future work.
+
+The fourth gap is the absence of a \textit{controlled head-to-head comparison} \label{gap:comparison}. Existing benchmarks typically evaluate a single rollup architecture in isolation, making it difficult to draw meaningful comparisons. Our framework runs both sequencers against the same Layer~1 node simultaneously, ensuring that they experience identical block timing, gas pricing, and network conditions, thereby enabling a genuinely fair comparison.
+
+The fifth and final gap concerns \textit{reproducibility} \label{gap:reproducibility}. Much of the existing performance data for Layer~2 systems comes from mainnet observations or proprietary benchmarks that other researchers cannot replicate. Our entire framework is open-source and deployable with a single Docker Compose command, allowing any researcher to reproduce our experiments, verify our results, and extend the evaluation to additional rollup architectures.
+
+This thesis directly addresses the first, second, fourth, and fifth gaps through its framework design, adversarial test suite, and open-source release. The third gap is explored qualitatively and left for future empirical investigation.
 
 \cleardoublepage
 
@@ -407,25 +335,21 @@ This thesis addresses gaps~\ref{gap:finality}, \ref{gap:recovery}, \ref{gap:comp
 \chapter{Framework Design and Architecture}
 \label{ch:framework}
 
-This chapter describes the design objectives, system architecture, and operating principles of the proposed testing framework. The framework is designed to enable a fair, reproducible comparison of ZK~Rollups and Optimistic~Rollups under both normal and adversarial conditions.
+This chapter describes the design objectives, system architecture, and operating principles of the proposed testing framework. The framework enables a fair and reproducible comparison of ZK~Rollups and Optimistic~Rollups under both normal and adversarial conditions, while remaining accessible to researchers who wish to replicate or extend the experiments on standard hardware.
 
 \section{Design Objectives}
 
 \subsection{Requirements}
 
-The framework was designed to satisfy the following primary requirements:
+Five requirements guided the design of the framework. The foremost requirement is \textit{comparative evaluation}: both rollup architectures must operate against the same Layer~1 node under identical conditions so that any observed differences in performance or resilience reflect genuine architectural properties rather than environmental artifacts. Closely related is the requirement for \textit{reproducibility}, which mandates that the entire testbed be open-source and deployable with a single command, enabling other researchers to replicate our experiments without encountering hidden dependencies or undocumented configuration steps.
 
-\begin{enumerate}
-    \item \textbf{Comparative evaluation}: both rollup architectures must operate under identical L1 conditions to ensure a fair comparison;
-    \item \textbf{Reproducibility}: the entire testbed must be open-source and deployable with a single command, allowing other researchers to replicate and extend the experiments;
-    \item \textbf{Extensibility}: the architecture should accommodate additional L2 designs (such as Plasma or Validium) with minimal modification;
-    \item \textbf{Observability}: the framework must export rich metrics covering performance, latency, and security-relevant events;
-    \item \textbf{Accessibility}: deployment should not require specialized infrastructure beyond a standard development machine with Docker.
-\end{enumerate}
+The third requirement, \textit{extensibility}, ensures that the architecture can accommodate additional Layer~2 designs---such as Plasma or Validium variants---with minimal modification to existing components. Each sequencer is an independent process communicating with the Layer~1 node through a well-defined contract interface, so adding a new rollup type amounts to writing a new sequencer and its corresponding verifier contract.
+
+The fourth requirement is \textit{observability}. The framework must export rich metrics covering throughput, latency, batching behavior, and security-relevant events, because a comparative evaluation is only as useful as the data it produces. Finally, \textit{accessibility} stipulates that deployment should not require specialized infrastructure beyond a standard development machine running Docker, keeping the barrier to entry low for academic use.
 
 \subsection{Evaluation Dimensions}
 
-Table~\ref{tab:eval-dimensions} summarizes the dimensions along which the framework evaluates each rollup architecture, together with the corresponding metrics and measurement techniques.
+Table~\ref{tab:eval-dimensions} summarizes the dimensions along which the framework evaluates each rollup architecture, together with the corresponding metrics and measurement techniques. These dimensions were chosen to cover the three pillars of our evaluation: performance, cost, and security.
 
 \begin{table}[h]
     \centering
@@ -452,16 +376,13 @@ Table~\ref{tab:eval-dimensions} summarizes the dimensions along which the framew
 
 \subsection{Component Overview}
 
-The framework comprises four major components, each fulfilling a distinct role in the evaluation pipeline:
+The framework comprises four major components. The first is a \textit{Layer~1 simulation} provided by a local Hardhat Ethereum node that hosts both the \texttt{ZKVerifier} and \texttt{OptimisticVerifier} smart contracts. Because both contracts reside on the same chain instance, any simulated congestion or block-timing variation affects both rollups equally.
 
-\begin{enumerate}
-    \item \textbf{Layer~1 simulation}: a Hardhat local Ethereum node running the verifier smart contracts;
-    \item \textbf{Layer~2 sequencers}: two independent Python processes implementing the ZK and Optimistic~Rollup logic, respectively;
-    \item \textbf{Web dashboard}: a Flask-based application providing real-time monitoring and scenario triggers;
-    \item \textbf{Observability stack}: a Prometheus instance for metrics collection paired with Grafana for visualization.
-\end{enumerate}
+The second component consists of two independent \textit{Layer~2 sequencers}, each implemented as a Python process with a Flask HTTP interface. The ZK sequencer listens on port~5000 and the Optimistic sequencer on port~5001; both connect to the shared Hardhat node on port~8545. Running the sequencers as separate processes ensures that a crash or slowdown in one does not contaminate the other's measurements.
 
-Figure~\ref{fig:architecture} illustrates how these components interact. Both sequencers submit their commitments to the same L1 node, ensuring that they experience identical L1 conditions (block timing, gas pricing, and any simulated congestion).
+The third component is a \textit{web dashboard}, also built with Flask, that provides real-time monitoring of both sequencers and exposes controls for triggering adversarial test scenarios from a browser. The fourth component is the \textit{observability stack}, consisting of a Prometheus instance that scrapes metrics from each sequencer's dedicated exporter endpoint (ports~9100 and~9101 respectively) and a Grafana instance that renders the collected time-series data into comparative dashboards.
+
+Figure~\ref{fig:architecture} illustrates how these components interact. The vertical flow from user through sequencers to the Layer~1 node and then into the monitoring stack captures the complete lifecycle of a transaction in the framework.
 
 \begin{figure}[h]
     \centering
@@ -505,7 +426,7 @@ Figure~\ref{fig:architecture} illustrates how these components interact. Both se
 
 \subsection{Technology Stack}
 
-Table~\ref{tab:tech-stack} lists the technologies used for each component, along with a brief justification for their selection. The primary criteria were maturity, ease of integration, and suitability for rapid prototyping within an academic context.
+Table~\ref{tab:tech-stack} lists the technologies used for each component along with the rationale for their selection. The primary criteria were maturity, ease of integration, and suitability for rapid prototyping within an academic context. Every tool in the stack is open-source and well-documented, which supports the reproducibility requirement established in Section~\ref{ch:framework}.
 
 \begin{table}[h]
     \centering
@@ -536,25 +457,15 @@ Table~\ref{tab:tech-stack} lists the technologies used for each component, along
 
 \subsection{Transaction Flow}
 
-A transaction passes through the following stages from submission to finality:
+A transaction in the framework follows a clearly defined path from submission to finality. The journey begins when a user or an automated test scenario sends a transaction to one of the Layer~2 sequencers via an HTTP POST request. The sequencer performs basic validation on the incoming data and, if the transaction is well-formed, adds it to its pending transaction pool.
 
-\begin{enumerate}
-    \item \textbf{Submission}: a user or automated test scenario sends a transaction to the L2 sequencer via an HTTP POST request.
-    \item \textbf{Validation}: the sequencer performs basic syntactic and semantic checks on the transaction.
-    \item \textbf{Mempool}: the validated transaction is added to the sequencer's pending transaction pool.
-    \item \textbf{Batching}: once the pool reaches a configurable threshold (100~transactions for ZK, 200 for Optimistic), a new batch is created.
-    \item \textbf{Commitment}:
-    \begin{itemize}
-        \item In the ZK~Rollup, a zero-knowledge proof is generated and submitted to L1 together with the new state root.
-        \item In the Optimistic~Rollup, only the state root is submitted to L1; no proof is attached.
-    \end{itemize}
-    \item \textbf{L1 verification}: the corresponding L1 contract verifies the commitment.
-    \item \textbf{Finality}: the transaction is considered final once the L1 block containing the commitment reaches finality and all architecture-specific security conditions are satisfied.
-\end{enumerate}
+Transactions accumulate in the pool until the number of pending items reaches a configurable batch threshold---one hundred transactions for the ZK sequencer, two hundred for the Optimistic sequencer. At that point the sequencer drains the pool and assembles a new batch. The commitment step is where the two architectures diverge most visibly. In the ZK~Rollup path, the sequencer computes a SHA-256 hash of the batch to derive the state root and then generates a proof that is submitted alongside the state root to the \texttt{ZKVerifier} contract on Layer~1. In the Optimistic~Rollup path, only the state root is submitted to the \texttt{OptimisticVerifier} contract; no accompanying proof is required at submission time, because the security model relies on a post-hoc challenge mechanism rather than upfront verification.
+
+Once the Layer~1 contract records the commitment, finality depends on the architecture. For the ZK~Rollup, the commitment is considered final after the proof has been verified and five additional blocks have elapsed on the Layer~1 chain. For the Optimistic~Rollup, finality requires that the full ten-block challenge period passes without a successful fraud proof submission.
 
 \subsection{Batching Strategy}
 
-The batching strategy seeks to balance throughput (frequent submissions) against L1 cost efficiency (larger batches). Algorithm~1 describes the batch creation loop used by both sequencers.
+The batching strategy seeks to balance throughput against Layer~1 cost efficiency. Submitting batches more frequently reduces the time individual transactions spend waiting in the pool, but each Layer~1 submission incurs gas costs that are better amortized over larger batches. Algorithm~1 describes the batch creation loop that both sequencers execute.
 
 \begin{algorithm}
     \caption{Batch Creation Loop}
@@ -572,13 +483,7 @@ The batching strategy seeks to balance throughput (frequent submissions) against
     \end{algorithmic}
 \end{algorithm}
 
-The algorithm is parameterized differently for each rollup type:
-\begin{itemize}
-    \item \textbf{ZK~Rollup}: $\textit{BATCH\_THRESHOLD} = 100$, $\textit{BATCH\_INTERVAL} = 5$~seconds.
-    \item \textbf{Optimistic~Rollup}: $\textit{BATCH\_THRESHOLD} = 200$, $\textit{BATCH\_INTERVAL} = 8$~seconds.
-\end{itemize}
-
-The Optimistic~Rollup uses a larger batch size and longer interval because it does not incur the computational overhead of proof generation, and benefits more from amortizing L1 submission costs over a larger number of transactions.
+The algorithm is parameterized differently for each rollup type. The ZK sequencer operates with $\textit{BATCH\_THRESHOLD} = 100$ and $\textit{BATCH\_INTERVAL} = 5$~seconds, while the Optimistic sequencer uses $\textit{BATCH\_THRESHOLD} = 200$ and $\textit{BATCH\_INTERVAL} = 8$~seconds. The Optimistic~Rollup benefits from a larger batch size and a longer polling interval because it does not incur the computational overhead of proof generation at submission time. Without that bottleneck, it can afford to accumulate more transactions per batch and thereby amortize the fixed gas cost of each Layer~1 submission over a greater number of transactions. Conversely, the ZK sequencer uses a smaller batch and shorter interval to keep finality latency low, since its proofs allow commitments to reach finality without waiting for a challenge window.
 
 \cleardoublepage
 
