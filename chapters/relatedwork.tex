@@ -1,0 +1,65 @@
+% =========================================
+% CHAPTER 3: RELATED WORK
+% =========================================
+\chapter{Related Work}
+\label{ch:relatedwork}
+
+This chapter surveys the academic literature and industry implementations that inform our comparative evaluation. We begin by reviewing key research contributions on rollup architectures, then examine the most prominent production systems deployed on Ethereum mainnet, and conclude with a gap analysis that positions our work within the broader research landscape.
+
+\section{Academic Research on Layer~2 Protocols}
+
+\subsection{Systematization of Knowledge}
+
+Thibault et al.~\cite{sok-layer2} provide what is, to our knowledge, the most thorough systematization of Layer~2 blockchain protocols. Their taxonomy organizes the design space into four families. Payment channels, exemplified by the Lightning Network and Raiden, enable bidirectional off-chain transfers between fixed pairs of participants. Sidechains, including Plasma and various commit-chain designs, operate as semi-independent chains that periodically anchor their state to the parent chain. Rollups, encompassing both the ZK and Optimistic variants, post transaction data on-chain while moving execution off-chain. Finally, hybrid approaches such as Validium and Volition blend on-chain and off-chain data availability to offer users a configurable trade-off between cost and security.
+
+While this systematization provides a valuable conceptual map and analyses security properties at a theoretical level, it does not include empirical measurement of how these systems behave when confronted with real failure conditions. The absence of controlled experimentation leaves open the question of whether the theoretical security guarantees translate into practical resilience.
+
+\subsection{ZK Rollup Research}
+
+B\"unz et al.~\cite{zk-efficient-proofs} introduced Bulletproofs, a proof system that generates efficient zero-knowledge range proofs without requiring a trusted setup ceremony. By eliminating the trusted setup, Bulletproofs removed a significant barrier to deploying zero-knowledge schemes in decentralized settings. Subsequent research extended this line of work toward SNARKs capable of verifying general computation, enabling the construction of ZK~Rollups that can process arbitrary smart contract logic on Layer~2.
+
+Gluchowski et al.~\cite{zksync-paper} published the architectural design of zkSync, a production-grade ZK~Rollup built on a PLONK-based proof system. Their contribution centers on proof generation optimizations and strategies for achieving compatibility with the Ethereum Virtual Machine, a challenge that has shaped the design of every major ZK~Rollup since. Our own \texttt{ZKVerifier} contract draws on similar patterns from the Scroll project's \texttt{ZkEvmVerifierV1}, which itself belongs to this lineage of Groth16 and PLONK-based verification architectures.
+
+Despite these advances in proof system design, neither body of work provides a systematic evaluation of ZK~Rollup finality behavior under adverse conditions such as Layer~1 chain reorganizations or sequencer outages. The performance characteristics of ZK~Rollups in the presence of failure remain largely uncharted territory.
+
+\subsection{Optimistic Rollup Research}
+
+Kalodner et al.~\cite{arbitrum-original} introduced Arbitrum, one of the earliest and most widely deployed Optimistic~Rollups. Their principal contribution is the \textit{interactive fault game}, a multi-round dispute protocol that progressively narrows the scope of disagreement until the Layer~1 contract needs to re-execute only a single instruction to determine whether the challenged state transition was valid. This approach dramatically reduces the on-chain cost of dispute resolution compared to re-executing the entire batch.
+
+Our framework's \texttt{OptimisticVerifier} contract incorporates patterns drawn from both the Optimism Bedrock \texttt{OptimismPortal2} and the Arbitrum Nitro \texttt{RollupCore}, including a configurable challenge period through which commitments must pass before reaching finality. In the thesis implementation, this period is set to ten blocks, a deliberately compressed value that preserves the architectural semantics of production systems while keeping experimental turnaround times manageable.
+
+Although Kalodner et al.\ discuss sequencer liveness and censorship resistance in their design documents, these properties have not been empirically evaluated in a controlled setting. The costs associated with failure recovery mechanisms---how long it takes a system to resume normal operation after a sequencer crash, and how much additional gas is consumed during the recovery process---remain largely unquantified in the existing literature.
+
+\section{Industry Implementations}
+
+Several production Layer~2 systems are currently deployed on Ethereum mainnet. We review the most prominent ones here, as they provide direct context for the design choices made in our framework.
+
+\subsection{Arbitrum}
+
+Arbitrum is the most widely adopted Optimistic~Rollup to date. Its architecture features an interactive fraud proof mechanism, now implemented through the Cannon virtual machine, combined with a seven-day challenge period that gives honest validators ample time to detect and dispute invalid state transitions. The system includes sequencer failover capabilities that allow a decentralized validator set to take over transaction ordering if the centralized sequencer goes offline. Arbitrum hosts a broad ecosystem of decentralized finance protocols, NFT marketplaces, and gaming applications, and its transaction volume regularly approaches or exceeds that of Ethereum mainnet itself.
+
+\subsection{Optimism}
+
+Optimism takes a different strategic approach within the same Optimistic~Rollup paradigm. Rather than focusing solely on a single chain, the project has developed the OP~Stack, a modular software framework that allows third parties to deploy custom rollup instances sharing a common security model and bridging infrastructure. This initiative, known as the Superchain vision, has spawned numerous independent chains including Base, Zora, and Mode. Optimism's emphasis on EVM equivalence means that existing Ethereum smart contracts can be deployed on its network with minimal or no modification. Our framework's \texttt{OptimisticVerifier} contract borrows structural patterns from Optimism's Bedrock upgrade, particularly the multi-state finality model that distinguishes between pending, soft-final, and hard-final commitments.
+
+\subsection{zkSync and StarkNet}
+
+zkSync and StarkNet represent two leading production ZK~Rollups, each pursuing a distinct proof system strategy. zkSync employs a PLONK-based proof system and targets full EVM compatibility, allowing developers to write and deploy contracts in Solidity without learning a new language. StarkNet, by contrast, uses the Cairo programming language and its proprietary STARK proof system. STARKs offer the advantage of requiring no trusted setup and scaling more efficiently for very large computations, though they produce larger proofs than their SNARK counterparts. StarkNet also offers a Volition mode that allows users to choose on a per-transaction basis whether their data should be stored on-chain for maximum security or off-chain for lower cost.
+
+A recurring observation across all of these production systems is that they are primarily optimized for normal-case performance. Their documentation and public benchmarks focus overwhelmingly on throughput under ideal conditions, while behavior under failure scenarios---sequencer crashes, malicious state proposals, Layer~1 congestion events---receives comparatively little attention. This optimization bias toward the happy path is understandable from a product perspective, but it leaves a significant gap in our understanding of how these architectures perform when things go wrong.
+
+\section{Gap Analysis}
+
+Drawing together the academic literature and industry implementations reviewed above, we identify five areas where the current body of knowledge lacks empirical evaluation.
+
+The first gap concerns \textit{finality time measurement} \label{gap:finality}. While the theoretical finality properties of both rollup families are well understood, actual finality latencies under varying Layer~1 conditions---including congestion, fluctuating gas prices, and chain reorganizations---have not been systematically measured. Our framework addresses this gap by recording the precise block number at which each commitment is submitted and the block number at which it reaches finality, enabling exact measurement across diverse scenarios.
+
+The second gap involves \textit{recovery cost quantification} \label{gap:recovery}. When a sequencer crashes or the Layer~1 connection is temporarily lost, the system must recover gracefully and resume normal operation. The time and gas costs associated with this recovery process have not been empirically studied. Our adversarial test suite includes dedicated crash-and-restart scenarios for both sequencer types, capturing the resources consumed during recovery.
+
+The third gap relates to \textit{censorship resistance} \label{gap:censorship}. The ability of honest users to force-include their transactions when a sequencer attempts to censor them is a critical property that existing research discusses primarily in theoretical terms. While our framework does not include a full empirical censorship resistance evaluation, we address this gap qualitatively in our security analysis and identify it as a direction for future work.
+
+The fourth gap is the absence of a \textit{controlled head-to-head comparison} \label{gap:comparison}. Existing benchmarks typically evaluate a single rollup architecture in isolation, making it difficult to draw meaningful comparisons. Our framework runs both sequencers against the same Layer~1 node simultaneously, ensuring that they experience identical block timing, gas pricing, and network conditions, thereby enabling a genuinely fair comparison.
+
+The fifth and final gap concerns \textit{reproducibility} \label{gap:reproducibility}. Much of the existing performance data for Layer~2 systems comes from mainnet observations or proprietary benchmarks that other researchers cannot replicate. Our entire framework is open-source and deployable with a single Docker Compose command, allowing any researcher to reproduce our experiments, verify our results, and extend the evaluation to additional rollup architectures.
+
+This thesis directly addresses the first, second, fourth, and fifth gaps through its framework design, adversarial test suite, and open-source release. The third gap is explored qualitatively and left for future empirical investigation.

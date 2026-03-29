@@ -1,0 +1,236 @@
+% =========================================
+% CHAPTER 6: EXPERIMENTAL EVALUATION
+% =========================================
+\chapter{Experimental Results and Performance Evaluation}
+\label{ch:evaluation}
+
+This chapter presents the experimental methodology and results of the comparative evaluation. We describe the test environment and scenarios, and then analyze the results along four dimensions: throughput, batch efficiency, finality latency, and computational overhead. Each subsection includes a discussion of the observed trade-offs between the two architectures.
+
+\section{Experimental Setup}
+
+\subsection{Test Environment}
+
+All experiments were conducted in a containerized environment with the following configuration:
+
+\begin{itemize}
+    \item \textbf{Hardware}: 8GB RAM, 4-core processor
+    \item \textbf{OS}: Linux/Docker container environment
+    \item \textbf{L1 Node}: Hardhat local node (production-like behavior)
+    \item \textbf{Sequencers}: Synchronized with 5-second grace period
+    \item \textbf{Duration}: Continuous 5-minute test scenarios
+\end{itemize}
+
+\subsection{Test Scenarios}
+
+Three scenarios were defined to evaluate the framework under different load conditions:
+
+\begin{enumerate}
+    \item \textbf{Scenario~A (Normal Load)}: 150~transactions are submitted to each sequencer, representing a moderate workload intended to exercise the basic batching and submission pipeline.
+    \item \textbf{Scenario~B (High Load)}: 500~transactions are submitted to stress-test the batching mechanism and measure peak throughput.
+    \item \textbf{Scenario~C (Batch Analysis)}: 250~transactions are submitted to observe batching patterns and L1 submission frequency.
+\end{enumerate}
+
+Each scenario was run for a continuous 5-minute window, with both sequencers operating in parallel against the same L1 node.
+
+\section{Throughput Analysis}
+
+\subsection{Transactions Per Second}
+
+Table~\ref{tab:tps-results} presents the measured peak TPS for each scenario.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|c|c|c}
+        \hline
+        \textbf{Scenario} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Difference} \\
+        \hline
+        Normal (150~tx) & $\sim$25~TPS & $\sim$18~TPS & +39\% ZK \\
+        \hline
+        High Load (500~tx) & $\sim$50~TPS & $\sim$35~TPS & +43\% ZK \\
+        \hline
+        Batch (250~tx) & $\sim$40~TPS & $\sim$28~TPS & +43\% ZK \\
+        \hline
+    \end{tabular}
+    \caption{Peak throughput comparison (transactions per second)}
+    \label{tab:tps-results}
+\end{table}
+
+Across all three scenarios, the ZK~Rollup achieves 39--43\% higher peak throughput than the Optimistic~Rollup. This advantage arises from the ZK~sequencer's configuration:
+\begin{itemize}
+    \item a smaller batch size (100~transactions versus 200) triggers submissions more frequently;
+    \item a shorter batching interval (5~seconds versus 8~seconds) reduces idle time between batches.
+\end{itemize}
+
+As a result, the ZK~sequencer processes transactions into L1-committed batches at a faster rate. However, this comes at the cost of a higher number of L1 submissions, which we analyze in the next subsection.
+
+\subsection{Batch Efficiency}
+
+While the ZK~Rollup achieves higher throughput, the Optimistic~Rollup makes more efficient use of each L1 submission. Table~\ref{tab:batch-efficiency} summarizes the batch efficiency metrics measured during a 400-transaction test.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|c|c|c}
+        \hline
+        \textbf{Metric} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Trade-off} \\
+        \hline
+        Batch size & 100~txs & 200~txs & 2$\times$ difference \\
+        \hline
+        Batches created (400~tx) & 7 & 4 & 43\% fewer for Optimistic \\
+        \hline
+        L1 submissions & 7 & 4 & Higher L1 cost for ZK \\
+        \hline
+        L1 gas per transaction & Higher & Lower & Optimistic cheaper \\
+        \hline
+    \end{tabular}
+    \caption{Batch efficiency comparison}
+    \label{tab:batch-efficiency}
+\end{table}
+
+We define batch efficiency as the ratio of transactions processed to L1 submissions:
+\begin{equation}
+\text{Batch Efficiency} = \frac{\text{Transactions Batched}}{\text{L1 Submissions}}
+\end{equation}
+
+Under this metric, the ZK~Rollup achieves an efficiency of $400 / 7 \approx 57$~transactions per L1 submission, while the Optimistic~Rollup achieves $400 / 4 = 100$~transactions per L1 submission. This means that the Optimistic~Rollup reduces L1 interaction by approximately 43\% compared to the ZK~Rollup, which translates directly into lower per-transaction gas costs on L1.
+
+This result illustrates a fundamental trade-off: the ZK~Rollup prioritizes low-latency finality (via frequent, smaller batches), while the Optimistic~Rollup prioritizes cost efficiency (via fewer, larger batches).
+
+\section{Finality Analysis}
+
+\subsection{L1 Inclusion Time}
+Table~\ref{tab:l1-latency} shows the L1 inclusion latency---the time elapsed between the sequencer submitting a batch transaction and that transaction being mined into an L1 block---measured at several percentiles.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|c|c|c}
+        \hline
+        \textbf{Latency} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{L1 Baseline} \\
+        \hline
+        P50 (median) & 4.2s & 4.3s & 4.0s \\
+        \hline
+        P95 & 4.75s & 4.75s & 4.7s \\
+        \hline
+        P99 & 5.2s & 5.1s & 5.0s \\
+        \hline
+        Maximum & 8.3s & 8.1s & 8.0s \\
+        \hline
+    \end{tabular}
+    \caption{L1 inclusion latency in seconds}
+    \label{tab:l1-latency}
+\end{table}
+
+Both rollups achieve L1 inclusion in approximately 4.75~seconds at the P95 level, which is nearly identical to the L1 baseline (a plain Ethereum transaction on the same Hardhat node). This confirms that \textbf{L1 block production time is the dominant factor} in inclusion latency, and neither sequencer introduces significant additional delay at this stage.
+
+\subsection{True Finality (Architecture-Specific)}
+
+L1 inclusion is a necessary but not sufficient condition for finality. Each rollup architecture imposes additional requirements before a transaction can be considered truly final. Table~\ref{tab:true-finality} breaks down the complete finality path for each architecture.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|c|c|c}
+        \hline
+        \textbf{Finality Stage} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Difference} \\
+        \hline
+        L1 inclusion & 4.75s & 4.75s & Identical \\
+        \hline
+        Proof verification & $\sim$15s & --- & ZK-specific \\
+        \hline
+        Challenge period & --- & 10~blocks ($\sim$2~min) & Optimistic-specific \\
+        \hline
+        \textbf{True finality} & \textbf{$\sim$15s} & \textbf{$\sim$2~min} & \textbf{$\sim$8$\times$ faster for ZK} \\
+        \hline
+    \end{tabular}
+    \caption{True finality comparison in the demo environment}
+    \label{tab:true-finality}
+\end{table}
+
+This distinction is critical. In our demo environment, the ZK~Rollup achieves true finality approximately 8 times faster than the Optimistic~Rollup. In a production Ethereum deployment, the gap widens dramatically:
+\begin{itemize}
+    \item \textbf{ZK~Rollup}: L1 inclusion ($\sim$12s) + proof verification ($\sim$2s) + confirmations ($\sim$1s) $\approx$ \textbf{15~seconds}.
+    \item \textbf{Optimistic~Rollup}: L1 inclusion ($\sim$12s) + 7-day challenge period $\approx$ \textbf{604,800~seconds}.
+\end{itemize}
+
+This represents a difference of roughly 672$\times$ in finality time, which has direct implications for applications that depend on fast settlement (such as decentralized exchanges and cross-chain bridges).
+
+\section{Computational Overhead: Proof Generation}
+
+The ZK~Rollup incurs a computational cost that the Optimistic~Rollup avoids: generating a zero-knowledge proof for each batch. Table~\ref{tab:proof-latency} reports the measured proof generation latency.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|c|c}
+        \hline
+        \textbf{Statistic} & \textbf{Time (ms)} & \textbf{Interpretation} \\
+        \hline
+        Minimum & 45 & Low overhead \\
+        \hline
+        P50 (median) & 78 & Typical per-batch cost \\
+        \hline
+        P95 & 95 & Occasional higher latency \\
+        \hline
+        P99 & 120 & Rare spike \\
+        \hline
+        Average & 82 & Mean per-batch cost \\
+        \hline
+    \end{tabular}
+    \caption{ZK proof generation latency distribution}
+    \label{tab:proof-latency}
+\end{table}
+
+At the P95 level, proof generation takes 95~ms. Relative to the 5-second batching interval, this represents a modest overhead:
+
+\begin{equation}
+\text{Batch Overhead} = \frac{\text{Proof Time}}{\text{Batch Interval}} = \frac{95 \text{ ms}}{5000 \text{ ms}} = 1.9\%
+\end{equation}
+
+This indicates that, in our test environment, proof generation consumes less than 2\% of the available time per batch cycle. While production ZK proof systems operating over more complex circuits will incur significantly higher costs, this result demonstrates that proof generation does not represent a fundamental bottleneck in the architecture---particularly as proof systems continue to improve in efficiency.
+
+\section{Security Model Comparison}
+
+In addition to performance metrics, the evaluation also compared the security behavior of both architectures when confronted with an invalid state proposal. Table~\ref{tab:security-models} contrasts the key security properties.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|p{4cm}|p{4cm}}
+        \hline
+        \textbf{Property} & \textbf{ZK Rollup} & \textbf{Optimistic Rollup} \\
+        \hline
+        Security assumption & 1-of-N honest (one prover suffices) & At least one honest challenger required \\
+        \hline
+        Proof type & Cryptographic validity proof & Economic fraud proof \\
+        \hline
+        Invalid state halted & Immediately upon proof rejection & After fraud proof submission \\
+        \hline
+        Cost model & Computational (proof generation) & Economic (challenge period and bonds) \\
+        \hline
+        Censorship risk & Low (anyone can generate a proof) & Medium (requires active challengers) \\
+        \hline
+    \end{tabular}
+    \caption{Security model comparison}
+    \label{tab:security-models}
+\end{table}
+
+\subsection{Behavior Under Invalid State Proposals}
+
+To illustrate the practical difference, consider a scenario in which the sequencer proposes an invalid state transition.
+
+In the \textbf{ZK~Rollup}, the response proceeds as follows:
+\begin{enumerate}
+    \item The sequencer submits a proof together with the invalid state root.
+    \item The L1 verifier contract checks the proof cryptographically.
+    \item Since the proof does not match the claimed state root, the submission is rejected.
+    \item The system continues from the last accepted valid state.
+    \item Detection time: approximately 15~seconds (the next proof cycle).
+\end{enumerate}
+
+In the \textbf{Optimistic~Rollup}, the response differs significantly:
+\begin{enumerate}
+    \item The sequencer submits only the state root (no proof is attached).
+    \item The state root is accepted as provisional.
+    \item Any observer may submit a fraud proof if they detect that the state is invalid.
+    \item The L1 contract re-executes the disputed transaction to adjudicate the claim.
+    \item If fraud is confirmed, the invalid state is reverted and the sequencer is penalized.
+    \item Time to resolution: the full challenge period (7~days in production).
+\end{enumerate}
+
+In summary, the ZK~Rollup detects invalidity through a cryptographic mechanism (fast but computationally expensive), while the Optimistic~Rollup relies on an economic mechanism (slower but cheaper in the absence of fraud).

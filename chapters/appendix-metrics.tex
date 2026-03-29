@@ -1,0 +1,54 @@
+% =========================================
+% APPENDIX B: METRICS REFERENCE
+% =========================================
+\chapter{Metrics Reference}
+\label{app:metrics}
+
+\section{Prometheus Metrics}
+
+All metrics are tagged with labels for filtering:
+
+\begin{listing}[H]
+    \begin{minted}{text}
+# ZK Rollup Metrics (Port 9100)
+l2_transactions_total{job="zk-sequencer"} = 1250
+l2_batches_total{job="zk-sequencer"} = 13
+l2_tps{job="zk-sequencer"} = 45.3
+l2_finality_time_seconds_bucket{job="zk-sequencer",le="15"} = 120
+l2_proof_generation_seconds_bucket{job="zk-sequencer",le="0.1"} = 8
+l2_pending_transactions{job="zk-sequencer"} = 37
+
+# Optimistic Rollup Metrics (Port 9101)
+opt_l2_transactions_total{job="opt-sequencer"} = 1200
+opt_l2_batches_total{job="opt-sequencer"} = 6
+opt_l2_tps{job="opt-sequencer"} = 32.1
+opt_l2_finality_time_seconds_bucket{job="opt-sequencer",le="10"} = 95
+opt_l2_pending_transactions{job="opt-sequencer"} = 62
+    \end{minted}
+    \caption{Example Prometheus output}
+    \label{lst:prometheus-output}
+\end{listing}
+
+\section{Grafana Queries}
+
+Key queries for analysis:
+
+\begin{listing}[H]
+    \begin{minted}{promql}
+# Current TPS comparison
+{l2_tps, opt_l2_tps}
+
+# Finality latency (P95)
+histogram_quantile(0.95, 
+  rate(l2_finality_time_seconds_bucket[1m]))
+
+# Batch efficiency
+rate(l2_transactions_total[1m]) / 
+  rate(l2_batches_total[1m])
+
+# 5-minute throughput average
+avg_over_time(l2_tps[5m])
+    \end{minted}
+    \caption{Grafana PromQL examples}
+    \label{lst:grafana-queries}
+\end{listing}

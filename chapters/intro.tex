@@ -1,0 +1,55 @@
+% =========================================
+% CHAPTER 1: INTRODUCTION
+% =========================================
+\chapter{Introduction}
+\label{ch:intro}
+
+Blockchain networks promised a world where trust is built through mathematics rather than institutions. Bitcoin showed that strangers could exchange value without a bank, and Ethereum went further by allowing them to run programs on a shared, tamper-proof computer. Yet both networks hit the same wall: they are painfully slow. Bitcoin handles roughly seven transactions every second, Ethereum around fifteen. For comparison, the Visa network processes thousands. This speed gap keeps fees high, frustrates users, and stands in the way of wider adoption.
+
+Layer~2 solutions were conceived as a way around this bottleneck. Instead of forcing every transaction through the congested main chain, they move the heavy work to a faster second layer while keeping the security anchored to Layer~1. The idea is elegant, but the details matter enormously---and those details are what this thesis sets out to examine.
+
+\section{Motivation}
+
+\subsection{The Scalability Trilemma}
+
+Buterin~\cite{scalability-trilemma} captured the core tension in blockchain design with what he called the scalability trilemma. A blockchain, he argued, can realistically achieve two of three desirable properties, but not all three at once. The first is \textit{decentralization}---the guarantee that no small group of nodes controls the system. The second is \textit{security}---the ability to resist attacks and ensure that confirmed transactions stay confirmed. The third is \textit{scalability}---the capacity to process a high volume of transactions quickly.
+
+Layer~2 systems attempt to escape this trilemma rather than solve it head-on. They borrow security from the base chain, which is already decentralized and secure, and focus their own resources on processing transactions as fast as possible. Whether they succeed depends on the specific design choices each system makes---and how those choices hold up when things go wrong.
+
+\subsection{The Problem: Evaluating Only the Happy Path}
+
+Most existing research on Layer~2 systems tells a rosy story. Papers and whitepapers report peak throughput under ideal conditions, best-case latency when everything runs smoothly, and gas costs when the network is calm. These numbers are useful, but they paint an incomplete picture.
+
+What happens when the Layer~1 chain reorganizes and the ground shifts beneath a Layer~2 commitment? What does the system do when its sequencer crashes, or worse, when the sequencer deliberately lies about the state? Can ordinary users still get their funds out when the operator is censoring transactions? And how do the two dominant security models---validity proofs in ZK~Rollups and fraud proofs in Optimistic~Rollups---actually compare when the pressure is on?
+
+These are not hypothetical concerns. Chain reorganizations happen, sequencer outages have occurred in production systems, and the question of censorship resistance is central to the entire promise of decentralization. Yet the literature offers surprisingly few concrete answers on how different Layer~2 architectures behave under stress.
+
+\subsection{What This Thesis Contributes}
+
+This thesis addresses that gap. We design and implement a comparative testing framework that places a ZK~Rollup and an Optimistic~Rollup side by side in the same controlled environment and measures how they perform---not only under normal conditions, but also when we deliberately introduce failures. Specifically, we measure finality guarantees (how long it takes for a transaction to become irreversible under various Layer~1 conditions), security mechanisms (the concrete differences between validity proofs and fraud proofs), recovery behavior (how each system responds to sequencer failures and malicious state proposals), and performance trade-offs (the relationship between security strength, throughput, and cost).
+
+To the best of our knowledge, no prior work has provided this kind of side-by-side empirical comparison under identical experimental conditions with an explicit focus on failure modes.
+
+\section{Research Questions}
+
+\subsection{Primary Question}
+
+The central question guiding this thesis is: \textit{How do ZK~Rollups and Optimistic~Rollups compare in terms of security guarantees, finality mechanisms, and recovery behavior when subjected to Layer~1 disruptions, sequencer failures, and malicious state proposals?}
+
+\subsection{Sub-Questions}
+
+To answer that broad question, we break it into five more specific ones.
+
+First (\ref{rq:finality}), \label{rq:finality} we ask how time-to-finality differs between the two architectures. The Optimistic approach relies on a fraud-proof window that can last days; the ZK approach relies on cryptographic proof verification that takes seconds. We seek to quantify the practical impact of that difference.
+
+Second (\ref{rq:l1congestion}), \label{rq:l1congestion} we investigate how Layer~1 congestion or chain reorganization affects Layer~2 security and finality propagation. When the foundation shakes, what safeguards prevent the upper floors from collapsing?
+
+Third (\ref{rq:censorship}), \label{rq:censorship} we examine censorship resistance during sequencer failures. If the operator goes offline or refuses to include certain transactions, what mechanisms allow users to recover, and what do those mechanisms cost?
+
+Fourth (\ref{rq:mechanisms}), \label{rq:mechanisms} we explore the costs and behaviors of fault-escape hatches and forced transaction inclusion---the safety valves built into each design.
+
+Fifth (\ref{rq:dataavailability}), \label{rq:dataavailability} we consider how the choice between on-chain and off-chain data availability affects system safety when Layer~1 is under stress.
+
+\section{Thesis Structure}
+
+The rest of this document is organized into seven chapters. Chapter~\ref{ch:background} lays the technical groundwork, covering blockchain fundamentals, Layer~2 scaling concepts, and the security models behind ZK and Optimistic~Rollups. Chapter~\ref{ch:relatedwork} surveys the existing literature and pinpoints the gaps our work aims to fill. Chapter~\ref{ch:framework} presents the design goals and architecture of our testing framework. Chapter~\ref{ch:implementation} walks through the implementation of the smart contracts, sequencers, dashboard, and metrics infrastructure. Chapter~\ref{ch:evaluation} reports our experimental results and discusses the measured trade-offs. Chapter~\ref{ch:security} analyzes the security properties of both architectures under the adversarial scenarios defined in our threat model. Finally, Chapter~\ref{ch:conclusion} draws conclusions, offers practical guidance for choosing a rollup architecture, and sketches directions for future research.

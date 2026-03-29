@@ -1,0 +1,168 @@
+% =========================================
+% CHAPTER 7: SECURITY ANALYSIS
+% =========================================
+\chapter{Security Analysis and Failure Modes}
+\label{ch:security}
+
+This chapter examines the security properties of both rollup architectures under adversarial conditions. We define a threat model, analyze the strengths and vulnerabilities of each architecture, and evaluate the impact of L1 chain reorganizations on L2 finality.
+
+\section{Threat Model}
+
+We consider five adversarial scenarios that are relevant to any Layer~2 deployment:
+
+\begin{enumerate}
+    \item \textbf{Malicious sequencer}: the sequencer attempts to commit invalid state transitions to L1.
+    \item \textbf{L1 chain reorganization}: one or more confirmed L1 blocks are replaced, invalidating L2 commitments anchored to those blocks.
+    \item \textbf{Sequencer failure}: the sequencer crashes or becomes temporarily unavailable.
+    \item \textbf{Censorship attack}: the sequencer selectively excludes certain transactions from batches.
+    \item \textbf{Data unavailability}: L2 state data is not published or becomes inaccessible, preventing independent verification.
+\end{enumerate}
+
+The following sections analyze how each architecture responds to these threats.
+
+\section{ZK Rollup Security}
+
+\subsection{Strength: Cryptographic Validity}
+
+The security of a ZK~Rollup derives from the mathematical properties of the underlying proof system:
+\begin{itemize}
+    \item \textbf{Soundness}: a valid proof guarantees that the corresponding state transition is correct; it is computationally infeasible to forge a proof for an invalid transition.
+    \item \textbf{Zero-knowledge}: the proof reveals no information about the individual transactions within the batch, only that the transition is valid.
+    \item \textbf{Non-interactivity}: proof verification is a single-step operation that requires no further communication between the prover and the verifier.
+\end{itemize}
+
+The practical implication is that any invalid state is rejected at the point of L1 verification. Invalid commitments never enter L1 storage, providing a strong safety guarantee.
+
+\subsection{Vulnerability: Prover Availability}
+
+If the sequencer produces valid transactions but fails to generate proofs (whether due to a crash, resource exhaustion, or deliberate refusal), the system enters a degraded state:
+\begin{itemize}
+    \item transactions continue to be accepted at the L2 level but are not finalized on L1;
+    \item users cannot prove the current L2 state to external parties or to L1;
+    \item the system is effectively \textit{censored but not compromised}---no funds are at risk, but progress halts.
+\end{itemize}
+
+The standard mitigation is a force-inclusion mechanism that requires the sequencer to produce proofs within a deadline or face penalties (such as collateral slashing or sequencer replacement).
+
+\subsection{Vulnerability: Proof System Compromise}
+
+If the zero-knowledge proof system itself contains a mathematical flaw, it may become possible to construct proofs for invalid state transitions. This is a low-probability but high-impact risk. Standard mitigations include:
+\begin{itemize}
+    \item adopting well-studied, battle-tested proof systems such as PLONK or STARK;
+    \item commissioning regular security audits by cryptography experts;
+    \item monitoring the academic literature for newly discovered vulnerabilities in the underlying assumptions.
+\end{itemize}
+
+\section{Optimistic Rollup Security}
+
+\subsection{Strength: Economic Incentives}
+
+The security of an Optimistic~Rollup is grounded in economic game theory rather than cryptographic proofs:
+\begin{itemize}
+    \item \textbf{Collateral requirements}: both the sequencer and any challenger must post bonds before participating in the protocol.
+    \item \textbf{Slashing}: a party found to be dishonest (either a malicious sequencer or a frivolous challenger) loses its posted collateral.
+    \item \textbf{Rational incentives}: under standard game-theoretic assumptions, honest behavior is the economically dominant strategy.
+\end{itemize}
+
+This design allows invalid states to be challenged and reverted, but only through an economic dispute process rather than an automatic cryptographic check.
+
+\subsection{Vulnerability: Challenger Absence}
+
+The most significant vulnerability of an Optimistic~Rollup is the possibility that no honest challenger submits a fraud proof during the challenge period. This can occur under the following conditions:
+\begin{itemize}
+    \item low network participation, with few nodes running full archival copies of the L2 state;
+    \item prohibitively high challenge costs that exceed the economic incentive to challenge;
+    \item coordinated collusion between the sequencer and a majority of potential challengers.
+\end{itemize}
+
+We can model the probability of a successful attack (i.e., no challenge) as follows. Let~$p$ denote the probability that any single observer detects the fraud, and let~$n$ denote the number of independent observers. Then:
+\begin{equation}
+P(\text{no challenge}) = (1 - p)^n
+\end{equation}
+
+For example, with $p = 0.1$ and $n = 10$:
+\begin{equation}
+P(\text{no challenge}) = (0.9)^{10} \approx 0.35
+\end{equation}
+
+This illustrative calculation shows that even with 10 independent observers, each having a 10\% chance of detecting fraud, there remains a 35\% probability that no challenge is submitted. In practice, production systems mitigate this through dedicated watchtower services and by increasing the number of independent validators.
+
+\subsection{Vulnerability: Withdrawal Latency}
+
+Users who wish to withdraw funds from an Optimistic~Rollup to L1 must wait for the full challenge period (7~days in production) to elapse. This has several practical consequences:
+\begin{itemize}
+    \item users who need faster access to their funds must rely on third-party liquidity providers, who charge a fee for the service;
+    \item withdrawals of small amounts become disproportionately expensive relative to liquidity provider fees;
+    \item the user experience is significantly worse than that of a ZK~Rollup, where withdrawals can be processed as soon as the proof is verified on L1.
+\end{itemize}
+
+Proposed mitigations include liquidity networks and hybrid models that use ZK proofs to accelerate the withdrawal process.
+
+\section{L1 Reorganization Impact}
+
+\subsection{Scenario: Shallow Reorg (1~Block)}
+
+Consider the following situation: an L1 block at height~$n$ contains a ZK proof~$\pi_1$ for batch~$B_1$. A 1-block reorganization occurs, and block~$n$ is replaced by a new block that does not contain~$\pi_1$.
+
+The impact on the ZK~Rollup is as follows:
+\begin{itemize}
+    \item the proof $\pi_1$ is no longer part of the L1 canonical chain;
+    \item the L2 state update that was based on $\pi_1$ becomes invalid;
+    \item the system reverts to the previous valid state;
+    \item the sequencer must resubmit the batch to L1.
+\end{itemize}
+
+The recovery process is automatic:
+\begin{enumerate}
+    \item The sequencer detects the reorganization by monitoring the L1 chain.
+    \item It regenerates the proof (possibly with updated batch ordering if necessary).
+    \item It resubmits the proof to L1.
+    \item The system re-finalizes once the new proof is included and confirmed.
+\end{enumerate}
+
+The expected recovery time can be estimated as:
+\begin{equation}
+T_{\text{recovery}} = T_{\text{detection}} + T_{\text{reproof}} + T_{\text{re-inclusion}}
+\end{equation}
+
+For a 1-block reorg on Ethereum: detection~$\approx$~12s, reproof~$\approx$~95ms, re-inclusion~$\approx$~12s, yielding a total recovery time of approximately \textbf{24~seconds}. Importantly, no data is lost during this process.
+
+\subsection{Scenario: Deep Reorg ($>$7~Blocks)}
+
+A deep reorganization ($>$7~blocks) is an extremely unlikely event on Ethereum, particularly following the transition to proof-of-stake and the introduction of finality gadgets. Such an event would require either a successful 51\% attack or a catastrophic network partition.
+
+If a deep reorg were to occur:
+\begin{itemize}
+    \item both ZK and Optimistic~Rollups would need to resubmit multiple batches or state roots;
+    \item in the Optimistic case, economic incentives could break down if challengers are unable to participate during the disruption;
+    \item the system would likely require manual intervention or social consensus to recover.
+\end{itemize}
+
+For practical purposes, deep reorgs are not considered a realistic threat for established L1 networks.
+
+\section{Comparative Security Summary}
+
+Table~\ref{tab:security-summary} provides a qualitative summary of the security properties of each architecture across the dimensions considered in this chapter.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|c|c}
+        \hline
+        \textbf{Security Property} & \textbf{ZK Rollup} & \textbf{Optimistic} \\
+        \hline
+        Cryptographic safety & Strong & Economic \\
+        \hline
+        Recovery speed & Moderate & Moderate \\
+        \hline
+        Censorship resistance & Good & Medium \\
+        \hline
+        Liveness requirement & Prover only & Prover + challenger \\
+        \hline
+        Finality speed & Fast ($\sim$15s) & Slow (7~days) \\
+        \hline
+        User exit cost & Low & High (7~days or fee) \\
+        \hline
+    \end{tabular}
+    \caption{Comparative security summary}
+    \label{tab:security-summary}
+\end{table}
