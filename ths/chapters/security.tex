@@ -18,7 +18,7 @@ We consider five adversarial scenarios that are relevant to any Layer~2 deployme
     \item \textbf{Data unavailability}: L2 state data is not published or becomes inaccessible, preventing independent verification.
 \end{enumerate}
 
-The following sections analyze how each architecture responds to these threats.
+We assume the adversary controls the sequencer process but not the Layer~1 consensus mechanism. The L1 chain is assumed to be secure under standard proof-of-stake assumptions (i.e., at least two-thirds of validators are honest). The following sections analyze how each architecture responds to these threats, with references to the empirical results from Chapter~\ref{ch:evaluation} where applicable.
 
 \section{ZK Rollup Security}
 
@@ -86,6 +86,13 @@ P(\text{no challenge}) = (0.9)^{10} \approx 0.35
 \end{equation}
 
 This illustrative calculation shows that even with 10 independent observers, each having a 10\% chance of detecting fraud, there remains a 35\% probability that no challenge is submitted. In practice, production systems mitigate this through dedicated watchtower services and by increasing the number of independent validators.
+
+More generally, we can express the minimum number of observers required to reduce the attack probability below a threshold~$\epsilon$ as:
+\begin{equation}
+n \geq \frac{\ln \epsilon}{\ln (1 - p)}
+\end{equation}
+
+For $p = 0.1$ and $\epsilon = 0.01$, we obtain $n \geq \frac{\ln 0.01}{\ln 0.9} \approx 43.7$, meaning at least 44~independent observers are needed to reduce the probability of a successful unchallenged attack to below 1\%. This requirement places a concrete lower bound on the validator set size for meaningful Optimistic security.
 
 \subsection{Vulnerability: Withdrawal Latency}
 
@@ -166,3 +173,31 @@ Table~\ref{tab:security-summary} provides a qualitative summary of the security 
     \caption{Comparative security summary}
     \label{tab:security-summary}
 \end{table}
+
+\section{Data Availability Analysis}
+
+Data availability---the guarantee that all L2 transaction data is accessible to any observer---is a prerequisite for the security of both architectures, though for different reasons.
+
+\subsection{Why Data Availability Matters}
+
+For a \textbf{ZK~Rollup}, data availability enables independent state reconstruction. Even though the validity proof guarantees that the state transition is correct, users need access to the underlying transaction data to determine their own account balances, construct withdrawal proofs, and verify that their transactions were included. Without data availability, the ZK~Rollup reduces to a system where correctness is assured but accessibility is not---users must trust the sequencer to report their state truthfully.
+
+For an \textbf{Optimistic~Rollup}, data availability is even more critical. Challengers cannot construct a fraud proof without access to the transaction data from the disputed batch. If the sequencer withholds data, it becomes impossible to prove that a state root is incorrect, effectively neutralizing the entire challenge mechanism. A data-withholding sequencer in an Optimistic~Rollup can commit arbitrary state transitions with impunity.
+
+\subsection{Data Availability in Our Framework}
+
+Both sequencers in our framework post full batch data as L1 calldata, ensuring that any Ethereum full node can reconstruct the complete L2 state from L1 data alone. The cost of this approach is captured in the gas analysis of Chapter~\ref{ch:evaluation}: each byte of calldata costs 16~gas (or 4~gas for zero bytes), which constitutes a significant fraction of the per-submission gas cost.
+
+Alternative data availability strategies---off-chain data with on-chain commitments (Validium), or per-transaction data availability choices (Volition)---offer lower costs but weaken the data availability guarantee. Our framework does not implement these alternatives, but they represent a natural direction for extension (Chapter~\ref{ch:conclusion}).
+
+\section{Practical Implications}
+
+The security analysis yields several practical guidelines for deploying and operating Layer~2 systems.
+
+\textbf{Validator set requirements.} The challenger absence analysis demonstrates that Optimistic~Rollups require a minimum validator set size to achieve a target security level. Operators should monitor the number of active watchtowers and ensure diversity across jurisdictions and infrastructure providers to prevent correlated failures.
+
+\textbf{Reorg monitoring.} Both architectures benefit from active monitoring of L1 chain reorganizations. The ZK~Rollup's automatic recovery (24~seconds for a 1-block reorg) is faster than any manual intervention, but operators should still alert on reorg events to track their frequency and depth. Optimistic~Rollups are more vulnerable during deep reorgs, as the challenge mechanism may be disrupted.
+
+\textbf{Sequencer redundancy.} The crash recovery results from Chapter~\ref{ch:evaluation} show that both sequencers lose in-memory state upon failure. Production deployments should implement transaction persistence (write-ahead logging) and standby sequencer failover to minimize data loss during outages.
+
+\textbf{Cost of security.} The ZK~Rollup's security comes at a measurable cost: approximately 2.6$\times$ higher L1 gas consumption (Chapter~\ref{ch:evaluation}). For applications where the security premium is justified by the value at risk, this cost is acceptable. For lower-value applications, the Optimistic model's cheaper security may be sufficient.
