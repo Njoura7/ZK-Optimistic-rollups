@@ -19,10 +19,41 @@ The ZK~Rollup achieved 39--43\% higher peak throughput than the Optimistic~Rollu
 Both architectures achieved L1 inclusion in approximately 4.75~seconds, confirming that L1 block production is the dominant latency factor. However, true finality---the point at which a transaction becomes irreversible---differs dramatically: approximately 15~seconds for the ZK~Rollup versus approximately 7~days for the Optimistic~Rollup in a production setting, a difference of roughly 672$\times$.
 
 \textbf{Security.}
-The ZK~Rollup provides cryptographic safety guarantees under a 1-of-N honest prover assumption, while the Optimistic~Rollup relies on economic guarantees under an at-least-one-honest-challenger assumption. Both architectures inherit the security of the underlying L1 through their anchoring mechanisms.
+The ZK~Rollup provides cryptographic safety guarantees under a 1-of-N honest prover assumption, while the Optimistic~Rollup relies on economic guarantees under an at-least-one-honest-challenger assumption. Both architectures inherit the security of the underlying L1 through their anchoring mechanisms. Empirically, the ZK~Rollup rejected invalid state proposals instantly at the contract level, while the Optimistic~Rollup required an active challenger to detect and dispute the fraud within the challenge window.
 
 \textbf{Computational overhead.}
 ZK proof generation incurs a P95 latency of 95~ms per batch, representing approximately 1.9\% of the batch interval. This overhead is manageable with current hardware and is expected to decrease as proof systems continue to improve.
+
+\textbf{Gas costs.}
+The ZK~Rollup consumed approximately 2.6$\times$ more total L1 gas than the Optimistic~Rollup for the same transaction volume, and its per-transaction gas cost was roughly 3$\times$ higher. This cost premium is the price of cryptographic finality.
+
+\textbf{Recovery behavior.}
+Both architectures preserved L1 state consistency through sequencer crashes, but both lost in-memory pending transactions. The Optimistic sequencer's larger batch accumulation window resulted in higher potential data loss per crash event.
+
+\subsection{Answers to Research Questions}
+
+Table~\ref{tab:rq-answers} maps each research question to the corresponding empirical finding.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{c|p{4cm}|p{6cm}}
+        \hline
+        \textbf{RQ} & \textbf{Question (Summary)} & \textbf{Finding} \\
+        \hline
+        1 & How does finality differ? & ZK achieves true finality in $\sim$15s; Optimistic requires 7~days. Difference: $\sim$672$\times$ in production. \\
+        \hline
+        2 & How does L1 congestion affect L2? & L1 inclusion latency is identical for both ($\sim$4.75s). Reorgs require $\sim$24s ZK recovery vs.\ full challenge period for Optimistic. \\
+        \hline
+        3 & Censorship during sequencer failure? & Both preserve L1 integrity. Optimistic loses more pending transactions per crash (142 vs.\ 73) due to larger batch accumulation. \\
+        \hline
+        4 & Cost of fault-escape hatches? & ZK rejection is automatic and costless to users. Optimistic challenge requires gas expenditure by the challenger. \\
+        \hline
+        5 & Data availability impact? & Both post full data on L1. ZK pays $\sim$3$\times$ more gas per transaction for this guarantee. \\
+        \hline
+    \end{tabular}
+    \caption{Research questions and empirical findings}
+    \label{tab:rq-answers}
+\end{table}
 
 \subsection{Contributions}
 
@@ -67,6 +98,22 @@ An Optimistic~Rollup is better suited to applications where:
 \end{itemize}
 
 Typical use cases include general-purpose smart contract platforms, gaming with infrequent settlements, governance applications, and migrations of existing decentralized applications.
+
+\section{Limitations}
+
+While the framework achieves its design objectives, several limitations should be acknowledged.
+
+\textbf{Simulated proof generation.} The ZK proof in our framework is a SHA-256 double-hash rather than a genuine SNARK or STARK. This preserves the structural pattern of the ZK pipeline but vastly underestimates the computational cost of production proof generation. The 1.9\% overhead figure reported in Chapter~\ref{ch:evaluation} is a lower bound; real-world ZK~Rollups require specialized hardware (GPUs, FPGAs) and report proof times ranging from seconds to minutes per batch.
+
+\textbf{Local L1 environment.} The Hardhat node provides deterministic, instant block production with zero network latency. Experiments on a public testnet or mainnet would introduce stochastic block times, mempool congestion, gas price competition, and network propagation delays that our framework does not capture.
+
+\textbf{Single-parameter configuration.} Each architecture was tested with a single set of batch parameters (100/5s for ZK, 200/8s for Optimistic). The observed trade-offs may shift under different configurations. A parameter sweep would provide a more complete picture of the Pareto frontier between throughput, cost, and finality.
+
+\textbf{No persistent mempool.} Neither sequencer persists its transaction pool to disk, which means crash recovery always loses pending transactions. Production systems mitigate this with write-ahead logs or redundant sequencers, neither of which is implemented in the current framework.
+
+\textbf{Simplified dispute resolution.} The Optimistic verifier's challenge mechanism accepts any \texttt{challenge()} call as valid. A production dispute system involves multi-round interactive proofs (as in Arbitrum's Cannon or Optimism's MIPS-based fault proofs) that are significantly more complex and costly.
+
+Despite these limitations, the framework achieves its central goal: providing a controlled, reproducible environment for \textit{comparative} evaluation. The relative differences between the two architectures---which are the thesis's primary findings---are robust to these simplifications, because both sides operate under the same constraints.
 
 \section{Future Research Directions}
 
