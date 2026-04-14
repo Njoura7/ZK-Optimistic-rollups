@@ -21,7 +21,7 @@ for i in {1..30}; do
     if curl -s -X POST http://127.0.0.1:8545 \
         -H "Content-Type: application/json" \
         -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' > /dev/null 2>&1; then
-        echo "✓ L1 node ready"
+        echo "L1 node ready"
         break
     fi
     echo "Waiting for L1... ($i/30)"
@@ -35,10 +35,10 @@ sleep 2
 
 # Verify deployment
 if [ -f /app/contracts.json ]; then
-    echo "✓ Contracts deployed"
+    echo "Contracts deployed"
     cat /app/contracts.json
 else
-    echo "✗ Deployment failed"
+    echo "Deployment failed"
     exit 1
 fi
 
