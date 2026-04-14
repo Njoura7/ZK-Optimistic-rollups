@@ -18,6 +18,9 @@ RUN npm install -g hardhat
 # Copy everything
 COPY . .
 
+# Normalize shell scripts copied from Windows checkouts
+RUN sed -i 's/\r$//' /app/start.sh && chmod +x /app/start.sh
+
 # Install Node dependencies
 WORKDIR /app/l1
 RUN npm install
