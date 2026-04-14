@@ -1,5 +1,4 @@
 # ZK Rollup Demo
-
 ## What This Demonstrates
 
 Layer 2 ZK Rollup scaling solution showing:
