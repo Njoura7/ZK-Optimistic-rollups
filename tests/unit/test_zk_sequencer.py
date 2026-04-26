@@ -28,14 +28,25 @@ sys.modules["prometheus_client"] = MagicMock()
 sys.modules["flask_cors"] = MagicMock()
 
 # ---------------------------------------------------------------------------
-# Ensure the l2-zkpackage is importable regardless of the working directory
-# from which pytest is invoked.
+# Ensure the l2-zk package is importable regardless of the working directory
+# from which pytest is invoked. Remove any cached sequencer module to avoid
+# loading the optimistic sequencer instead.
 # ---------------------------------------------------------------------------
+sys.modules.pop("sequencer", None)  # Remove any cached sequencer module
+sys.modules.pop("opt_sequencer", None)  # Remove optimistic version if loaded
+
 _L2_DIR = str(pathlib.Path(__file__).resolve().parents[2] / "l2-zk")
 if _L2_DIR not in sys.path:
     sys.path.insert(0, _L2_DIR)
 
 from sequencer import Sequencer, app  # noqa: E402 — must follow sys.modules setup
+import sequencer as _seq_module  # noqa: E402 — used to access module-level Prometheus mocks
+
+# Rename the cached module so that a subsequent import of the optimistic test
+# (which also uses the name 'sequencer') gets a fresh load from l2-optimistic/
+# instead of finding this ZK version. The module object itself is unchanged;
+# _seq_module, Sequencer, and app already hold direct references.
+sys.modules["zk_sequencer"] = sys.modules.pop("sequencer")
 
 
 # ---------------------------------------------------------------------------

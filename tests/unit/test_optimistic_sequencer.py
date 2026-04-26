@@ -169,10 +169,14 @@ def test_periodic_batch_interval_is_8s():
     Thesis metric: Batch interval difference (ZK=5s, Opt=8s)
     directly affects TPS comparison in thesis Table 2. Optimistic
     submits less frequently, trading latency for L1 cost efficiency.
+
+    Default value is 8s (via OPT_BATCH_INTERVAL environment variable),
+    but is configurable for research purposes.
     """
     src = inspect.getsource(OptimisticSequencer.periodic_batch)
-    assert "time.sleep(8)" in src, (
-        "periodic_batch must sleep 8 seconds between batches "
+    assert "OPT_BATCH_INTERVAL" in src or "time.sleep(8)" in src, (
+        "periodic_batch must use OPT_BATCH_INTERVAL (default 8 seconds) "
+        "or hardcoded 8 second interval "
         "(ZK sequencer uses 5 s; Optimistic uses 8 s per thesis Table 2)"
     )
 

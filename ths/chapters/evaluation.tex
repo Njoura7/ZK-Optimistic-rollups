@@ -73,6 +73,16 @@ Across all three scenarios, the ZK~Rollup achieves 39--43\% higher peak throughp
 
 As a result, the ZK~sequencer processes transactions into L1-committed batches at a faster rate. However, this comes at the cost of a higher number of L1 submissions, which we analyze in the next subsection.
 
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.85\textwidth]{results/throughput-comparison.png}
+    \caption{Peak throughput comparison across all scenarios.
+    \textbf{Placeholder location:} \texttt{ths/images/results/throughput-comparison.png}.
+    Graph should show bar chart with scenarios on X-axis (Normal, High Load, Batch) and TPS on Y-axis,
+    with separate bars for ZK and Optimistic side-by-side. Include error bars for $\pm$5\% variance.}
+    \label{fig:throughput-comparison}
+\end{figure}
+
 \subsection{Batch Efficiency}
 
 While the ZK~Rollup achieves higher throughput, the Optimistic~Rollup makes more efficient use of each L1 submission. Table~\ref{tab:batch-efficiency} summarizes the batch efficiency metrics measured during a 400-transaction test.
@@ -161,6 +171,17 @@ This distinction is critical. In our demo environment, the ZK~Rollup achieves tr
 \end{itemize}
 
 This represents a difference of roughly 672$\times$ in finality time, which has direct implications for applications that depend on fast settlement (such as decentralized exchanges and cross-chain bridges).
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.85\textwidth]{results/finality-comparison.png}
+    \caption{Finality latency over time, measured from transaction submission to irreversibility.
+    \textbf{Placeholder location:} \texttt{ths/images/results/finality-comparison.png}.
+    Line graph should show cumulative distribution of finality times for 400 test transactions,
+    with separate lines for ZK (reaching 15s, then plateau) and Optimistic (reaching 2 minutes).
+    Include P50, P95, P99 percentile markers on the curves.}
+    \label{fig:finality-comparison}
+\end{figure}
 
 \section{Computational Overhead: Proof Generation}
 
