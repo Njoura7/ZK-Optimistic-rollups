@@ -11,13 +11,16 @@
 
 ## 📋 Executive Summary
 
-This project implements a **comparative testing framework** for analyzing Layer 2 blockchain scaling solutions under adverse conditions. The framework evaluates **ZK Rollups**, **Optimistic Rollups**, and **Plasma/Validium chains** across three critical dimensions:
+This project builds a **testing framework** to compare how different Layer 2 blockchain solutions work under real conditions—not just when everything goes smoothly. 
 
-1. **Finality Guarantees** - How quickly transactions become irreversible
-2. **Security Mechanisms** - Validity proofs vs. fraud proofs vs. data availability
-3. **Recovery Behavior** - System resilience under L1 congestion, sequencer failures, and malicious state proposals
+What we test:
+1. **Finality** - How long until a transaction is locked in and cannot be reversed?
+2. **Security** - Does one approach protect users better than the other?
+3. **Recovery** - What happens when something breaks? Can the system recover?
 
-**Key Innovation:** First systematic study of L2 _failure modes_ rather than just ideal-state performance.
+We compare three approaches: **ZK Rollups** (using cryptographic proofs), **Optimistic Rollups** (assuming submissions are correct unless challenged), and **Plasma/Validium chains** (lightweight commitments with data availability).
+
+**Why this matters:** Most research tests systems when they work perfectly. We also test what happens when the sequencer crashes, Layer 1 gets congested, or someone submits invalid data. This reveals what architectures are actually more resilient.
 
 ---
 
@@ -125,33 +128,30 @@ This project implements a **comparative testing framework** for analyzing Layer 
 
 ### Technology Stack
 
+**Why we chose each tool:** We needed fast iteration over production perfection. Every tool here is open-source and well-documented. None of the choices are controversial—they're the natural picks for this kind of research project.
+
 **Layer 1 (Ethereum Simulation)**
 
-- **Hardhat**: Local Ethereum node for rapid development
-- **Solidity**: Smart contract language
-- **ethers.js**: Ethereum library for JavaScript
+- **Hardhat** [[hardhat2024]](#hardhat): Local Ethereum test node. Produces blocks instantly (perfect for testing), provides accounts with test ETH, and supports forking mainnet state.
+- **Solidity** [[solidity2024]](#solidity): Smart contract language for Ethereum. Both verifier contracts are written in Solidity 0.8.20.
+- **ethers.js** [[ethersjs2024]](#ethersjs): JavaScript library for Ethereum. Handles contract deployment and calling from our test scripts.
 
 **Layer 2 Sequencers**
 
-- **Python 3.11**: Core sequencer logic
-- **Flask**: REST API for transaction submission
-- **web3.py**: Ethereum interaction library
+- **Python 3.11**: We chose Python because it's readable—easier to understand what the sequencer actually does, which matters for research code that people might extend.
+- **Flask** [[flask2024]](#flask): Lightweight HTTP framework. Handles three endpoints: POST /tx (submit transaction), GET /metrics (Prometheus metrics), GET /health (liveness check).
+- **web3.py** [[web3py2024]](#web3py): Python library for Ethereum. Used to submit batch commitments to the Layer 1 contract.
 
-**Smart Contracts**
+**Monitoring & Metrics**
 
-- **ZKVerifier.sol**: Validity proof verification (34 lines)
-- **OptimisticVerifier.sol**: Fraud proof challenge system (81 lines)
-
-**Monitoring & Visualization**
-
-- **Prometheus**: Time-series metrics database
-- **Grafana**: Advanced visualization dashboards
-- **Flask Dashboard**: Real-time monitoring UI
+- **Prometheus** [[prometheus2024]](#prometheus): Time-series database that collects metrics (transaction counts, finality latency, throughput). Scrapes our sequencers every 15 seconds and stores data for 7 days.
+- **Grafana** [[grafana2024]](#grafana): Visualization tool. Pre-configured dashboards show real-time metrics and historical trends. No setup required—dashboards auto-provision from JSON configuration.
+- **prometheus_client** (Python library): Exports metrics in Prometheus format. Used by both sequencers to expose metrics on ports 9100 (ZK) and 9101 (Optimistic).
 
 **Infrastructure**
 
-- **Docker Compose**: Container orchestration
-- **Docker**: Containerization
+- **Docker** [[docker2024]](#docker): Containerization. Everything (Hardhat, sequencers, Prometheus, Grafana) runs in isolated containers with defined resource limits.
+- **Docker Compose** [[compose2024]](#compose): Orchestration. One command (`docker-compose up --build`) starts all services with networking, volume mounts, and dependencies configured.
 
 ### File Structure
 
@@ -210,31 +210,158 @@ docker-compose up --build
 
 ### Running Experiments
 
-**Option 1: Flask Dashboard (Recommended for quick tests)**
+Everything runs in **one Docker container**. After you start it with `docker-compose up --build`, the system stays running and you can interact with it in three different ways. Pick whichever works best for what you want to test.
 
-1. Open http://localhost:3000
-2. Click demo buttons:
-   - Blue buttons → ZK Rollup scenarios
-   - Green buttons → Optimistic Rollup scenarios
-3. Watch real-time metrics update
+---
 
-**Option 2: Grafana Dashboard (Recommended for analysis)**
+#### **One Setup, Three Ways to Test:**
 
-1. Open http://localhost:3001
-2. Login: `admin` / `admin`
-3. Navigate to: "ZK / Optimistic Rollup L2 Metrics Comparison"
-4. Run experiments from Flask dashboard
-5. Analyze historical data in Grafana
+**Way 1: Web Dashboard (Easiest for Quick Testing)**
 
-**Demo Scenarios:**
+```bash
+# After docker-compose up --build is done, open in your browser:
+http://localhost:3000
+```
 
-- **Normal (150 txs)**: Steady-state operation
-- **High Load (500 txs)**: Stress test throughput
-- **Batch Test (250 txs)**: Observe batching behavior
+What you see:
+- Real-time transaction counts and batch totals
+- Current transactions per second (TPS) for each rollup
+- Buttons to trigger test scenarios:
+  - Blue buttons run ZK Rollup scenarios
+  - Green buttons run Optimistic Rollup scenarios
+- Live metrics update as transactions flow through
+
+Use this when: You want to watch the system work in real-time, or run quick demos.
+
+---
+
+**Way 2: Grafana Dashboard (Best for Analysis)**
+
+```bash
+# Open in your browser:
+http://localhost:3001
+
+# Login with: admin / admin
+# Go to dashboard: "ZK / Optimistic Rollup L2 Metrics Comparison"
+```
+
+What you see:
+- Side-by-side comparison of both rollups
+- Historical graphs (stores data for 7 days)
+- Finality time, throughput, batch size trends
+- Proof generation time (ZK only)
+
+How to use:
+1. Run a test scenario from the Flask dashboard (Way 1)
+2. Immediately check Grafana to see the metrics accumulating
+3. Compare how ZK and Optimistic differ
+
+Use this when: You want to analyze trends or save historical data for your thesis.
+
+---
+
+**Way 3: Automated Tests (Best for Reproducible Benchmarks)**
+
+```bash
+# Run all tests (happens inside Docker automatically)
+docker-compose run --rm test-runner pytest tests/ -v
+
+# Run only crash/recovery tests
+docker-compose run --rm test-runner pytest tests/adversarial/ -v
+
+# Run only finality/throughput tests
+docker-compose run --rm test-runner pytest tests/integration/ -v
+```
+
+What happens:
+- Tests submit transactions automatically (no manual clicking)
+- Results print to terminal and save to logs
+- Metrics appear in Prometheus/Grafana while tests run
+- Perfect for reproducible experimental runs
+
+Use this when: You need consistent, repeatable tests for your evaluation chapter.
+
+---
+
+#### **Real Example: Complete Workflow**
+
+```bash
+# Terminal 1: Start the system (and leave it running)
+docker-compose up --build
+# Wait 2 minutes for Prometheus to initialize
+
+# Terminal 2: Run a quick test
+# Option A: Click buttons in Flask
+open http://localhost:3000      # Click "Normal (150 txs)" button
+# Option B: Run automated test
+docker-compose run --rm test-runner pytest tests/integration/test_dual_sequencer.py -v
+
+# Terminal 3: Check the results
+open http://localhost:3001      # View graphs in Grafana
+# Or check raw metrics:
+curl http://localhost:9100/metrics | grep l2_finality_time_seconds
+
+# View logs from the test
+docker-compose logs zk-rollup   # Shows sequencer activity
+```
+
+---
+
+#### **Access Points (All Inside Docker)**
+
+| Component | URL | Purpose |
+|-----------|-----|---------|
+| **Flask Dashboard** | `http://localhost:3000` | Interactive testing, real-time view |
+| **Grafana Dashboard** | `http://localhost:3001` | Historical data, graphs, analysis |
+| **Prometheus Metrics** | `http://localhost:9090/graph` | Raw metric queries, debugging |
+| **ZK Metrics Export** | `http://localhost:9100/metrics` | Prometheus scrape endpoint (ZK) |
+| **Optimistic Metrics** | `http://localhost:9101/metrics` | Prometheus scrape endpoint (Optimistic) |
+| **L1 Node RPC** | `http://localhost:8545` | Ethereum simulation (internal use) |
+
+---
+
+#### **Customizing Parameters While Docker is Running**
+
+Want to test different batch sizes or polling intervals? Stop and restart with environment variables:
+
+```bash
+# Stop the current setup
+docker-compose down
+
+# Restart with custom parameters
+ZK_BATCH_SIZE=150 \
+OPT_BATCH_INTERVAL=5 \
+ZK_GAS_LIMIT=250000 \
+docker-compose up --build
+
+# Or modify docker-compose.yml before running
+```
+
+See Chapter 4 (Framework Design) in the thesis for what each parameter does.
 
 ---
 
 ## 📊 Metrics & Observability
+
+### Framework Scope: What This Tests (And What It Doesn't)
+
+This framework is **not a production system**. It's a controlled lab for comparing ZK and Optimistic architectures. Think of it like a physics experiment: we control as many variables as possible so we can see the differences clearly.
+
+**What we measure (accurate):**
+- How much faster ZK finality is than Optimistic finality
+- How batch size affects throughput
+- How proof generation impacts latency
+
+**What we simulate (approximated for testing):**
+- **Gas costs**: We calculate them, but on a local Hardhat node, not mainnet. Real Ethereum gas varies with market demand; we use fixed costs.
+- **Proof generation**: We use SHA-256 hashing instead of real cryptographic proofs. In production, proofs take seconds to minutes; ours take milliseconds. But both approaches still follow the same pattern: compute proof, submit to Layer 1.
+- **Block timing**: Hardhat produces a new block instantly. Real Ethereum takes ~12-15 seconds. So absolute finality times are lower in our tests.
+- **Network delays**: Zero (everything is local containers). Real systems have network propagation delays.
+
+**Why this matters for your thesis:**
+- **Relative differences are trustworthy**: If ZK finality is 10x faster than Optimistic in our tests, that ratio is real and meaningful.
+- **Absolute numbers are lower bounds**: Actual deployment would take longer due to real network effects.
+- **Architectural comparisons are valid**: The choice between ZK and Optimistic depends on trade-offs we measure correctly (proof cost, finality, batching), even if actual values differ from production.
 
 ### Prometheus Metrics Exported
 
@@ -260,22 +387,31 @@ docker-compose up --build
 
 **Dashboard 1: ZK Rollup L2 Metrics (Thesis Edition)**
 
-- Total transactions & batches
-- Current TPS
-- Finality time distribution (P50, P95, P99)
-- Proof generation time
+Displays:
+- Total transactions & batches (counters)
+- Current TPS (gauge)
+- Finality time distribution (P50, P95, P99 from histogram)
+- Proof generation time (ZK-specific metric)
 - L1 submission success rate
 - Sequencer uptime
-- Transaction rate over time
+- Transaction rate over time (line graph)
 
 **Dashboard 2: ZK / Optimistic Rollup L2 Metrics Comparison**
 
-- Side-by-side stat panels (ZK vs Optimistic)
-- TPS comparison graph
-- Finality time comparison graph
+Side-by-side comparison showing:
+- Stat panels: ZK vs Optimistic metrics
+- TPS comparison graph (over time)
+- Finality time comparison graph (ZK significantly faster)
 - Transaction rate comparison
-- ZK proof generation time
-- Pending transactions comparison
+- ZK proof generation time (Optimistic: N/A)
+- Pending transactions in mempool
+- Batch assembly frequency
+
+**Accessing Dashboards:**
+1. Start the stack: `docker-compose up -d`
+2. Wait 2-3 minutes for Prometheus to scrape initial data
+3. Run a demo scenario (Flask dashboard or pytest)
+4. View results in Grafana: `http://localhost:3001`
 
 ---
 

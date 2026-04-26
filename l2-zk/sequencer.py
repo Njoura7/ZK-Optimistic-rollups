@@ -2,11 +2,18 @@
 import time
 import hashlib
 import json
+import os
 from threading import Thread, Lock
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from web3 import Web3
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
+
+# Configuration from environment (with defaults matching current values)
+BATCH_THRESHOLD = int(os.getenv('ZK_BATCH_SIZE', '100'))
+BATCH_INTERVAL = int(os.getenv('ZK_BATCH_INTERVAL', '5'))
+ZK_GAS_LIMIT = int(os.getenv('ZK_GAS_LIMIT', '200000'))
+L1_RPC = os.getenv('L1_RPC', 'http://localhost:8545')
 
 app = Flask(__name__)
 CORS(app)
@@ -21,7 +28,7 @@ pending_txs_gauge = Gauge('l2_pending_transactions', 'ZK pending transactions')
 
 class Sequencer:
     def __init__(self):
-        self.w3 = Web3(Web3.HTTPProvider('http://localhost:8545'))
+        self.w3 = Web3(Web3.HTTPProvider(L1_RPC))
         self.pending = []
         self.metrics = {'txs': 0, 'batches': 0, 'tps': 0}
         self.lock = Lock()
@@ -35,15 +42,15 @@ class Sequencer:
             self.metrics['txs'] += 1
         tx_counter.inc()
         pending_txs_gauge.set(len(self.pending))
-        if len(self.pending) >= 100:
+        if len(self.pending) >= BATCH_THRESHOLD:
             self._batch()
-    
+
     def _batch(self):
         with self.lock:
             if not self.pending:
                 return
-            batch = self.pending[:100]
-            self.pending = self.pending[100:]
+            batch = self.pending[:BATCH_THRESHOLD]
+            self.pending = self.pending[BATCH_THRESHOLD:]
         
         pending_txs_gauge.set(len(self.pending))
         
@@ -72,7 +79,7 @@ class Sequencer:
             tx = contract.functions.submit(state_root, proof).build_transaction({
                 'from': account,
                 'nonce': self.w3.eth.get_transaction_count(account),
-                'gas': 200000
+                'gas': ZK_GAS_LIMIT
             })
             
             signed = self.w3.eth.account.sign_transaction(tx, private_key='0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80')
@@ -92,7 +99,7 @@ class Sequencer:
     
     def periodic_batch(self):
         while self.running:
-            time.sleep(5)
+            time.sleep(BATCH_INTERVAL)
             if len(self.pending) > 0:
                 self._batch()
     

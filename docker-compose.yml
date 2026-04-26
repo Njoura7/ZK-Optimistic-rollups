@@ -11,8 +11,13 @@ services:
       - "9100:9100" # ZK Prometheus metrics
       - "9101:9101" # Optimistic Prometheus metrics
     environment:
-      - BATCH_SIZE=100
-      - BATCH_INTERVAL=10
+      - ZK_BATCH_SIZE=100
+      - ZK_BATCH_INTERVAL=5
+      - ZK_GAS_LIMIT=200000
+      - OPT_BATCH_SIZE=200
+      - OPT_BATCH_INTERVAL=8
+      - OPT_GAS_LIMIT=150000
+      - L1_RPC=http://localhost:8545
     volumes:
       - zk-data:/app/data
     networks:

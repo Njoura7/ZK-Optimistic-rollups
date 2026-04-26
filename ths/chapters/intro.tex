@@ -4,52 +4,68 @@
 \chapter{Introduction}
 \label{ch:intro}
 
-Blockchain networks promised a world where trust is built through mathematics rather than institutions. Bitcoin showed that strangers could exchange value without a bank, and Ethereum went further by allowing them to run programs on a shared, tamper-proof computer. Yet both networks hit the same wall: they are painfully slow. Bitcoin handles roughly seven transactions every second, Ethereum around fifteen. For comparison, the Visa network processes thousands. This speed gap keeps fees high, frustrates users, and stands in the way of wider adoption.
+\section{The Problem}
 
-Layer~2 solutions were conceived as a way around this bottleneck. Instead of forcing every transaction through the congested main chain, they move the heavy work to a faster second layer while keeping the security anchored to Layer~1. The idea is elegant, but the details matter enormously---and those details are what this thesis sets out to examine.
+Bitcoin~\cite{nakamoto2008bitcoin} solved a specific problem: two strangers can exchange value without a bank. Ethereum~\cite{wood2014ethereum} generalized that to programmable computation. Both networks hit the same wall. Bitcoin processes 7 transactions per second. Ethereum processes 15. Visa processes thousands per second. This gap matters because it means blockchain fees spike under demand and most applications cannot use the network reliably.
 
-\section{Motivation}
+The reason is simple: every node must validate every transaction. This keeps the network secure and decentralized, but it is slow. You cannot make it faster without breaking something.
 
-\subsection{The Scalability Trilemma}
+Layer~2 systems try a different approach. Instead of validating every transaction, Layer~1 validates a summary—a single commitment representing thousands of transactions batched together. The commitment is how Layer~2 anchors security to Layer~1. If the commitment is wrong, Layer~1 rejects it. If it is right, the transactions are secure.
 
-Buterin~\cite{scalability-trilemma} captured the core tension in blockchain design with what he called the scalability trilemma. A blockchain, he argued, can realistically achieve two of three desirable properties, but not all three at once. The first is \textit{decentralization}---the guarantee that no small group of nodes controls the system. The second is \textit{security}---the ability to resist attacks and ensure that confirmed transactions stay confirmed. The third is \textit{scalability}---the capacity to process a high volume of transactions quickly.
+Two approaches emerged. ZK~Rollups compute a cryptographic proof showing the commitment is valid, then submit the proof to Layer~1. Layer~1 checks the proof and accepts the commitment immediately. Optimistic~Rollups submit the commitment without proof. They give anyone a window to challenge it if it is wrong. If no valid challenge appears, the commitment becomes final.
 
-Layer~2 systems attempt to escape this trilemma rather than solve it head-on. They borrow security from the base chain, which is already decentralized and secure, and focus their own resources on processing transactions as fast as possible. Whether they succeed depends on the specific design choices each system makes---and how those choices hold up when things go wrong.
+Which is better? It depends. ZK Rollups finalize faster but proof computation is expensive. Optimistic Rollups are cheaper but users wait days for settlement. We lack empirical data on how they actually compare under stress.
 
-\subsection{The Problem: Evaluating Only the Happy Path}
+\section{What Is Missing}
 
-Most existing research on Layer~2 systems tells a rosy story. Papers and whitepapers report peak throughput under ideal conditions, best-case latency when everything runs smoothly, and gas costs when the network is calm. These numbers are useful, but they paint an incomplete picture.
+Academic papers describe the theory. Production systems achieve throughput at scale. But nobody measures what happens when things break.
 
-What happens when the Layer~1 chain reorganizes and the ground shifts beneath a Layer~2 commitment? What does the system do when its sequencer crashes, or worse, when the sequencer deliberately lies about the state? Can ordinary users still get their funds out when the operator is censoring transactions? And how do the two dominant security models---validity proofs in ZK~Rollups and fraud proofs in Optimistic~Rollups---actually compare when the pressure is on?
+When Layer~1 undergoes a chain reorganization (it happens), which finality guarantee is more robust? When a sequencer crashes or disappears, what can users do and what does recovery cost? When a commitment contains an error, how does each system detect and recover?
 
-These are not hypothetical concerns. Chain reorganizations happen, sequencer outages have occurred in production systems, and the question of censorship resistance is central to the entire promise of decentralization. Yet the literature offers surprisingly few concrete answers on how different Layer~2 architectures behave under stress.
+These are not hypothetical. Chain reorganizations have occurred. Sequencer outages have happened. Yet the literature offers few concrete answers on how ZK versus Optimistic compare under stress.
 
-\subsection{What This Thesis Contributes}
+Most evaluation papers measure throughput when the network is uncongested, latency when sequencers work correctly, and costs under ideal conditions. It is useful, but it is incomplete.
 
-This thesis addresses that gap. We design and implement a comparative testing framework that places a ZK~Rollup and an Optimistic~Rollup side by side in the same controlled environment and measures how they perform---not only under normal conditions, but also when we deliberately introduce failures. Specifically, we measure finality guarantees (how long it takes for a transaction to become irreversible under various Layer~1 conditions), security mechanisms (the concrete differences between validity proofs and fraud proofs), recovery behavior (how each system responds to sequencer failures and malicious state proposals), and performance trade-offs (the relationship between security strength, throughput, and cost).
+\section{What This Thesis Does}
 
-To the best of our knowledge, no prior work has provided this kind of side-by-side empirical comparison under identical experimental conditions with an explicit focus on failure modes.
+This thesis builds a testing framework and uses it to measure both rollup types under normal operation and deliberate failures. The goal is to characterize when each approach is preferable.
+
+The framework runs both sequencers against the same Layer~1 node and measures what happens. We simulate sequencer crashes. We inject Layer~1 delays. We submit invalid states. For each scenario, we record finality latency, recovery time, gas cost, and whether data is lost.
+
+Everything is open-source and deployable with a single Docker command. This means other researchers can verify the results, extend the evaluation, and build on the work.
 
 \section{Research Questions}
 
-\subsection{Primary Question}
+The evaluation answers four specific questions.
 
-The central question guiding this thesis is: \textit{How do ZK~Rollups and Optimistic~Rollups compare in terms of security guarantees, finality mechanisms, and recovery behavior when subjected to Layer~1 disruptions, sequencer failures, and malicious state proposals?}
+First, how long does a transaction actually take to become irreversible? Theory says ZK Rollups finalize in seconds and Optimistic Rollups finalize in days. What do we measure in practice?
 
-\subsection{Sub-Questions}
+Second, when a sequencer crashes, what is the cost to recover? Do users lose their transactions? How much gas is required to get the system working again?
 
-To answer that broad question, we break it into five more specific ones.
+Third, what are the actual trade-offs? ZK Rollups compute proofs. Optimistic Rollups wait for challenge windows. Where do the real costs come from?
 
-First (\ref{rq:finality}), \label{rq:finality} we ask how time-to-finality differs between the two architectures. The Optimistic approach relies on a fraud-proof window that can last days; the ZK approach relies on cryptographic proof verification that takes seconds. We seek to quantify the practical impact of that difference.
+Fourth, can we build a fair comparison on standard developer hardware? If yes, the framework is useful. If no, it is a toy.
 
-Second (\ref{rq:l1congestion}), \label{rq:l1congestion} we investigate how Layer~1 congestion or chain reorganization affects Layer~2 security and finality propagation. When the foundation shakes, what safeguards prevent the upper floors from collapsing?
+\section{Why a Framework?}
 
-Third (\ref{rq:censorship}), \label{rq:censorship} we examine censorship resistance during sequencer failures. If the operator goes offline or refuses to include certain transactions, what mechanisms allow users to recover, and what do those mechanisms cost?
+Why not deploy both systems on mainnet and compare? Because environmental noise masks architectural differences. Gas prices change. Network conditions vary. Sequencer implementations differ in hundreds of ways. A controlled framework isolates the essential differences.
 
-Fourth (\ref{rq:mechanisms}), \label{rq:mechanisms} we explore the costs and behaviors of fault-escape hatches and forced transaction inclusion---the safety valves built into each design.
+Why not just do formal analysis? Because real systems diverge from theory. Proof generation has overhead that depends on batch size, hardware, and implementation choices. Fraud proofs require network propagation delays that formal analysis does not capture. Real bugs occur in real systems. Formal analysis gives bounds; measurement gives data.
 
-Fifth (\ref{rq:dataavailability}), \label{rq:dataavailability} we consider how the choice between on-chain and off-chain data availability affects system safety when Layer~1 is under stress.
+\section{Contributions}
+
+This work contributes three things. An open-source testing framework with configurable parameters, allowing researchers to test different batch sizes, polling frequencies, and gas allocations. Empirical data on finality, recovery cost, and resource overhead for both architectures under controlled conditions. A documented interface specification so researchers can implement custom sequencers and test them against the framework contracts.
 
 \section{Thesis Structure}
 
-The rest of this document is organized into seven chapters. Chapter~\ref{ch:background} lays the technical groundwork, covering blockchain fundamentals, Layer~2 scaling concepts, and the security models behind ZK and Optimistic~Rollups. Chapter~\ref{ch:relatedwork} surveys the existing literature and pinpoints the gaps our work aims to fill. Chapter~\ref{ch:framework} presents the design goals and architecture of our testing framework. Chapter~\ref{ch:implementation} walks through the implementation of the smart contracts, sequencers, dashboard, and metrics infrastructure. Chapter~\ref{ch:evaluation} reports our experimental results and discusses the measured trade-offs. Chapter~\ref{ch:security} analyzes the security properties of both architectures under the adversarial scenarios defined in our threat model. Finally, Chapter~\ref{ch:conclusion} draws conclusions, offers practical guidance for choosing a rollup architecture, and sketches directions for future research.
+Chapter~\ref{ch:background} covers the technical foundations: how blockchains work, why they are slow, and how ZK and Optimistic security models differ.
+
+Chapter~\ref{ch:relatedwork} surveys existing research and identifies the specific gaps this work addresses.
+
+Chapter~\ref{ch:framework} describes the framework architecture and design choices.
+
+Chapter~\ref{ch:implementation} details the code: the contracts, sequencer processes, and metrics collection.
+
+Chapter~\ref{ch:evaluation} reports the empirical results.
+
+Chapter~\ref{ch:conclusion} synthesizes the findings and discusses implications.

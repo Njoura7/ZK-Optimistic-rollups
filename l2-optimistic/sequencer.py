@@ -2,11 +2,18 @@
 import time
 import hashlib
 import json
+import os
 from threading import Thread, Lock
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from web3 import Web3
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
+
+# Configuration from environment (with defaults matching current values)
+OPT_BATCH_THRESHOLD = int(os.getenv('OPT_BATCH_SIZE', '200'))
+OPT_BATCH_INTERVAL = int(os.getenv('OPT_BATCH_INTERVAL', '8'))
+OPT_GAS_LIMIT = int(os.getenv('OPT_GAS_LIMIT', '150000'))
+L1_RPC = os.getenv('L1_RPC', 'http://localhost:8545')
 
 app = Flask(__name__)
 CORS(app)
@@ -21,7 +28,7 @@ batch_processing_time = Histogram('opt_l2_batch_processing_seconds', 'Optimistic
 
 class OptimisticSequencer:
     def __init__(self):
-        self.w3 = Web3(Web3.HTTPProvider('http://localhost:8545'))
+        self.w3 = Web3(Web3.HTTPProvider(L1_RPC))
         self.pending = []
         self.metrics = {'txs': 0, 'batches': 0, 'tps': 0, 'finality_time': 10}
         self.lock = Lock()
@@ -72,21 +79,21 @@ class OptimisticSequencer:
         with self.lock:
             self.pending.append(tx)
             self.metrics['txs'] += 1
-        
+
         tx_counter.inc()
         pending_txs_gauge.set(len(self.pending))
-        
-        # Optimistic: larger batches (200 txs)
-        if len(self.pending) >= 200:
+
+        # Optimistic: larger batches (configurable)
+        if len(self.pending) >= OPT_BATCH_THRESHOLD:
             self._batch()
-    
+
     def _batch(self):
         with self.lock:
             if not self.pending:
                 return
-            
-            batch = self.pending[:200]
-            self.pending = self.pending[200:]
+
+            batch = self.pending[:OPT_BATCH_THRESHOLD]
+            self.pending = self.pending[OPT_BATCH_THRESHOLD:]
         
         pending_txs_gauge.set(len(self.pending))
         
@@ -111,7 +118,7 @@ class OptimisticSequencer:
             tx = self.contract.functions.submit(state_root).build_transaction({
                 'from': account,
                 'nonce': self.w3.eth.get_transaction_count(account),
-                'gas': 150000
+                'gas': OPT_GAS_LIMIT
             })
             
             # Hardhat default account[1] private key
@@ -128,9 +135,9 @@ class OptimisticSequencer:
             print(f"Optimistic L1 submit skipped: {e}")
     
     def periodic_batch(self):
-        """Batch every 8 seconds (faster than ZK)"""
+        """Batch periodically (configurable interval)"""
         while self.running:
-            time.sleep(8)
+            time.sleep(OPT_BATCH_INTERVAL)
             if len(self.pending) > 0:
                 self._batch()
     

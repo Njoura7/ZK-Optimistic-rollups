@@ -4,60 +4,43 @@
 \chapter{Framework Design and Architecture}
 \label{ch:framework}
 
-This chapter describes the design objectives, system architecture, and operating principles of the proposed testing framework. The framework enables a fair and reproducible comparison of ZK~Rollups and Optimistic~Rollups under both normal and adversarial conditions, while remaining accessible to researchers who wish to replicate or extend the experiments on standard hardware.
+This chapter describes the design of the testing framework. The goal is straightforward: run both rollup types against the same Layer~1 node and measure what actually happens. The framework needs to let us measure finality latency, recovery time after crashes, and resource costs. It also needs to be reproducible so other researchers can verify the results.
 
-\section{Design Objectives}
+\section{What the Framework Needs to Do}
 
-\subsection{Requirements}
+Based on the gaps in the literature, we identified five requirements that drove the design:
 
-Five requirements guided the design of the framework. The foremost requirement is \textit{comparative evaluation}: both rollup architectures must operate against the same Layer~1 node under identical conditions so that any observed differences in performance or resilience reflect genuine architectural properties rather than environmental artifacts. Closely related is the requirement for \textit{reproducibility}, which mandates that the entire testbed be open-source and deployable with a single command, enabling other researchers to replicate our experiments without encountering hidden dependencies or undocumented configuration steps.
+First, we need to measure finality precisely. Both rollups must record when transactions are submitted and when they become irreversible. This is Gap 1 from Chapter~\ref{ch:relatedwork}—we want actual numbers, not estimates.
 
-The third requirement, \textit{extensibility}, ensures that the architecture can accommodate additional Layer~2 designs---such as Plasma or Validium variants---with minimal modification to existing components. Each sequencer is an independent process communicating with the Layer~1 node through a well-defined contract interface, so adding a new rollup type amounts to writing a new sequencer and its corresponding verifier contract.
+Second, we need to see what happens when things break. Specifically, we simulate sequencer crashes and measure how long recovery takes and whether data is lost. This addresses Gap 2.
 
-The fourth requirement is \textit{observability}. The framework must export rich metrics covering throughput, latency, batching behavior, and security-relevant events, because a comparative evaluation is only as useful as the data it produces. Finally, \textit{accessibility} stipulates that deployment should not require specialized infrastructure beyond a standard development machine running Docker, keeping the barrier to entry low for academic use.
+Third, both rollups must run against the same Layer~1 node with identical conditions. This is critical because if they run against different nodes or at different times, we cannot know whether differences come from the architecture or from the environment. This is Gap 4.
 
-\subsection{Evaluation Dimensions}
+Fourth, the entire testbed must be open-source and deployable with a single Docker command. This is Gap 5. If other researchers cannot easily reproduce the setup, the results are not useful.
 
-Table~\ref{tab:eval-dimensions} summarizes the dimensions along which the framework evaluates each rollup architecture, together with the corresponding metrics and measurement techniques. These dimensions were chosen to cover the three pillars of our evaluation: performance, cost, and security.
+Fifth, we need to export enough metrics so we can actually analyze what happened. Throughput, latency, batch sizes, proof generation time—all of these need to be recorded.
 
-\begin{table}[h]
-    \centering
-    \begin{tabular}{l|l|l}
-        \hline
-        \textbf{Dimension} & \textbf{Metric} & \textbf{Measurement} \\
-        \hline
-        Finality & Time to L1 inclusion & Histogram (P50, P95, P99) \\
-        \hline
-        Throughput & Transactions per second & Real-time gauge \\
-        \hline
-        Batching & Batch size and frequency & Counter and post-hoc analysis \\
-        \hline
-        Proof cost & Generation and verification time & Time and gas histogram \\
-        \hline
-        Security & State root validity & Binary check and reorg handling \\
-        \hline
-    \end{tabular}
-    \caption{Framework evaluation dimensions}
-    \label{tab:eval-dimensions}
-\end{table}
+Three additional requirements follow from the design but are not fully implemented: extensibility (adding new rollup types should be straightforward), accessibility (it should run on standard developer hardware), and censorship resistance (partially addressed through test design).
 
 \section{System Architecture}
 
-\subsection{Component Overview}
+The framework has four components that work together to compare both rollup types.
 
-The framework comprises four major components. The first is a \textit{Layer~1 simulation} provided by a local Hardhat Ethereum node that hosts both the \texttt{ZKVerifier} and \texttt{OptimisticVerifier} smart contracts. Because both contracts reside on the same chain instance, any simulated congestion or block-timing variation affects both rollups equally.
+The first component is a local Ethereum node running Hardhat~\cite{hardhat2024}. This node hosts both the ZKVerifier and OptimisticVerifier contracts. Because both contracts run on the same blockchain instance, any network delay or block timing variation affects both rollups equally. This prevents us from accidentally favoring one architecture.
 
-The second component consists of two independent \textit{Layer~2 sequencers}, each implemented as a Python process with a Flask HTTP interface. The ZK sequencer listens on port~5000 and the Optimistic sequencer on port~5001; both connect to the shared Hardhat node on port~8545. Running the sequencers as separate processes ensures that a crash or slowdown in one does not contaminate the other's measurements.
+The second component is two sequencers, each running as a separate Python process. They run within the same Docker~\cite{docker2024} container and connect to the shared Hardhat node. The ZK sequencer listens on port 5000; the Optimistic sequencer listens on port 5001. Running them as separate processes means if one crashes, the other continues—we can measure failures in isolation.
 
-The third component is a \textit{web dashboard}, also built with Flask, that provides real-time monitoring of both sequencers and exposes controls for triggering adversarial test scenarios from a browser. The fourth component is the \textit{observability stack}, consisting of a Prometheus instance that scrapes metrics from each sequencer's dedicated exporter endpoint (ports~9100 and~9101 respectively) and a Grafana instance that renders the collected time-series data into comparative dashboards.
+The third component is a web dashboard built with Flask~\cite{flask2024}. It shows real-time metrics from both sequencers and lets us trigger test scenarios. When we want to simulate a sequencer crash or inject a Layer~1 delay, we do it from the dashboard.
 
-Figure~\ref{fig:architecture} illustrates how these components interact. The vertical flow from user through sequencers to the Layer~1 node and then into the monitoring stack captures the complete lifecycle of a transaction in the framework.
+The fourth component is the metrics stack. Prometheus~\cite{prometheus2024} scrapes metrics from each sequencer (ports 9100 and 9101) and Grafana~\cite{grafana2024} visualizes the data. This gives us time-series records we can analyze later.
+
+Figure~\ref{fig:architecture} shows how these pieces connect.
 
 \begin{figure}[h]
     \centering
     \begin{verbatim}
  ┌──────────────────────────────────────────────────┐
- │         Users / Test Scenarios                   │
+ │         Test Scenarios                           │
  │         (Browser: localhost:3000)                │
  └────────────────────┬─────────────────────────────┘
                       │
@@ -89,67 +72,132 @@ Figure~\ref{fig:architecture} illustrates how these components interact. The ver
              │  (Port 3001)    │
              └─────────────────┘
     \end{verbatim}
-    \caption{System architecture overview}
+    \caption{System architecture}
     \label{fig:architecture}
 \end{figure}
 
-\subsection{Technology Stack}
+To deploy the framework, we run a single Docker Compose~\cite{compose2024} command. This starts all components at once. Table~\ref{tab:eval-dimensions} lists what we measure and how.
 
-Table~\ref{tab:tech-stack} lists the technologies used for each component along with the rationale for their selection. The primary criteria were maturity, ease of integration, and suitability for rapid prototyping within an academic context. Every tool in the stack is open-source and well-documented, which supports the reproducibility requirement established in Section~\ref{ch:framework}.
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|l|l}
+        \hline
+        \textbf{What We Measure} & \textbf{Method} & \textbf{Unit} \\
+        \hline
+        Finality time & Record submission block and finality block & Blocks (or seconds) \\
+        \hline
+        Throughput & Count transactions per time window & Transactions/second \\
+        \hline
+        Batching & Record batch size and timing & Transactions per batch \\
+        \hline
+        Proof cost & Time to generate, gas to verify & Seconds and wei \\
+        \hline
+        State validity & Check if state roots match & Binary \\
+        \hline
+    \end{tabular}
+    \caption{Measurement dimensions and methods}
+    \label{tab:eval-dimensions}
+\end{table}
+
+\section{How Transactions Flow Through the Framework}
+
+When we submit a transaction, here is what happens. The test scenario sends HTTP POST to one of the sequencers. The sequencer adds the transaction to a pending pool. When the pool reaches a threshold (100 transactions for ZK, 200 for Optimistic), the sequencer creates a batch. The sequencer computes the state root. For ZK, it also generates a proof. Then it sends the commitment to Layer~1.
+
+The Layer~1 contract either verifies the proof (ZK) or opens a challenge window (Optimistic). For ZK, finality happens when the proof is verified and five additional blocks have passed. For Optimistic, finality happens when the challenge window closes and no dispute was filed.
+
+We record timestamps at each step. The difference between submission block and finality block is the latency we measure. This latency includes both on-chain delays and off-chain computation.
+
+\section{Why These Design Choices}
+
+We chose to use SHA-256 for proof generation instead of real zk-SNARKs. Real proofs require expensive elliptic-curve computations and specialized hardware. SHA-256 is fast enough that we can run many test scenarios quickly. The key point is that both sequencers still generate something and submit it—the architectural difference remains even though we simplified the proof. Important caveat: The 1.9\% proof overhead we measure in Chapter~\ref{ch:evaluation} is a lower bound. Production ZK~Rollups report overhead ranging from seconds to minutes per batch, depending on hardware and circuit complexity.
+
+We set the ZK batch size to 100 transactions and Optimistic to 200. Why? Because larger batches amortize the cost of Layer~1 submission better, but only if proof generation is not a bottleneck. With ZK, proof generation limits how fast the sequencer can work, so smaller batches keep finality latency low. With Optimistic, there is no proof overhead, so larger batches are fine. These numbers reflect the real trade-offs.
+
+We compress the Optimistic challenge window to 10 blocks instead of 7 days. Production systems cannot wait 7 days for every test. But 10 blocks (roughly 2 minutes on Hardhat) preserves the structure of the security model. Any Layer~1 reorganization that is short enough to be practical to test will not exceed 5 blocks anyway.
+
+We run both sequencers against the same Layer~1 node. Some frameworks test each system in isolation. That introduces noise. Network delays, block timings, gas prices—these vary over time. By running both simultaneously against identical conditions, we eliminate these variables. Any difference we observe comes from the architecture, not the environment.
+
+\section{Metrics We Export}
+
+Each sequencer exports metrics to Prometheus on a dedicated port. The metrics are simple: transaction count, batch count, throughput, finality latency, and proof generation time (ZK only). We store these as histograms so we can compute percentiles—not just the average, but the P95 and P99 latencies, which matter more for user experience.
+
+Table~\ref{tab:research-questions} shows how each research question maps to what we measure.
 
 \begin{table}[h]
     \centering
     \begin{tabular}{l|l|p{5cm}}
         \hline
-        \textbf{Component} & \textbf{Technology} & \textbf{Rationale} \\
+        \textbf{Question} & \textbf{What We Measure} & \textbf{Test File} \\
         \hline
-        L1 simulation & Hardhat + Solidity & Fast local Ethereum node with built-in support for fork testing \\
+        RQ1: Finality & Time from submission to finality & \texttt{tests/integration/test\_dual\_sequencer.py} \\
         \hline
-        L2 sequencer & Python~3.9 + Flask & Rapid prototyping with straightforward state management \\
+        RQ2: Recovery & Time and cost to recover after crash & \texttt{tests/adversarial/test\_sequencer\_crash.py} \\
         \hline
-        Smart contracts & Solidity~0.8.20 & Access to latest EVM features and security patterns \\
-        \hline
-        Web3 library & web3.py & Native Python integration, mature contract interaction API \\
-        \hline
-        Metrics & Prometheus client & Industry-standard time-series metrics collection \\
-        \hline
-        Visualization & Grafana & Rich dashboards with support for complex queries \\
-        \hline
-        Infrastructure & Docker Compose & Single-command deployment, ensuring reproducibility \\
+        RQ3: Security cost & Proof generation time and gas overhead & \texttt{tests/integration/test\_dual\_sequencer.py} \\
         \hline
     \end{tabular}
-    \caption{Technology stack and selection rationale}
-    \label{tab:tech-stack}
+    \caption{Research questions and measurements}
+    \label{tab:research-questions}
 \end{table}
 
-\section{Operating Principles}
+\subsection{Technology Stack}
 
-\subsection{Transaction Flow}
+Table~\ref{tab:tech-stack} lists the technologies used for each component along with the rationale for their selection. The primary criteria were maturity, ease of integration, and suitability for rapid prototyping within an academic context. Every tool in the stack is open-source and well-documented, which supports the reproducibility requirement established in Section~\ref{ch:framework}.
 
-A transaction in the framework follows a clearly defined path from submission to finality. The journey begins when a user or an automated test scenario sends a transaction to one of the Layer~2 sequencers via an HTTP POST request. The sequencer performs basic validation on the incoming data and, if the transaction is well-formed, adds it to its pending transaction pool.
 
-Transactions accumulate in the pool until the number of pending items reaches a configurable batch threshold---one hundred transactions for the ZK sequencer, two hundred for the Optimistic sequencer. At that point the sequencer drains the pool and assembles a new batch. The commitment step is where the two architectures diverge most visibly. In the ZK~Rollup path, the sequencer computes a SHA-256 hash of the batch to derive the state root and then generates a proof that is submitted alongside the state root to the \texttt{ZKVerifier} contract on Layer~1. In the Optimistic~Rollup path, only the state root is submitted to the \texttt{OptimisticVerifier} contract; no accompanying proof is required at submission time, because the security model relies on a post-hoc challenge mechanism rather than upfront verification.
+\section{Configuration}
 
-Once the Layer~1 contract records the commitment, finality depends on the architecture. For the ZK~Rollup, the commitment is considered final after the proof has been verified and five additional blocks have elapsed on the Layer~1 chain. For the Optimistic~Rollup, finality requires that the full ten-block challenge period passes without a successful fraud proof submission.
+The framework parameters are configurable via environment variables. This allows researchers to test how different architectural choices affect performance.
 
-\subsection{Batching Strategy}
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|l|l}
+        \hline
+        \textbf{Parameter} & \textbf{Default} & \textbf{Purpose} \\
+        \hline
+        ZK_BATCH_SIZE & 100 & Transactions per ZK batch \\
+        \hline
+        ZK_BATCH_INTERVAL & 5 & Seconds between ZK batch checks \\
+        \hline
+        ZK_GAS_LIMIT & 200000 & Gas allocated to ZK submissions \\
+        \hline
+        OPT_BATCH_SIZE & 200 & Transactions per Optimistic batch \\
+        \hline
+        OPT_BATCH_INTERVAL & 8 & Seconds between Optimistic batch checks \\
+        \hline
+        OPT_GAS_LIMIT & 150000 & Gas allocated to Optimistic submissions \\
+        \hline
+        L1_RPC & http://localhost:8545 & Layer 1 RPC endpoint \\
+        \hline
+    \end{tabular}
+    \caption{Configurable framework parameters}
+    \label{tab:config-params}
+\end{table}
 
-The batching strategy seeks to balance throughput against Layer~1 cost efficiency. Submitting batches more frequently reduces the time individual transactions spend waiting in the pool, but each Layer~1 submission incurs gas costs that are better amortized over larger batches. Algorithm~1 describes the batch creation loop that both sequencers execute.
+These parameters can be set via Docker environment variables when starting the framework, allowing experimental variation without code changes. For example:
 
-\begin{algorithm}
-    \caption{Batch Creation Loop}
-    \begin{algorithmic}
-        \STATE Initialize $\textit{batch} \leftarrow \emptyset$
-        \LOOP
-            \IF{$|\textit{pending\_pool}| \geq \textit{BATCH\_THRESHOLD}$}
-                \STATE $\textit{batch} \leftarrow \textit{pending\_pool}.\text{drain}(\textit{BATCH\_SIZE})$
-                \STATE $\textit{commitment} \leftarrow \text{create\_commitment}(\textit{batch})$
-                \STATE $\text{submit\_to\_L1}(\textit{commitment})$
-                \STATE $\text{record\_metrics}(\textit{batch})$
-            \ENDIF
-            \STATE $\text{sleep}(\textit{BATCH\_INTERVAL})$
-        \ENDLOOP
-    \end{algorithmic}
-\end{algorithm}
+\begin{verbatim}
+docker-compose up -d
+# Now modify one parameter and re-run the full stack:
+ZK_BATCH_SIZE=150 OPT_BATCH_INTERVAL=5 docker-compose up -d
+\end{verbatim}
 
-The algorithm is parameterized differently for each rollup type. The ZK sequencer operates with $\textit{BATCH\_THRESHOLD} = 100$ and $\textit{BATCH\_INTERVAL} = 5$~seconds, while the Optimistic sequencer uses $\textit{BATCH\_THRESHOLD} = 200$ and $\textit{BATCH\_INTERVAL} = 8$~seconds. The Optimistic~Rollup benefits from a larger batch size and a longer polling interval because it does not incur the computational overhead of proof generation at submission time. Without that bottleneck, it can afford to accumulate more transactions per batch and thereby amortize the fixed gas cost of each Layer~1 submission over a greater number of transactions. Conversely, the ZK sequencer uses a smaller batch and shorter interval to keep finality latency low, since its proofs allow commitments to reach finality without waiting for a challenge window.
+This approach lets researchers measure how batch size, polling frequency, and gas allocation affect finality latency, throughput, and cost. Changing any parameter and re-running the test suite provides immediate feedback on its impact.
+
+We chose Hardhat for Layer~1 because it is fast and easy to configure. We chose Python and Flask for the sequencers because we wanted to iterate quickly, not optimize for production performance. Prometheus and Grafana are standards in the monitoring space. Docker Compose handles deployment. None of these choices are controversial—they are reliable tools that let us focus on measuring rollup behavior, not on building production infrastructure.
+
+\section{How the System Actually Works}
+
+When a test submits a transaction, the sequencer receives it via HTTP and adds it to a queue. The sequencer has a background thread that wakes up every few seconds and checks if there are enough transactions to form a batch. If yes, it creates a commitment, sends it to Layer~1, and records how long that took.
+
+For ZK, "creating a commitment" means computing two hash values and packaging them together. For Optimistic, it means computing one hash.
+
+Layer~1 then does something different depending on the type. For ZK, it checks that a proof was provided (we do not verify the proof itself to keep things fast). For Optimistic, it records that a challenge window has started and waits to see if anyone disputes it.
+
+A commitment reaches finality when either the proof is verified and five blocks have passed (ZK), or the challenge window has closed and no dispute was filed (Optimistic).
+
+We record every timestamp—submission, inclusion in a block, and finality. The difference between submission and finality is the latency we measure in Chapter~\ref{ch:evaluation}.
+
+One note on failure handling: If a sequencer crashes during batch assembly, pending transactions are lost. This is a limitation of the test framework (production systems use persistent mempools and recovery mechanisms). However, because the two sequencers are independent processes, a crash in one does not affect the other—we can isolate and measure failures separately.
+
+The batch creation loop is simple: wait for the pool to fill, create a batch, submit it, then sleep and repeat. The ZK sequencer sleeps for 5 seconds and uses a batch of 100 transactions. The Optimistic sequencer sleeps for 8 seconds and uses 200 transactions. These numbers reflect the different trade-offs between proof overhead and Layer~1 gas cost.
