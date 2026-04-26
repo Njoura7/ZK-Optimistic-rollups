@@ -132,13 +132,23 @@ Both sequencer implementations are available in the framework repository: \textt
 \section{Web Dashboard and Metrics Infrastructure}
 \label{sec:metrics-design}
 
-The framework includes a Flask-based web dashboard that aggregates real-time metrics from both sequencers and exposes HTTP endpoints for test automation. The dashboard runs on port~3000 and provides:
+The framework includes a Flask~\cite{flask2024}-based web dashboard that aggregates real-time metrics from both sequencers and exposes HTTP endpoints for test automation. The dashboard runs on port~3000 and provides:
 
 \begin{itemize}
     \item \textbf{Real-time status}: Current transaction count, batch count, and throughput for each sequencer.
     \item \textbf{Comparative visualization}: Side-by-side graphs of finality latency and throughput over time, enabling visual identification of architectural differences.
     \item \textbf{Test control API}: Endpoints to submit test transactions, query sequencer health, and trigger adversarial scenarios (crash simulation, delay injection).
 \end{itemize}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\textwidth]{dashboards/flask-dashboard-overview.png}
+    \caption{Flask dashboard showing real-time metrics from both sequencers.
+    \textbf{Placeholder location:} \texttt{ths/images/dashboards/flask-dashboard-overview.png}.
+    Screenshot should show: transaction counts (upper left), TPS comparison (upper right),
+    batch totals (center), and throughput graph over time (lower section).}
+    \label{fig:flask-dashboard}
+\end{figure}
 
 Underlying the dashboard is a Prometheus~\cite{prometheus2024} metrics collection layer. Each sequencer exports metrics to a dedicated HTTP endpoint (ports 9100 and 9101) that Prometheus scrapes at 15-second intervals. Table~\ref{tab:metrics-exported} lists the metrics collected.
 
@@ -167,7 +177,17 @@ Underlying the dashboard is a Prometheus~\cite{prometheus2024} metrics collectio
 
 \textbf{Why this instrumentation matters}: The finality latency histogram answers RQ1—we can see exactly how long it takes for transactions to become irreversible, not just an average. The proof generation histogram isolates the computational cost of the ZK path. By comparing these histograms, we can tell whether ZK is faster because of architectural differences, or because our implementation is optimized differently. The pending transaction gauge shows how batching parameters affect how long users wait before their transaction gets included in a batch.
 
-Grafana~\cite{grafana2024} connects to the Prometheus datasource and renders pre-configured dashboards automatically when the Docker Compose stack starts. This ensures that anyone deploying the framework sees the same visualizations without manual configuration.
+Grafana~\cite{grafana2024} connects to the Prometheus datasource and renders pre-configured dashboards automatically when the Docker Compose~\cite{compose2024} stack starts. This ensures that anyone deploying the framework sees the same visualizations without manual configuration.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\textwidth]{dashboards/grafana-comparison.png}
+    \caption{Grafana dashboard comparing ZK and Optimistic Rollup metrics.
+    \textbf{Placeholder location:} \texttt{ths/images/dashboards/grafana-comparison.png}.
+    Screenshot should show side-by-side comparison of finality time, throughput, batch efficiency,
+    and proof generation time (ZK only) over the 7-day retention window.}
+    \label{fig:grafana-comparison}
+\end{figure}
 
 \section{Summary: Implementation and Big Picture}
 

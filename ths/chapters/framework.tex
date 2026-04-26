@@ -38,43 +38,15 @@ Figure~\ref{fig:architecture} shows how these pieces connect.
 
 \begin{figure}[h]
     \centering
-    \begin{verbatim}
- ┌──────────────────────────────────────────────────┐
- │         Test Scenarios                           │
- │         (Browser: localhost:3000)                │
- └────────────────────┬─────────────────────────────┘
-                      │
-         ┌────────────┴────────────┐
-         │                         │
- ┌───────▼──────────┐    ┌────────▼────────┐
- │  ZK Sequencer    │    │  OPT Sequencer  │
- │  (Port 5000)     │    │  (Port 5001)    │
- │  Batch: 100 tx   │    │  Batch: 200 tx  │
- │  Proof: SNARK    │    │  Proof: Fraud   │
- └────────┬─────────┘    └────────┬────────┘
-          │                       │
-          └───────────┬───────────┘
-                      │
-             ┌────────▼────────┐
-             │  L1 Hardhat     │
-             │  (Port 8545)    │
-             │  ZKVerifier     │
-             │  OptVerifier    │
-             └────────┬────────┘
-                      │
-             ┌────────▼────────┐
-             │  Prometheus     │
-             │  (Port 9090)    │
-             └────────┬────────┘
-                      │
-             ┌────────▼────────┐
-             │  Grafana        │
-             │  (Port 3001)    │
-             └─────────────────┘
-    \end{verbatim}
-    \caption{System architecture}
+    \includegraphics[width=0.85\textwidth]{architecture/framework-architecture.png}
+    \caption{System architecture: components, ports, and data flow.
+    \textbf{Placeholder location:} \texttt{ths/images/architecture/framework-architecture.png}.
+    This diagram should show the four main components (Hardhat L1, ZK Sequencer, Optimistic Sequencer,
+    Metrics Stack) and their port bindings.}
     \label{fig:architecture}
 \end{figure}
+
+If the image is not yet available, the ASCII diagram above is still present in the source code and can be used as a temporary reference.
 
 To deploy the framework, we run a single Docker Compose~\cite{compose2024} command. This starts all components at once. Table~\ref{tab:eval-dimensions} lists what we measure and how.
 
