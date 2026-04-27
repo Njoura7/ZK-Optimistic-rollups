@@ -4,19 +4,21 @@
 \chapter{Implementation Details}
 \label{ch:implementation}
 
-\section{Overview and Purpose}
+\section{Overview}
 
-This chapter describes how the framework instantiates the architectural concepts from the related work (Chapter~\ref{ch:relatedwork}) and the design objectives from the framework chapter (Chapter~\ref{ch:framework}). The core challenge is translating theoretical properties of ZK and Optimistic security models into measurable quantities. This requires:
+This chapter describes how the framework is built. The design chapter (Chapter~\ref{ch:framework}) explained what we want to measure and why. This chapter explains what we actually wrote and what trade-offs we made.
 
-Three things need to work:
+Three things had to work together:
 
-(1) Faithful architectural representation. The ZK contract must verify proofs (or at minimum simulate proof verification in a way that preserves the two-phase submission model); the Optimistic contract must enforce a time-bounded challenge period before finality.
+\begin{enumerate}
+    \item \textbf{Faithful architecture.} The ZK contract must require a proof at submission time and enforce a post-submission confirmation delay. The Optimistic contract must accept submissions without a proof and enforce a challenge window before finality.
 
-(2) Synchronized execution environment. Both sequencers must operate against the same Layer~1 node, eliminating environmental confounds.
+    \item \textbf{Shared Layer~1.} Both sequencers operate against the same Hardhat node simultaneously. This eliminates timing and block-production differences as confounds.
 
-(3) Instrumented measurement. Every state transition must record timestamps and outcomes for later analysis.
+    \item \textbf{Instrumented measurement.} Every state transition records a timestamp and outcome so we can analyze the data later.
+\end{enumerate}
 
-We address these constraints through three implementation layers: Layer~1 smart contracts that anchor commitments and enforce finality rules, Layer~2 sequencer processes that batch transactions and interface with Layer~1, and metrics infrastructure for observation. Each layer is described below. Throughout, we note where the framework simplifies production behavior and explain the rationale.
+The implementation has three layers: Layer~1 smart contracts (finality rules), Layer~2 sequencer processes (batching and submission), and a metrics stack (Prometheus and Grafana). Where the framework simplifies production behavior, we explain why and what that means for the results.
 
 \section{Layer~1: Smart Contract Design}
 \label{sec:l1-design}
@@ -90,12 +92,14 @@ The sequencers are implemented as independent Python processes using Flask~\cite
         \hline
         Polling interval & 5 seconds & 8 seconds \\
         \hline
-        L1 gas per submission & 200,000 & 150,000 \\
+        L1 gas per submission & $\sim$200,000 (Hardhat only) & $\sim$150,000 (Hardhat only) \\
         \hline
-        Proof record & \texttt{ZKVerifier.submit(root, proof)} & \texttt{OptimisticVerifier.submit(root)} \\
+        Contract loading & Per \texttt{\_batch()} call (lazy) & Once in \texttt{\_\_init\_\_} \\
+        \hline
+        L1 call & \texttt{ZKVerifier.submit(root, proof)} & \texttt{OptimisticVerifier.submit(root)} \\
         \hline
     \end{tabular}
-    \caption{Architectural differences between sequencer types}
+    \caption{Architectural differences between sequencer types. Gas values are from a local Hardhat node and are not representative of Ethereum mainnet costs.}
     \label{tab:sequencer-comparison}
 \end{table}
 
@@ -107,13 +111,18 @@ The gas allocations (200K vs. 150K) reflect the difference in Layer~1 contract w
 
 \subsection{Sequencer Implementation Structure}
 
-Both sequencers follow the same structure:
+Both sequencers follow the same four-step structure:
 
 \begin{enumerate}
-    \item \texttt{add\_tx(tx)}: Accept a transaction via HTTP POST, add it to the pending pool.
-    \item \texttt{periodic\_batch()}: Background thread that checks the pending pool every N seconds; if the transaction count exceeds the threshold, call \texttt{\_batch()}.
-    \item \texttt{\_batch()}: Compute the state root (and proof, if ZK), call the appropriate Layer~1 contract function, record metrics.
-    \item \texttt{calculate\_tps()}: Background thread that periodically computes and updates the throughput metric.
+    \item \texttt{add\_tx(tx)}: Accept a transaction via HTTP POST and append it to the pending pool.
+    \item \texttt{periodic\_batch()}: Background thread that wakes up every N seconds; if the pool has reached the batch threshold, call \texttt{\_batch()}.
+    \item \texttt{\_batch()}: Compute the state root (and proof, if ZK), then submit to Layer~1. The two sequencers differ here in two ways:
+        \begin{itemize}
+            \item The \textbf{ZK sequencer} reads \texttt{/app/contracts.json} on \emph{every} \texttt{\_batch()} call to obtain the verifier address. There is no contract handle stored in \texttt{\_\_init\_\_}. If the file is absent (for example, deployment has not completed), the exception is caught and the batch is dropped silently.
+            \item The \textbf{Optimistic sequencer} calls \texttt{\_init\_contract()} in \texttt{\_\_init\_\_} and stores the contract handle as \texttt{self.contract}. If that initial call failed because the L1 node was not ready, \texttt{\_batch()} retries \texttt{\_init\_contract()} before proceeding.
+        \end{itemize}
+        This difference has a practical effect: the ZK sequencer tolerates a slow deploy by simply skipping batches until the file appears; the Optimistic sequencer needs a successful L1 connection at startup.
+    \item \texttt{calculate\_tps()}: Background thread that updates the throughput gauge periodically.
 \end{enumerate}
 
 The Flask HTTP API exposes three endpoints:
@@ -143,10 +152,12 @@ The framework includes a Flask~\cite{flask2024}-based web dashboard that aggrega
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.9\textwidth]{dashboards/flask-dashboard-overview.png}
-    \caption{Flask dashboard showing real-time metrics from both sequencers.
-    \textbf{Placeholder location:} \texttt{ths/images/dashboards/flask-dashboard-overview.png}.
-    Screenshot should show: transaction counts (upper left), TPS comparison (upper right),
-    batch totals (center), and throughput graph over time (lower section).}
+    \caption{Flask dashboard showing real-time metrics from both sequencers (transaction counts,
+    current TPS, batch totals, and throughput over time). \emph{[Screenshot to be captured
+    per \texttt{ths/images/README.md} Step~1: run stack, trigger Normal~150 scenario on each
+    sequencer, screenshot \texttt{http://localhost:3000}. Save as
+    \texttt{ths/images/dashboards/flask-dashboard-overview.png}.]}
+    }
     \label{fig:flask-dashboard}
 \end{figure}
 
@@ -182,10 +193,13 @@ Grafana~\cite{grafana2024} connects to the Prometheus datasource and renders pre
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.9\textwidth]{dashboards/grafana-comparison.png}
-    \caption{Grafana dashboard comparing ZK and Optimistic Rollup metrics.
-    \textbf{Placeholder location:} \texttt{ths/images/dashboards/grafana-comparison.png}.
-    Screenshot should show side-by-side comparison of finality time, throughput, batch efficiency,
-    and proof generation time (ZK only) over the 7-day retention window.}
+    \caption{Grafana side-by-side comparison dashboard showing finality time, throughput, batch
+    efficiency, and proof generation time (ZK only).
+    \emph{[Screenshot to be captured per \texttt{ths/images/README.md} Step~2: after running
+    High Load scenario, navigate to \texttt{http://localhost:3001}, open
+    ``ZK / Optimistic Rollup L2 Metrics Comparison'', set time range to Last~5~minutes.
+    Save as \texttt{ths/images/dashboards/grafana-comparison.png}.]}
+    }
     \label{fig:grafana-comparison}
 \end{figure}
 

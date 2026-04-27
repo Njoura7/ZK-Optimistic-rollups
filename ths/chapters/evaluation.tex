@@ -76,10 +76,11 @@ As a result, the ZK~sequencer processes transactions into L1-committed batches a
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.85\textwidth]{results/throughput-comparison.png}
-    \caption{Peak throughput comparison across all scenarios.
-    \textbf{Placeholder location:} \texttt{ths/images/results/throughput-comparison.png}.
-    Graph should show bar chart with scenarios on X-axis (Normal, High Load, Batch) and TPS on Y-axis,
-    with separate bars for ZK and Optimistic side-by-side. Include error bars for $\pm$5\% variance.}
+    \caption{Peak throughput for each scenario, with ZK and Optimistic bars side by side.
+    \emph{[Generate from Prometheus data after running all three scenarios.
+    Export \texttt{l2\_tps} and \texttt{opt\_l2\_tps} gauge values per scenario, plot as grouped
+    bar chart with $\pm$5\% error bars. Save as \texttt{ths/images/results/throughput-comparison.png}.]}
+    }
     \label{fig:throughput-comparison}
 \end{figure}
 
@@ -175,11 +176,13 @@ This represents a difference of roughly 672$\times$ in finality time, which has 
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.85\textwidth]{results/finality-comparison.png}
-    \caption{Finality latency over time, measured from transaction submission to irreversibility.
-    \textbf{Placeholder location:} \texttt{ths/images/results/finality-comparison.png}.
-    Line graph should show cumulative distribution of finality times for 400 test transactions,
-    with separate lines for ZK (reaching 15s, then plateau) and Optimistic (reaching 2 minutes).
-    Include P50, P95, P99 percentile markers on the curves.}
+    \caption{Cumulative distribution of finality times for 400 test transactions: ZK plateaus
+    at $\sim$15\,s; Optimistic reaches $\sim$2\,minutes.
+    \emph{[Generate from \texttt{l2\_finality\_time\_seconds\_bucket} and
+    \texttt{opt\_l2\_finality\_time\_seconds\_bucket} histograms exported from Prometheus.
+    Plot as CDF with P50/P95/P99 markers. Save as
+    \texttt{ths/images/results/finality-comparison.png}.]}
+    }
     \label{fig:finality-comparison}
 \end{figure}
 
@@ -268,9 +271,9 @@ In summary, the ZK~Rollup detects invalidity through a cryptographic mechanism (
 
 \section{Gas Cost Analysis}
 
-Layer~1 gas consumption is a primary cost driver for any rollup deployment. Each L1 submission incurs a fixed base cost plus a variable component that depends on the calldata size and the contract's execution logic.
+\emph{Important scope note:} The gas figures in this section come from a local Hardhat node. Hardhat uses a fixed gas price and deterministic block production; it does not replicate Ethereum mainnet's market-driven fee auction, EIP-1559 base fee, or real-world congestion. The numbers here are useful for comparing the two architectures \emph{relative to each other}—the ZK path consistently uses more gas than the Optimistic path because of the proof payload and extra contract storage—but they should not be treated as absolute production cost estimates. Actual mainnet costs depend on gas price, which can vary by an order of magnitude day to day.
 
-\subsection{Per-Submission Gas}
+\subsection{Per-Submission Gas (Hardhat measurements)}
 
 Table~\ref{tab:gas-costs} reports the gas consumed per L1 submission for each architecture, measured from transaction receipts in the Hardhat environment.
 
@@ -293,20 +296,18 @@ Table~\ref{tab:gas-costs} reports the gas consumed per L1 submission for each ar
     \label{tab:gas-costs}
 \end{table}
 
-The ZK~Rollup consumes approximately 2.6$\times$ more total L1 gas than the Optimistic~Rollup for the same transaction volume. This premium arises from two factors: each ZK submission carries a proof payload that increases calldata size, and the ZK verifier contract performs additional computation (the mock proof check) that the Optimistic verifier omits. In a production deployment with on-chain Groth16 pairing verification, the per-submission gas would be higher still---typically 200K--500K gas for the pairing check alone.
+The ZK~Rollup consumes approximately 2.6$\times$ more total L1 gas than the Optimistic~Rollup for the same transaction volume. This comes from two sources: each ZK submission carries a proof payload that increases calldata size, and the ZK verifier stores both a state root and a proof hash, while the Optimistic verifier stores only the state root. In a production deployment using real Groth16 pairing verification, the per-submission cost would be substantially higher—typically an additional 200K–500K gas for the pairing check alone.
 
 \subsection{Per-Transaction Cost}
 
-Using the amortization model from Chapter~\ref{ch:framework}, the effective per-transaction L1 cost is:
+Amortizing the per-submission cost across batch size gives the effective gas cost per transaction:
 
 \begin{equation}
 \text{Cost}_{\text{ZK}} = \frac{180{,}000}{100} = 1{,}800 \text{ gas/tx}, \quad
 \text{Cost}_{\text{Opt}} = \frac{120{,}000}{200} = 600 \text{ gas/tx}
 \end{equation}
 
-The Optimistic~Rollup achieves a 3$\times$ lower per-transaction gas cost, owing to both its lower per-submission gas and its larger batch size. This result quantifies the economic trade-off identified in earlier sections: the ZK~Rollup pays a higher L1 cost in exchange for faster finality and cryptographic security.
-
-At current Ethereum mainnet gas prices (approximately 20--50~Gwei), the difference translates to a cost of roughly \$0.05--0.12 per transaction for the ZK path versus \$0.02--0.04 for the Optimistic path. For high-volume applications processing millions of transactions, this cost differential becomes a significant architectural consideration.
+The Optimistic path uses 3$\times$ less gas per transaction, driven by both its lower per-submission cost and its larger batch size. This ratio is the meaningful result: the relative difference between the two architectures is stable regardless of gas price. Translating either figure into a dollar cost requires a real mainnet gas price, which varies too much to quote reliably here.
 
 \section{Adversarial Scenario Results}
 

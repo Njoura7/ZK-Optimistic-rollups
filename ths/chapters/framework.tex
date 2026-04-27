@@ -4,23 +4,21 @@
 \chapter{Framework Design and Architecture}
 \label{ch:framework}
 
-This chapter describes the design of the testing framework. The goal is straightforward: run both rollup types against the same Layer~1 node and measure what actually happens. The framework needs to let us measure finality latency, recovery time after crashes, and resource costs. It also needs to be reproducible so other researchers can verify the results.
+This chapter describes the design of the testing framework. We run both rollup types against the same Layer~1 node and measure what actually happens under comparable conditions. The framework captures finality latency, recovery time after crashes, and throughput, and it can be reproduced with a single Docker command.
 
-\section{What the Framework Needs to Do}
+\section{Design Requirements}
 
-Based on the gaps in the literature, we identified five requirements that drove the design:
+Five requirements drove the design:
 
-First, we need to measure finality precisely. Both rollups must record when transactions are submitted and when they become irreversible. This is Gap 1 from Chapter~\ref{ch:relatedwork}—we want actual numbers, not estimates.
+\textbf{Precise finality measurement.} Both rollups record when transactions are submitted and when they become irreversible. We want measured numbers from the running system, not theoretical estimates.
 
-Second, we need to see what happens when things break. Specifically, we simulate sequencer crashes and measure how long recovery takes and whether data is lost. This addresses Gap 2.
+\textbf{Failure observation.} We simulate sequencer crashes and measure recovery time and data loss. A comparative framework that only tests the happy path misses the most architecturally interesting behavior.
 
-Third, both rollups must run against the same Layer~1 node with identical conditions. This is critical because if they run against different nodes or at different times, we cannot know whether differences come from the architecture or from the environment. This is Gap 4.
+\textbf{Shared Layer~1.} Both rollups run against the same Hardhat node. If they ran against separate nodes or at different times, observed differences could come from the environment rather than the architecture. Sharing a node eliminates that confound.
 
-Fourth, the entire testbed must be open-source and deployable with a single Docker command. This is Gap 5. If other researchers cannot easily reproduce the setup, the results are not useful.
+\textbf{Single-command deployment.} The full testbed starts with \texttt{docker-compose up -{}-build}. Reproducing the results should not require manual configuration steps that differ between machines.
 
-Fifth, we need to export enough metrics so we can actually analyze what happened. Throughput, latency, batch sizes, proof generation time—all of these need to be recorded.
-
-Three additional requirements follow from the design but are not fully implemented: extensibility (adding new rollup types should be straightforward), accessibility (it should run on standard developer hardware), and censorship resistance (partially addressed through test design).
+\textbf{Sufficient instrumentation.} Every sequencer exports throughput, batch counts, finality latency, and—for ZK—proof generation time. These feed into Prometheus and Grafana for time-series analysis.
 
 \section{System Architecture}
 
@@ -38,15 +36,13 @@ Figure~\ref{fig:architecture} shows how these pieces connect.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.85\textwidth]{architecture/framework-architecture.png}
-    \caption{System architecture: components, ports, and data flow.
-    \textbf{Placeholder location:} \texttt{ths/images/architecture/framework-architecture.png}.
-    This diagram should show the four main components (Hardhat L1, ZK Sequencer, Optimistic Sequencer,
-    Metrics Stack) and their port bindings.}
+    \includegraphics[width=0.85\textwidth]{architecture/system-architecture.png}
+    \caption{System architecture showing the four main components—Hardhat L1 node,
+    ZK Sequencer (port 5000 / metrics 9100), Optimistic Sequencer (port 5001 / metrics 9101),
+    Flask Dashboard (port 3000), Prometheus (port 9090), and Grafana (port 3001)—and
+    how they connect inside the Docker network.}
     \label{fig:architecture}
 \end{figure}
-
-If the image is not yet available, the ASCII diagram above is still present in the source code and can be used as a temporary reference.
 
 To deploy the framework, we run a single Docker Compose~\cite{compose2024} command. This starts all components at once. Table~\ref{tab:eval-dimensions} lists what we measure and how.
 
@@ -62,7 +58,9 @@ To deploy the framework, we run a single Docker Compose~\cite{compose2024} comma
         \hline
         Batching & Record batch size and timing & Transactions per batch \\
         \hline
-        Proof cost & Time to generate, gas to verify & Seconds and wei \\
+        Proof generation time & Time ZK sequencer spends computing commitment & Seconds (histogram) \\
+        \hline
+        L1 gas per submission & Gas from Hardhat receipts (local estimate only) & Gas units \\
         \hline
         State validity & Check if state roots match & Binary \\
         \hline
@@ -79,15 +77,26 @@ The Layer~1 contract either verifies the proof (ZK) or opens a challenge window 
 
 We record timestamps at each step. The difference between submission block and finality block is the latency we measure. This latency includes both on-chain delays and off-chain computation.
 
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.85\textwidth]{architecture/batch-flow.png}
+    \caption{The \texttt{\_batch()} function in both sequencer processes.
+    The two paths diverge at the SHA-256 step: the ZK sequencer computes a second
+    hash as a mock proof and reads \texttt{/app/contracts.json} on every call;
+    the Optimistic sequencer uses a contract handle loaded at startup and increments
+    its batch counter before the L1 call.}
+    \label{fig:batch-flow}
+\end{figure}
+
 \section{Why These Design Choices}
 
-We chose to use SHA-256 for proof generation instead of real zk-SNARKs. Real proofs require expensive elliptic-curve computations and specialized hardware. SHA-256 is fast enough that we can run many test scenarios quickly. The key point is that both sequencers still generate something and submit it—the architectural difference remains even though we simplified the proof. Important caveat: The 1.9\% proof overhead we measure in Chapter~\ref{ch:evaluation} is a lower bound. Production ZK~Rollups report overhead ranging from seconds to minutes per batch, depending on hardware and circuit complexity.
+We use SHA-256 for proof generation rather than real zk-SNARKs. Real proofs require elliptic-curve pairing computations and, in practice, take seconds to minutes per batch on specialized hardware. SHA-256 lets us run many test scenarios quickly without that bottleneck. Both sequencers still generate a commitment and submit it to Layer~1—the architectural difference (proof required vs.\ not required) is preserved even though the proof itself is simplified. Production ZK~Rollups report proof generation times ranging from seconds to minutes per batch, so any overhead figures measured here are a lower bound.
 
-We set the ZK batch size to 100 transactions and Optimistic to 200. Why? Because larger batches amortize the cost of Layer~1 submission better, but only if proof generation is not a bottleneck. With ZK, proof generation limits how fast the sequencer can work, so smaller batches keep finality latency low. With Optimistic, there is no proof overhead, so larger batches are fine. These numbers reflect the real trade-offs.
+The ZK batch size is 100 transactions and Optimistic is 200. Larger batches amortize the fixed cost of each Layer~1 submission across more transactions, which is good—but only when batch assembly itself is fast. With ZK, the commitment step is the bottleneck, so smaller batches keep per-transaction latency low. With Optimistic, there is no proof step, so the batching interval can be longer and the batch larger. These numbers reflect the trade-off each model makes.
 
-We compress the Optimistic challenge window to 10 blocks instead of 7 days. Production systems cannot wait 7 days for every test. But 10 blocks (roughly 2 minutes on Hardhat) preserves the structure of the security model. Any Layer~1 reorganization that is short enough to be practical to test will not exceed 5 blocks anyway.
+The Optimistic challenge window is compressed to 10 blocks (~2 minutes on a Hardhat node) from the 7-day production value. Any evaluation framework needs to complete within a reasonable time. Ten blocks preserves the structural property—invalid state can be challenged before finality—while keeping test runs tractable.
 
-We run both sequencers against the same Layer~1 node. Some frameworks test each system in isolation. That introduces noise. Network delays, block timings, gas prices—these vary over time. By running both simultaneously against identical conditions, we eliminate these variables. Any difference we observe comes from the architecture, not the environment.
+Both sequencers run against the same Layer~1 node. Isolating each in its own node would introduce timing and block-production differences that could skew results. Shared execution means any observed latency or throughput difference is architectural, not environmental.
 
 \section{Metrics We Export}
 
@@ -131,13 +140,13 @@ The framework parameters are configurable via environment variables. This allows
         \hline
         ZK_BATCH_INTERVAL & 5 & Seconds between ZK batch checks \\
         \hline
-        ZK_GAS_LIMIT & 200000 & Gas allocated to ZK submissions \\
+        ZK_GAS_LIMIT & 200000 & Gas limit for ZK submissions (Hardhat estimate; not a mainnet figure) \\
         \hline
         OPT_BATCH_SIZE & 200 & Transactions per Optimistic batch \\
         \hline
         OPT_BATCH_INTERVAL & 8 & Seconds between Optimistic batch checks \\
         \hline
-        OPT_GAS_LIMIT & 150000 & Gas allocated to Optimistic submissions \\
+        OPT_GAS_LIMIT & 150000 & Gas limit for Optimistic submissions (Hardhat estimate; not a mainnet figure) \\
         \hline
         L1_RPC & http://localhost:8545 & Layer 1 RPC endpoint \\
         \hline
