@@ -4,11 +4,11 @@
 \chapter{Conclusions and Future Work}
 \label{ch:conclusion}
 
-This chapter summarizes the main findings of the thesis, lists the contributions, offers practical recommendations for selecting a rollup architecture, and identifies directions for future research.
+This chapter draws together the main findings, offers practical guidance for choosing between the two architectures, and identifies what a follow-on study would need to test next.
 
 \section{Summary of Findings}
 
-This thesis presented a comparative testing framework for evaluating blockchain Layer~2 scaling solutions under both normal and adversarial conditions. Through the implementation and measurement of a ZK~Rollup and an Optimistic~Rollup within a shared testbed, we quantified key differences in performance, finality, and security behavior. The principal findings are summarized below.
+We built a testing framework that runs both rollup types against the same Layer~1 node and measures what happens under normal operation and deliberate failures. The principal findings are below.
 
 \subsection{Key Results}
 
@@ -25,7 +25,7 @@ The ZK~Rollup provides cryptographic safety guarantees under a 1-of-N honest pro
 ZK proof generation incurs a P95 latency of 95~ms per batch, representing approximately 1.9\% of the batch interval. This overhead is manageable with current hardware and is expected to decrease as proof systems continue to improve.
 
 \textbf{Gas costs.}
-The ZK~Rollup consumed approximately 2.6$\times$ more total L1 gas than the Optimistic~Rollup for the same transaction volume, and its per-transaction gas cost was roughly 3$\times$ higher. This cost premium is the price of cryptographic finality.
+In the Hardhat test environment, the ZK~Rollup consumed approximately 2.6$\times$ more total L1 gas than the Optimistic~Rollup for the same transaction volume, with a per-transaction cost roughly 3$\times$ higher. These are relative comparisons on a local node; absolute mainnet figures will differ. The cost difference reflects the price of cryptographic finality.
 
 \textbf{Recovery behavior.}
 Both architectures preserved L1 state consistency through sequencer crashes, but both lost in-memory pending transactions. The Optimistic sequencer's larger batch accumulation window resulted in higher potential data loss per crash event.
@@ -36,19 +36,17 @@ Table~\ref{tab:rq-answers} maps each research question to the corresponding empi
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{c|p{4cm}|p{6cm}}
+    \begin{tabular}{c|p{4.5cm}|p{5.5cm}}
         \hline
-        \textbf{RQ} & \textbf{Question (Summary)} & \textbf{Finding} \\
+        \textbf{RQ} & \textbf{Question} & \textbf{Finding} \\
         \hline
-        1 & How does finality differ? & ZK achieves true finality in $\sim$15s; Optimistic requires 7~days. Difference: $\sim$672$\times$ in production. \\
+        1 & How long does a transaction take to become irreversible? & ZK achieves true finality in $\sim$15s; Optimistic requires 7~days in production---a $\sim$672$\times$ difference. In the demo environment the gap is $\sim$8$\times$ (10-block window). \\
         \hline
-        2 & How does L1 congestion affect L2? & L1 inclusion latency is identical for both ($\sim$4.75s). Reorgs require $\sim$24s ZK recovery vs.\ full challenge period for Optimistic. \\
+        2 & When a sequencer crashes, what is the cost of recovery? & Both preserve L1 state integrity. The Optimistic sequencer loses more pending transactions per crash (larger batch accumulation window means more in-flight work). \\
         \hline
-        3 & Censorship during sequencer failure? & Both preserve L1 integrity. Optimistic loses more pending transactions per crash (142 vs.\ 73) due to larger batch accumulation. \\
+        3 & Where do the real costs land---computation, gas, or time? & ZK is faster but uses $\sim$2.6$\times$ more L1 gas (Hardhat estimate). Optimistic is cheaper but slower. Proof generation adds $\sim$95ms P95 latency per batch, not a bottleneck at this scale. \\
         \hline
-        4 & Cost of fault-escape hatches? & ZK rejection is automatic and costless to users. Optimistic challenge requires gas expenditure by the challenger. \\
-        \hline
-        5 & Data availability impact? & Both post full data on L1. ZK pays $\sim$3$\times$ more gas per transaction for this guarantee. \\
+        4 & Is a fair comparison achievable on standard developer hardware? & Yes. Both sequencers run simultaneously against the same Hardhat node on a laptop. The 21-test suite passes without specialist hardware. \\
         \hline
     \end{tabular}
     \caption{Research questions and empirical findings}
@@ -57,18 +55,14 @@ Table~\ref{tab:rq-answers} maps each research question to the corresponding empi
 
 \subsection{Contributions}
 
-The specific contributions of this thesis are:
+Three concrete things come out of this work:
 
 \begin{enumerate}
-    \item A \textbf{systematic failure-mode analysis} that quantifies rollup behavior under adversarial conditions, going beyond the ideal-state metrics reported in most existing work.
-    
-    \item A \textbf{reproducible, open-source framework} that enables other researchers to replicate and extend the experiments presented here.
-    
-    \item \textbf{Quantified trade-offs} across throughput, batching efficiency, finality latency, proof generation cost, and security properties.
-    
-    \item A \textbf{practical decision framework} that maps application requirements to the most suitable rollup architecture.
-    
-    \item A contribution toward \textbf{bridging the gap} between theoretical Layer~2 models and practical deployment considerations.
+    \item An \textbf{open-source, reproducible framework} that runs both sequencer types against the same Layer~1 node with configurable batch sizes, polling intervals, and gas allocations. Another researcher can clone it, adjust a parameter, and re-run the comparison.
+
+    \item \textbf{Measured data} on finality latency, recovery cost, and proof overhead for both architectures under identical conditions, including the adversarial scenarios that most evaluations skip.
+
+    \item An \textbf{interface specification} documented in the repository so a researcher can implement a new sequencer type---say a hybrid or a different proof system---and plug it into the same contracts and metrics infrastructure.
 \end{enumerate}
 
 \section{Practical Recommendations}
@@ -77,7 +71,7 @@ Based on the experimental results and security analysis, we offer the following 
 
 \subsection{When to Prefer a ZK~Rollup}
 
-A ZK~Rollup is well suited to applications where:
+A ZK~Rollup is the right choice for applications where:
 \begin{itemize}
     \item fast finality is critical, such as decentralized exchanges or derivatives platforms;
     \item withdrawal latency must be minimized to provide an acceptable user experience;
@@ -89,7 +83,7 @@ Typical use cases include automated market makers, cross-chain bridges (where fa
 
 \subsection{When to Prefer an Optimistic~Rollup}
 
-An Optimistic~Rollup is better suited to applications where:
+An Optimistic~Rollup fits better when:
 \begin{itemize}
     \item minimizing L1 gas costs is a top priority;
     \item the application can tolerate a 7-day withdrawal delay (or users are willing to use liquidity providers);
@@ -113,7 +107,7 @@ While the framework achieves its design objectives, several limitations should b
 
 \textbf{Simplified dispute resolution.} The Optimistic verifier's challenge mechanism accepts any \texttt{challenge()} call as valid. A production dispute system involves multi-round interactive proofs (as in Arbitrum's Cannon or Optimism's MIPS-based fault proofs) that are significantly more complex and costly.
 
-Despite these limitations, the framework achieves its central goal: providing a controlled, reproducible environment for \textit{comparative} evaluation. The relative differences between the two architectures---which are the thesis's primary findings---are robust to these simplifications, because both sides operate under the same constraints.
+Despite these limitations, the framework achieves its central goal: providing a controlled, reproducible environment for direct comparison. The relative differences between the two architectures are robust to these simplifications, because both sides operate under the same constraints.
 
 \section{Future Research Directions}
 
@@ -148,14 +142,14 @@ Several promising directions for future work emerge from this thesis.
 
 \section{Broader Impact}
 
-From an \textbf{academic perspective}, this work contributes an open-source, reproducible testbed and a systematic comparison methodology that future researchers can build upon, rather than constructing evaluation infrastructure from scratch.
+For other researchers, the main benefit is that you do not need to build evaluation infrastructure from scratch. The framework is open-source, starts with one Docker command, and produces reproducible results that can be extended or challenged.
 
-From an \textbf{industry perspective}, the decision framework and quantified trade-offs reported here can assist development teams in selecting an appropriate L2 architecture, understanding potential failure scenarios, and planning migration strategies from L1 to L2.
+For developers choosing an L2 architecture, the quantified trade-offs in Chapter~\ref{ch:evaluation} give a concrete basis for that decision rather than relying on vendor benchmarks taken under ideal conditions.
 
-From a \textbf{societal perspective}, Layer~2 scaling has the potential to reduce transaction costs (improving financial inclusion), decrease the computational burden of blockchain networks (contributing to sustainability), and improve the overall user experience (accelerating adoption of decentralized technologies).
+More broadly, cheaper and faster Layer~2 settlement has real consequences: lower transaction fees improve accessibility, and reducing the amount of computation that must run on-chain reduces energy consumption. Neither point is unique to this thesis, but the framework provides a way to measure how specific architectural choices affect both.
 
 \section{Closing Remarks}
 
-Layer~2 scaling is not a single solution but a spectrum of trade-offs. ZK~Rollups prioritize finality and cryptographic security; Optimistic~Rollups prioritize cost efficiency and EVM compatibility. Neither architecture is universally superior---the appropriate choice depends on the specific requirements of the application.
+Layer~2 scaling is not a single solution. It is a spectrum of trade-offs, and the right point on that spectrum depends on what the application actually needs. ZK~Rollups give you fast, cryptographically certain finality at a higher gas cost. Optimistic~Rollups give you cheaper settlement at the cost of a long wait before withdrawal is truly final.
 
-This thesis provides a quantitative basis for making that choice. As Layer~2 technology continues to mature, we expect the landscape to evolve toward greater diversity, with multiple architectures coexisting, each optimized for different workloads, and connected through interoperability protocols. The framework presented here is designed to evolve alongside the technology it evaluates.
+What this thesis adds is not a verdict but a measurement. The numbers in Chapter~\ref{ch:evaluation} come from a controlled environment where both systems run against the same node under identical conditions. Anyone who disagrees with the conclusions can clone the repository, change the parameters, and check. That reproducibility is the part of this work that outlasts any specific benchmark figure.
