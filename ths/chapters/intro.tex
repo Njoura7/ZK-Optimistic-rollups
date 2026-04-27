@@ -28,29 +28,29 @@ Most evaluation papers measure throughput when the network is uncongested, laten
 
 \section{What This Thesis Does}
 
-This thesis builds a testing framework and uses it to measure both rollup types under normal operation and deliberate failures. The goal is to characterize when each approach is preferable.
+This thesis creates a testing framework and uses it to evaluate both types of rollups in normal functioning and during specific failures. The aim is to understand when each method is better.
 
-The framework runs both sequencers against the same Layer~1 node and measures what happens. We simulate sequencer crashes. We inject Layer~1 delays. We submit invalid states. For each scenario, we record finality latency, recovery time, gas cost, and whether data is lost.
+The framework tests both sequencers on the same Layer~1 node and observes the outcomes. We simulate sequencer crashes, introduce Layer~1 delays, and submit incorrect states. For each situation, we track finality latency, recovery time, gas costs, and whether any data is lost.
 
-Everything is open-source and deployable with a single Docker command. This means other researchers can verify the results, extend the evaluation, and build on the work.
+Everything is open-source and can be deployed with just one Docker command. This allows other researchers to check the results, enhance the evaluation, and further develop the work.
 
 \section{Research Questions}
 
-The evaluation answers four specific questions.
+This evaluation tackles four key questions.
 
-First, how long does a transaction actually take to become irreversible? Theory says ZK Rollups finalize in seconds and Optimistic Rollups finalize in days. What do we measure in practice?
+First, how long does it take for a transaction to become irreversible? Theory suggests ZK Rollups wrap up in seconds, while Optimistic Rollups take days. What do we actually see in practice?
 
-Second, when a sequencer crashes, what is the cost to recover? Do users lose their transactions? How much gas is required to get the system working again?
+Second, when a sequencer fails, what’s the recovery cost? Do users lose their transactions? What’s the gas cost to get everything back on track?
 
-Third, what are the actual trade-offs? ZK Rollups compute proofs. Optimistic Rollups wait for challenge windows. Where do the real costs come from?
+Third, what are the true trade-offs? ZK Rollups create proofs, whereas Optimistic Rollups wait for challenge periods. Where do the actual costs arise?
 
-Fourth, can we build a fair comparison on standard developer hardware? If yes, the framework is useful. If no, it is a toy.
+Fourth, can we create a fair comparison using standard developer hardware? If we can, the framework is valuable. If not, then it's merely a toy.
 
 \section{Why a Framework?}
 
-Why not deploy both systems on mainnet and compare? Because environmental noise masks architectural differences. Gas prices change. Network conditions vary. Sequencer implementations differ in hundreds of ways. A controlled framework isolates the essential differences.
+Why not just run both systems on mainnet and compare them? Because environmental noise hides key architectural differences. Gas prices fluctuate. Network conditions shift. Sequencer implementations vary in numerous ways. A controlled framework can highlight the essential distinctions.
 
-Why not just do formal analysis? Because real systems diverge from theory. Proof generation has overhead that depends on batch size, hardware, and implementation choices. Fraud proofs require network propagation delays that formal analysis does not capture. Real bugs occur in real systems. Formal analysis gives bounds; measurement gives data.
+Why not focus solely on formal analysis? Because real systems often stray from theoretical expectations. Proof generation incurs overhead that varies with batch size, hardware, and implementation choices. Fraud proofs depend on network propagation delays that formal analysis misses. Real bugs crop up in actual systems. Formal analysis offers limits, while measurement provides real data.
 
 \section{Contributions}
 
