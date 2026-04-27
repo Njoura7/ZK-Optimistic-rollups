@@ -4,165 +4,105 @@
 \chapter{Background: Layer~2 Scaling Solutions}
 \label{ch:background}
 
-This chapter covers the technical concepts the rest of the thesis
-builds on. Section~\ref{sec:fundamentals} describes the throughput
-constraints of Layer~1 blockchains. Section~\ref{sec:l2concept}
-introduces the general Layer~2 execution model. Sections~\ref{sec:zk}
-and~\ref{sec:optimistic} describe each rollup family and note how this
-thesis instantiates them. Section~\ref{sec:summary} connects the
-chapter to the work that follows.
+Blockchain throughput is limited by design, not accident. This chapter explains why, then describes how ZK and Optimistic rollups address that limitation in different ways. Each rollup section closes with a brief note on how the concept maps to the contracts and sequencer code in this framework, so Chapter~\ref{ch:implementation} can go straight to implementation detail without re-explaining the theory.
 
 % -----------------------------------------
 \section{Blockchain Fundamentals}
 \label{sec:fundamentals}
 % -----------------------------------------
 
-Bitcoin~\cite{nakamoto2008bitcoin} established a decentralized
-consensus model for exchanging value without intermediaries. Ethereum
-extended it with a programmable execution layer~\cite{wood2014ethereum}.
-Both networks face a hard throughput ceiling: Bitcoin sustains roughly
-seven transactions per second, Ethereum around fifteen, both governed
-by block-level resource limits~\cite{croman2016scaling}.
+Bitcoin~\cite{nakamoto2008bitcoin} established a decentralised consensus model for exchanging value without intermediaries. Ethereum extended it with a programmable execution layer~\cite{wood2014ethereum}. Both networks face a hard throughput ceiling: Bitcoin sustains roughly seven transactions per second and Ethereum around fifteen, both governed by block-level resource limits~\cite{croman2016scaling}.
 
-A blockchain can be modeled as a state machine. At each block~$t$ the
-network holds a global state~$S_t$; incoming transactions produce a
-successor:
+A blockchain can be modelled as a state machine. At each block~$t$ the network holds a global state~$S_t$; incoming transactions produce a successor:
 \begin{equation}
   S_{t+1} = \text{apply}(S_t,\ \text{txs}_t)
 \end{equation}
-Integrity rests on three properties~\cite{wood2014ethereum}:
-\textit{consensus} (agreement on transaction ordering),
-\textit{finality} (irreversibility of confirmed blocks), and
-\textit{data availability} (full auditability by any node). Layer~2
-systems inherit these properties from the base layer rather than
-reproducing them independently.
+Integrity rests on three properties~\cite{wood2014ethereum}: consensus (agreement on transaction ordering), finality (irreversibility of confirmed blocks), and data availability (full auditability by any participant). Layer~2 systems inherit these properties from the base layer rather than building them independently. That inheritance is exactly the commitment that gets posted to Layer~1.
 
 % -----------------------------------------
 \section{The Layer~2 Execution Model}
 \label{sec:l2concept}
 % -----------------------------------------
 
-Layer~2 systems separate execution from settlement~\cite{gudgeon2020sok}.
-A \textit{sequencer} orders transactions, executes them off-chain, and
-periodically submits a state commitment to a Layer~1 smart contract.
-Security derives from that on-chain commitment, not from the off-chain
-environment itself.
+Layer~2 systems separate execution from settlement~\cite{gudgeon2020sok}. A sequencer orders transactions, executes them off-chain, and periodically submits a state commitment to a Layer~1 smart contract. Security derives from that on-chain commitment, not from the off-chain environment.
 
-The economic motivation is cost amortization. One Layer~1 verification
-is shared across an entire batch:
+The economic motivation is cost amortisation. One Layer~1 verification is shared across an entire batch:
 \begin{equation}
   \text{Cost per L2 tx} =
     \frac{\text{L1 batch cost} + \text{L2 execution cost}}{\text{batch size}}
 \end{equation}
-The two dominant approaches differ in what the sequencer submits
-alongside the state root: a cryptographic validity proof (ZK~Rollups)
-or nothing, relying on a post-hoc fraud challenge
-(Optimistic~Rollups)~\cite{sok-layer2}.
+The two dominant rollup families differ in what the sequencer submits alongside the state root: a cryptographic validity proof in the ZK case, or nothing---relying instead on a post-hoc fraud challenge---in the Optimistic case~\cite{sok-layer2}.
 
 % -----------------------------------------
 \section{ZK Rollups}
 \label{sec:zk}
 % -----------------------------------------
 
-A ZK~Rollup requires a validity proof with every state
-commitment~\cite{groth2016size}. The prover computes a zk-SNARK
-attesting that the transition from $\text{state}_\text{old}$ to
-$\text{state}_\text{new}$ is correct:
+A ZK~Rollup requires a validity proof with every state commitment~\cite{groth2016size}. The prover computes a zk-SNARK attesting that the transition from $\text{state}_\text{old}$ to $\text{state}_\text{new}$ is correct:
 \begin{equation}
-  \pi = \text{Prove}(\text{state}_\text{old},\ \text{txs},\
-    \text{state}_\text{new})
+  \pi = \text{Prove}(\text{state}_\text{old},\ \text{txs},\ \text{state}_\text{new})
 \end{equation}
-The Layer~1 verifier contract accepts or rejects the submission
-immediately based on the proof alone---no waiting period is
-needed~\cite{groth2016size}. Production deployments such as
-zkSync~\cite{zksync-paper} and Scroll~\cite{scroll2023} implement
-Groth16~\cite{groth2016size} verification using Ethereum's BN254
-pairing precompile.
+The Layer~1 verifier contract accepts or rejects the submission immediately based on the proof alone---no waiting period is needed~\cite{groth2016size}. Production deployments such as zkSync~\cite{zksync-paper} and Scroll~\cite{scroll2023} implement Groth16~\cite{groth2016size} verification using Ethereum's BN254 pairing precompile.
 
 \textbf{Security.}
-Safety follows from proof soundness: a dishonest sequencer cannot
-produce a valid proof for an incorrect state. This property is
-sometimes called the \textit{one-honest-prover}
-condition~\cite{chaliasos2024sok}---the system remains safe as long as
-one correct prover exists. Finality is achieved shortly after the
-proof lands on Layer~1, typically within one block confirmation
-window.
+Safety follows from proof soundness: a dishonest sequencer cannot produce a valid proof for an incorrect state transition. This is sometimes called the one-honest-prover property~\cite{sok-layer2}---the system remains safe as long as one correct prover exists. Finality is achieved shortly after the proof lands on Layer~1, typically within one block confirmation window.
 
 \textbf{Constraints.}
-Proof generation is computationally expensive, requiring specialized
-hardware in production and adding measurable latency per
-batch~\cite{zksync-paper}. On-chain verification costs between 200K
-and 500K gas due to pairing operations~\cite{groth2016size}. Newer
-schemes such as PLONK~\cite{gabizon2019plonk} and
-STARKs~\cite{ben-sasson2018stark} reduce some of these overheads but
-Groth16 remains the most widely deployed.
+Proof generation is computationally expensive and adds measurable latency per batch~\cite{zksync-paper}. On-chain verification costs between 200K and 500K gas due to pairing operations~\cite{groth2016size}. Newer schemes such as PLONK~\cite{gabizon2019plonk} and STARKs~\cite{bensasson2018stark} reduce some of these overheads, but Groth16 remains the most widely deployed in production as of this writing.
 
 \textbf{Framework instantiation.}
-\texttt{ZKVerifier.sol} accepts a state root and a mock proof,
-binding it to a verifying-key hash. Proof generation is simulated
-in \texttt{l2-zk/sequencer.py} using SHA-256 hashing. Batch
-size and polling interval are configurable but default to 100~transactions
-and 5~seconds, reflecting the higher per-batch submission cost relative to the Optimistic side.
+\texttt{ZKVerifier.sol} accepts a state root and a mock proof, binding it to a verifying-key hash. Proof generation is simulated in \texttt{l2-zk/sequencer.py} using two chained SHA-256 hashes---one for the state root, one for the proof. This preserves the structural property (proof required at submission; no challenge window) without the hardware cost of real elliptic-curve computation. Batch size and polling interval default to 100~transactions and 5~seconds, reflecting the higher per-batch submission cost relative to the Optimistic path.
 
 % -----------------------------------------
 \section{Optimistic Rollups}
 \label{sec:optimistic}
 % -----------------------------------------
 
-An Optimistic~Rollup posts a state root without a proof and opens a
-\textit{challenge window}---a period during which any observer can
-dispute the commitment by submitting a fraud
-proof~\cite{arbitrum-original}. In production deployments (Optimism,
-Arbitrum) this window is seven days. In this framework it is
-compressed to ten Layer~1 blocks ($\approx$2~minutes on a local
-Hardhat node) for experimental tractability.
+An Optimistic~Rollup posts a state root without a proof and opens a challenge window---a period during which any observer can dispute the commitment by submitting a fraud proof~\cite{arbitrum-original}. In production deployments such as Optimism and Arbitrum, this window is seven days. In this framework it is compressed to ten Layer~1 blocks (approximately two minutes on a local Hardhat node) for experimental tractability.
 
-Fraud proving is implemented as a bisection protocol: the challenger
-and sequencer narrow their disagreement to a single execution step,
-which the Layer~1 contract re-executes to resolve the
-dispute~\cite{arbitrum-original}. Optimism implements this via the
-Cannon fault-proof VM~\cite{optimism2023cannon}; Arbitrum uses a
-comparable WebAssembly-based mechanism~\cite{arbitrum-original}.
+Fraud proving in production systems is implemented as a bisection protocol: the challenger and sequencer narrow their disagreement to a single execution step, which the Layer~1 contract re-executes to resolve the dispute~\cite{arbitrum-original}. Optimism implements this via the Cannon fault-proof virtual machine~\cite{cannon2023}; Arbitrum uses a comparable mechanism based on WebAssembly.
 
-A commitment that survives its window without a valid challenge
-transitions from optimistic acceptance to finality. This framework's
-\texttt{OptimisticVerifier.sol} models the lifecycle through four
-states: \texttt{PENDING}, \texttt{SOFT\_FINAL}, \texttt{HARD\_FINAL},
-and \texttt{CHALLENGED}.
+A commitment that survives its window without a valid challenge transitions from optimistic acceptance to finality. The \texttt{OptimisticVerifier.sol} contract in this framework models the lifecycle through four states: \texttt{PENDING}, \texttt{SOFT\_FINAL}, \texttt{HARD\_FINAL}, and \texttt{CHALLENGED}.
 
 \textbf{Security.}
-Safety depends on what Kalodner et al.~\cite{arbitrum-original} term
-the \textit{at-least-one-honest-watcher} condition: the system is
-secure as long as one participant monitors the chain and challenges
-invalid roots within the window. This is an economic guarantee,
-enforced through sequencer collateral, rather than a cryptographic
-one~\cite{chaliasos2024sok}.
+Safety depends on what Kalodner et al.~\cite{arbitrum-original} term the at-least-one-honest-watcher condition: the system is secure as long as one participant monitors the chain and challenges invalid roots within the window. This is an economic guarantee enforced through sequencer collateral, not a cryptographic one~\cite{sok-layer2}.
 
 \textbf{Constraints.}
-The challenge window is the primary usability cost: withdrawals to
-Layer~1 are delayed by the full window, unless a liquidity provider
-offers an early exit for a fee. Full transaction data must be published
-on-chain so watchers can reconstruct state independently; EIP-4844
-blob transactions~\cite{eip4844} reduce this data cost in recent
-deployments.
+The challenge window is the primary usability cost: withdrawals to Layer~1 are delayed by the full window unless a liquidity provider offers early exit for a fee. Full transaction data must be published on-chain so watchers can reconstruct state independently; EIP-4844 blob transactions~\cite{eip4844} reduce this data cost in recent deployments.
 
 \textbf{Framework instantiation.}
-\texttt{l2-optimistic/sequencer.py} submits state roots without proof
-generation. Batch size and polling interval are configurable but default to 200~transactions
-and 8~seconds. Recovery scenarios are
-triggered programmatically and observed through Prometheus metrics
-(Chapter~\ref{ch:implementation}).
+\texttt{l2-optimistic/sequencer.py} submits state roots without proof generation---a single SHA-256 hash of the batch data serves as the state root. Batch size and polling interval default to 200~transactions and 8~seconds. The contract loading strategy differs from the ZK sequencer in one important detail: the Optimistic sequencer loads the verifier contract handle once at startup, while the ZK sequencer reads \texttt{contracts.json} on every batch call. Recovery scenarios are triggered programmatically and observed through Prometheus metrics on port~9101.
 
 % -----------------------------------------
-\section{Summary}
+\section{How the Two Approaches Compare}
 \label{sec:summary}
 % -----------------------------------------
 
-Both rollup families move execution off-chain and anchor security
-on-chain, but differ in the mechanism that links the two: immediate
-cryptographic verification in the ZK case versus deferred economic
-enforcement in the Optimistic case. This single design choice drives
-every dimension this thesis measures---finality time, recovery cost,
-and security mechanism overhead. Chapter~\ref{ch:relatedwork} surveys
-how existing work has studied these properties and identifies the gap
-this framework addresses.
+Both rollup families move execution off-chain and anchor security on-chain, but differ in the mechanism that links the two: immediate cryptographic verification in the ZK case versus deferred economic enforcement in the Optimistic case. That one design choice is the source of every difference measured in Chapter~\ref{ch:evaluation}: finality time, per-transaction gas cost, recovery behaviour after a crash, and what happens when an invalid state root is submitted.
+
+Table~\ref{tab:bg-summary} summarises the properties at a glance before the framework chapters get into specifics.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|p{4.5cm}|p{4.5cm}}
+        \hline
+        \textbf{Property} & \textbf{ZK Rollup} & \textbf{Optimistic Rollup} \\
+        \hline
+        Proof at submission & Required (cryptographic) & None \\
+        \hline
+        Finality trigger & Proof verified on Layer~1 & Challenge window expires \\
+        \hline
+        Typical finality (production) & Seconds to minutes & 7 days \\
+        \hline
+        Invalid state detection & Immediate (proof rejection) & After fraud proof (during window) \\
+        \hline
+        Security assumption & One honest prover & At least one honest watcher \\
+        \hline
+        Layer~1 gas cost & Higher (proof calldata) & Lower (state root only) \\
+        \hline
+    \end{tabular}
+    \caption{Summary of ZK and Optimistic rollup properties}
+    \label{tab:bg-summary}
+\end{table}
+
+Chapter~\ref{ch:relatedwork} reviews how existing research has studied these properties and identifies what is still missing.
