@@ -8,7 +8,7 @@ This chapter examines the security properties of both rollup architectures under
 
 \section{Threat Model}
 
-We consider five adversarial scenarios that are relevant to any Layer~2 deployment:
+Five adversarial scenarios are relevant to any Layer~2 deployment:
 
 \begin{enumerate}
     \item \textbf{Malicious sequencer}: the sequencer attempts to commit invalid state transitions to L1.
@@ -18,7 +18,7 @@ We consider five adversarial scenarios that are relevant to any Layer~2 deployme
     \item \textbf{Data unavailability}: L2 state data is not published or becomes inaccessible, preventing independent verification.
 \end{enumerate}
 
-We assume the adversary controls the sequencer process but not the Layer~1 consensus mechanism. The L1 chain is assumed to be secure under standard proof-of-stake assumptions (i.e., at least two-thirds of validators are honest). The following sections analyze how each architecture responds to these threats, with references to the empirical results from Chapter~\ref{ch:evaluation} where applicable.
+We assume the adversary controls the sequencer process but not the Layer~1 consensus mechanism. The L1 chain is assumed to be secure under standard proof-of-stake assumptions---that is, at least two-thirds of validators are honest. Each section below examines how each architecture responds to these threats, with reference to the empirical results from Chapter~\ref{ch:evaluation} where applicable.
 
 \section{ZK Rollup Security}
 
@@ -39,7 +39,7 @@ If the sequencer produces valid transactions but fails to generate proofs (wheth
 \begin{itemize}
     \item transactions continue to be accepted at the L2 level but are not finalized on L1;
     \item users cannot prove the current L2 state to external parties or to L1;
-    \item the system is effectively \textit{censored but not compromised}---no funds are at risk, but progress halts.
+    \item the system is effectively stalled but not compromised---no funds are at risk, but progress halts.
 \end{itemize}
 
 The standard mitigation is a force-inclusion mechanism that requires the sequencer to produce proofs within a deadline or face penalties (such as collateral slashing or sequencer replacement).
@@ -200,4 +200,10 @@ The security analysis yields several practical guidelines for deploying and oper
 
 \textbf{Sequencer redundancy.} The crash recovery results from Chapter~\ref{ch:evaluation} show that both sequencers lose in-memory state upon failure. Production deployments should implement transaction persistence (write-ahead logging) and standby sequencer failover to minimize data loss during outages.
 
-\textbf{Cost of security.} The ZK~Rollup's security comes at a measurable cost: approximately 2.6$\times$ higher L1 gas consumption (Chapter~\ref{ch:evaluation}). For applications where the security premium is justified by the value at risk, this cost is acceptable. For lower-value applications, the Optimistic model's cheaper security may be sufficient.
+\textbf{Cost of security.} The ZK~Rollup's security comes at a measurable cost: approximately 2.6$\times$ higher L1 gas consumption in the Hardhat test environment (Chapter~\ref{ch:evaluation}). For applications where the security premium is justified by the value at risk, this cost is acceptable. For lower-value applications, the Optimistic model's cheaper security may be sufficient.
+
+\section{What the Security Analysis Adds}
+
+The patterns from Chapter~\ref{ch:evaluation} translate directly into security terms. ZK finality is fast because invalid states are rejected at the contract level before they reach L1 storage. Optimistic finality is slow because security depends on watchers having enough time to act. The analysis in this chapter gives that intuition a concrete form---specifically, the minimum observer count needed to bring unchallenged-fraud probability below a target threshold, and the recovery-time formula for reorg scenarios.
+
+Chapter~\ref{ch:conclusion} takes these findings and asks the practical question: when does each architecture actually make sense, and what would a follow-on study need to test next?
