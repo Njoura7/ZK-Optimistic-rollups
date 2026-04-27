@@ -37,3 +37,6 @@ Thumbs.db
 
 # latex for thesis
 # main.tex
+
+# Claude Code internals — worktrees, session state, memory
+.claude/
