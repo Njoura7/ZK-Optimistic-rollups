@@ -4,19 +4,21 @@
 \chapter{Implementation Details}
 \label{ch:implementation}
 
-\section{Overview and Purpose}
+\section{Overview}
 
-This chapter describes how the framework instantiates the architectural concepts from the related work (Chapter~\ref{ch:relatedwork}) and the design objectives from the framework chapter (Chapter~\ref{ch:framework}). The core challenge is translating theoretical properties of ZK and Optimistic security models into measurable quantities. This requires:
+This chapter describes how the framework is built. Chapter~\ref{ch:framework} explained what we want to measure and why. This chapter explains what we actually wrote and what trade-offs we made.
 
-Three things need to work:
+Three things had to work together:
 
-(1) Faithful architectural representation. The ZK contract must verify proofs (or at minimum simulate proof verification in a way that preserves the two-phase submission model); the Optimistic contract must enforce a time-bounded challenge period before finality.
+\begin{enumerate}
+    \item \textbf{Faithful architecture.} The ZK contract must require a proof at submission time and enforce a post-submission confirmation delay. The Optimistic contract must accept submissions without a proof and enforce a challenge window before finality.
 
-(2) Synchronized execution environment. Both sequencers must operate against the same Layer~1 node, eliminating environmental confounds.
+    \item \textbf{Shared Layer~1.} Both sequencers operate against the same Hardhat node simultaneously. This eliminates timing and block-production differences as confounds.
 
-(3) Instrumented measurement. Every state transition must record timestamps and outcomes for later analysis.
+    \item \textbf{Instrumented measurement.} Every state transition records a timestamp and outcome so we can analyze the data later.
+\end{enumerate}
 
-We address these constraints through three implementation layers: Layer~1 smart contracts that anchor commitments and enforce finality rules, Layer~2 sequencer processes that batch transactions and interface with Layer~1, and metrics infrastructure for observation. Each layer is described below. Throughout, we note where the framework simplifies production behavior and explain the rationale.
+The implementation has three layers: Layer~1 smart contracts (finality rules), Layer~2 sequencer processes (batching and submission), and a metrics stack (Prometheus and Grafana). Where the framework simplifies production behavior, we explain why and what that means for the results.
 
 \section{Layer~1: Smart Contract Design}
 \label{sec:l1-design}
@@ -189,22 +191,53 @@ Grafana~\cite{grafana2024} connects to the Prometheus datasource and renders pre
     \label{fig:grafana-comparison}
 \end{figure}
 
-\section{Summary: Implementation and Big Picture}
+\section{Validation Through Automated Tests}
+\label{sec:tests}
 
-This chapter described how we translated architectural concepts into working code. The core principle is: keep the architecture faithful, simplify the expensive parts, and measure the differences that matter.
+The framework includes 21 automated tests distributed across three tiers. Each test replaces the web3 library and the Prometheus client with mock objects at import time, so no Hardhat node or running Docker stack is required. Tests can therefore execute in continuous integration without the startup cost of the full service.
 
-The Layer~1 contracts preserve the essential security models (ZK requires proof at submission; Optimistic requires a challenge window), but they don't do expensive cryptographic operations. The Layer~2 sequencers implement the core batching and submission logic that distinguishes ZK from Optimistic, with tuned parameters that reflect each model's economics. All parameters are configurable via environment variables, so researchers can change batch sizes, polling intervals, or gas allocations and immediately see the impact.
+\subsection{Test Structure}
 
-The metrics infrastructure captures what we need to answer the research questions:
+\textbf{Unit tests} cover ten cases: five for each sequencer. Each test instantiates a fresh sequencer object so that metric state accumulated in one test does not carry into the next. The ZK unit tests check that the batch threshold fires at exactly 100 transactions, that the commitment step produces a 32-byte state root and a non-empty proof, that the throughput gauge computes correctly from a known transaction count and elapsed time, and that an RPC failure during Layer~1 submission leaves the batch counter at zero. The Optimistic unit tests apply the same categories of check at the 200-transaction threshold—confirming the absence of a second hash call (no proof step), that the finality timestamp is recorded, and that the HTTP metrics endpoint returns the required fields.
 
-\begin{itemize}
-    \item RQ1 (Finality latency) — measured via the finality time histogram
-    \item RQ2 (Recovery cost) — measured via adversarial test scenarios that trigger crashes
-    \item RQ3 (Comparative evaluation) — enabled by running both sequencers against the same Layer~1 node
-    \item RQ4 (Reproducibility) — achieved via single-command Docker Compose deployment
-    \item RQ5 (Observability) — provided by Prometheus metrics and Grafana dashboards
-\end{itemize}
+\textbf{Integration tests} cover seven scenarios and load both sequencer classes in the same test process using distinct module aliases to prevent name conflicts. The tests verify that 200 transactions submitted to each sequencer produce two ZK batches and one Optimistic batch, that the full pipeline from submission to mock Layer~1 receipt increments the correct counters, that the ZK path performs exactly two SHA-256 operations per batch while the Optimistic path performs one, that 500 transactions produce five ZK batches and two Optimistic batches (with 100 below threshold and left pending), and that both metrics endpoints expose the same core fields.
 
-The framework's modular design—separate processes communicating via HTTP, configurable parameters, and clear contract interfaces—makes it suitable for extension. Researchers can implement custom sequencers by following the interface specification in the repository documentation. A custom sequencer needs to: (1) expose HTTP endpoints for transaction submission and metrics reporting, (2) read contract addresses from the framework's configuration, and (3) call the contract's submit() function with the appropriate parameters.
+\textbf{Adversarial tests} cover four failure scenarios. One injects a \texttt{RuntimeError} at the moment the batch threshold fires and verifies that a replacement sequencer starts with clean state. A second applies the same crash scenario to the Optimistic sequencer at its larger threshold. A third introduces a 1.5-second delay inside \texttt{\_batch()} to model Layer~1 inclusion latency and confirms that all transaction counts remain accurate despite the blocking call. A fourth configures the ZK contract mock to reject finalization for a malicious state root and confirms that the Optimistic challenge window shows blocks remaining before finality.
 
-The framework bridges the architectural understanding in Chapter~\ref{ch:framework} and the empirical evaluation in Chapter~\ref{ch:evaluation}. It operationalizes design objectives into concrete technical artifacts that can be deployed, tested, and analyzed.
+Table~\ref{tab:test-coverage} maps each tier to the research questions it exercises.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|c|l}
+        \hline
+        \textbf{Tier} & \textbf{Tests} & \textbf{Research Questions Covered} \\
+        \hline
+        Unit — ZK sequencer & 5 & RQ1 (finality mechanism), RQ3 (proof overhead) \\
+        \hline
+        Unit — Optimistic sequencer & 5 & RQ1 (challenge period), RQ3 (no proof overhead) \\
+        \hline
+        Integration — dual sequencer & 7 & RQ1, RQ3, RQ5 (metrics schema parity) \\
+        \hline
+        Adversarial — crash and recovery & 4 & RQ2 (recovery), RQ4 (invalid state) \\
+        \hline
+    \end{tabular}
+    \caption{Test tier structure and research question coverage}
+    \label{tab:test-coverage}
+\end{table}
+
+\subsection{Running the Tests}
+
+Tests run through the Docker Compose test profile and are separate from the main service stack:
+
+\begin{verbatim}
+docker compose --profile test run --rm test-runner \
+    pytest tests/ -v --tb=short
+\end{verbatim}
+
+Individual tiers can be targeted by path (e.g., \texttt{tests/adversarial/}). The expected result is 21 tests passing in under two minutes. Tests are also executed automatically on every commit that modifies sequencer code, contracts, or test files through the GitHub Actions workflow in \texttt{.github/workflows/ci.yml}.
+
+\section{From Code to Measurement}
+
+This chapter described how the design objectives from Chapter~\ref{ch:framework} became concrete code. The Layer~1 contracts enforce the correct finality rules for each architecture without running the full cryptographic operations that would make experimental iteration impractical. The Layer~2 sequencers implement the batching and submission logic that distinguishes ZK from Optimistic, with parameters exposed as environment variables so that any configuration can be tested by restarting the stack. The metrics layer exports histograms and counters that answer the research questions directly: finality latency distributions for RQ1, crash behavior for RQ2, and proof overhead for RQ3. The automated test suite validates each component in isolation before anything runs against the live Hardhat node.
+
+Chapter~\ref{ch:evaluation} takes these components as given and uses them to generate measurements. It reports what the numbers look like under normal load, high load, and adversarial conditions, and discusses what the differences mean for each architecture.
