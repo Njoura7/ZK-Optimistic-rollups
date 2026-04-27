@@ -4,7 +4,7 @@
 \chapter{Security Analysis and Failure Modes}
 \label{ch:security}
 
-This chapter examines the security properties of both rollup architectures under adversarial conditions. We define a threat model, analyze the strengths and vulnerabilities of each architecture, and evaluate the impact of L1 chain reorganizations on L2 finality.
+This chapter examines security properties and failure modes. Two of the scenarios below were directly tested: sequencer crashes (scenario 3) and invalid state submissions (scenario 1). The remaining three---chain reorganisations, censorship, and data unavailability---are not easily reproducible on a local Hardhat node, so they are analysed from the architecture rather than measured. Each section makes clear which category it falls into.
 
 \section{Threat Model}
 
@@ -106,6 +106,8 @@ Users who wish to withdraw funds from an Optimistic~Rollup to L1 must wait for t
 Proposed mitigations include liquidity networks and hybrid models that use ZK proofs to accelerate the withdrawal process.
 
 \section{L1 Reorganization Impact}
+
+The following analysis is derived from the architecture, not from an experiment. Hardhat produces deterministic blocks and does not simulate chain reorganisations, so these scenarios were not run. The estimates use Ethereum mainnet block timing (12 seconds per block) as a reference.
 
 \subsection{Scenario: Shallow Reorg (1~Block)}
 

@@ -16,19 +16,19 @@ The systematisation provides a useful taxonomy and analyses security properties 
 
 \subsection{ZK Rollup Research}
 
-Bunz et al.\ introduced Bulletproofs, a proof system that generates efficient zero-knowledge range proofs without a trusted setup ceremony~\cite{zk-efficient-proofs}. By eliminating that ceremony, Bulletproofs removed a significant barrier to deploying zero-knowledge schemes in decentralised settings. Subsequent research extended this work toward SNARKs capable of verifying general computation, which is what makes ZK~Rollups over arbitrary smart contract logic possible.
+Bünz et al.\ introduced Bulletproofs, a proof system that generates efficient zero-knowledge range proofs without a trusted setup ceremony~\cite{zk-efficient-proofs}. By eliminating that ceremony, Bulletproofs removed a significant barrier to deploying zero-knowledge schemes in decentralised settings. Subsequent work extended this toward SNARKs capable of verifying general computation---the foundation for ZK~Rollups over arbitrary smart contract logic.
 
-Gluchowski et al.\ published the architectural design of zkSync, a ZK~Rollup built on a PLONK-based proof system~\cite{zksync-paper}. Their contribution centres on proof generation optimisations and strategies for EVM compatibility. The Scroll project builds on this lineage with a Groth16-based verifier~\cite{scroll2023}. The \texttt{ZKVerifier} contract in this thesis draws on patterns from both architectures.
+The zkSync team published the architectural design of their PLONK-based ZK~Rollup~\cite{zksync-paper}, focusing on proof generation and EVM compatibility. The Scroll project~\cite{scroll2023} follows the same line with a Groth16-based on-chain verifier. The \texttt{ZKVerifier} contract in this thesis takes its structural pattern from these two designs: a submission function that requires a proof and a finalization check tied to block confirmation. What we do differently is compress the confirmation delay to five blocks and replace the BN254 pairing check with a hash comparison, so the framework can iterate quickly without specialized hardware.
 
-Neither body of work provides a systematic measurement of ZK~Rollup finality behaviour under adverse conditions such as Layer~1 reorganisations or sequencer outages. The performance of ZK~Rollups when something goes wrong remains largely uncharted.
+Neither of these bodies of work measures ZK~Rollup behaviour when something breaks---no systematic data exists on finality under Layer~1 reorganisations or sequencer outages. That is the gap this thesis addresses.
 
 \subsection{Optimistic Rollup Research}
 
-Kalodner et al.\ introduced Arbitrum, one of the earliest Optimistic~Rollups~\cite{arbitrum-original}. Their principal contribution is the interactive fault game: a multi-round dispute protocol that progressively narrows the scope of disagreement until the Layer~1 contract only needs to re-execute a single instruction to determine whether the challenged transition was valid. This reduces the on-chain cost of dispute resolution compared to re-executing the whole batch.
+Kalodner et al.\ introduced Arbitrum, one of the first Optimistic~Rollups~\cite{arbitrum-original}. Their main contribution is the interactive fault game: a multi-round dispute protocol that narrows disagreement to a single instruction, which the Layer~1 contract re-executes to settle the dispute. This avoids re-executing the whole batch on-chain.
 
-The \texttt{OptimisticVerifier} contract in this thesis incorporates patterns from Optimism Bedrock~\cite{optimism2023bedrock} and Arbitrum Nitro~\cite{nitro2023}, including the configurable challenge period through which commitments must pass before finality. The implementation uses ten blocks---a compressed value that preserves the architectural semantics while keeping experimental runs tractable.
+The \texttt{OptimisticVerifier} contract in this thesis borrows two specific patterns from Arbitrum Nitro~\cite{nitro2023} and Optimism Bedrock~\cite{optimism2023bedrock}: the configurable challenge window and the four-state commitment lifecycle (\texttt{PENDING}, \texttt{SOFT\_FINAL}, \texttt{HARD\_FINAL}, \texttt{CHALLENGED}). The difference is that our dispute resolution is simplified to a binary outcome---any \texttt{challenge()} call invalidates the root---rather than the full interactive bisection game. This preserves the property we care about for comparison (incorrect roots can be blocked before finality) without the implementation complexity that production systems require.
 
-Kalodner et al.\ discuss sequencer liveness and censorship resistance in their original design, but these properties have not been measured in a controlled comparative setting. The cost of failure recovery remains unquantified.
+Kalodner et al.\ discuss sequencer liveness, but the cost of failure recovery has not been measured in a controlled setting. That is one of the four gaps this thesis addresses.
 
 \section{Industry Implementations}
 
@@ -36,20 +36,22 @@ Several production Layer~2 systems are deployed on Ethereum mainnet. This sectio
 
 \subsection{Arbitrum}
 
-Arbitrum is a widely deployed Optimistic~Rollup. Its architecture features an interactive fraud proof mechanism implemented through the Cannon virtual machine, combined with a seven-day challenge period that gives validators time to detect and dispute invalid state transitions~\cite{cannon2023}. The system includes sequencer failover capabilities that allow a decentralised validator set to resume transaction ordering if the centralised sequencer goes offline. Arbitrum hosts a large ecosystem of decentralised finance protocols and applications.
+Arbitrum is the most deployed Optimistic~Rollup on Ethereum mainnet~\cite{cannon2023}. It uses a seven-day challenge window and an interactive fraud proof mechanism built on the Cannon virtual machine. If the centralised sequencer goes offline, a decentralised validator set can take over transaction ordering.
 
-The engineering complexity of Arbitrum is concentrated in the interactive dispute protocol: the system must correctly sequence all parties, run the bisection on-chain, and determine the correct outcome at minimal gas cost. This is reflected in the multi-year development timeline for the Nitro upgrade.
+This is directly relevant to the design in Chapter~\ref{ch:implementation}: the ten-block challenge window and the binary challenge outcome in \texttt{OptimisticVerifier} are simplified versions of the Arbitrum model. The simplification removes the multi-round bisection game but keeps the property that matters for comparison---an incorrect state root can be blocked before it becomes final.
 
 \subsection{Optimism}
 
-Optimism takes a modular approach within the Optimistic paradigm. Rather than building a single chain, the project developed the OP Stack---a software framework that allows third parties to deploy rollup instances sharing a common security model and bridging infrastructure~\cite{opstack2023}. This has produced independent chains including Base, Zora, and Mode. Optimism emphasises EVM equivalence, meaning existing Ethereum contracts can be deployed with minimal changes. The \texttt{OptimisticVerifier} contract in this thesis borrows the multi-state finality model from Optimism Bedrock, which distinguishes between pending, soft-final, and hard-final commitments.
+Optimism introduced the OP Stack, a modular framework that lets other teams deploy rollup chains sharing the same security model~\cite{opstack2023}. Its Bedrock upgrade defined a clear three-stage commitment lifecycle: pending, then soft-final once the challenge window closes without a dispute, then hard-final once explicitly confirmed.
+
+The \texttt{OptimisticVerifier} contract in this thesis takes this lifecycle model directly from Bedrock. The four states (\texttt{PENDING}, \texttt{SOFT\_FINAL}, \texttt{HARD\_FINAL}, \texttt{CHALLENGED}) allow the dashboard and test suite to observe transitions between stages, which is how the finality latency results in Chapter~\ref{ch:evaluation} are measured.
 
 \subsection{zkSync and StarkNet}
 \label{sec:zk-production}
 
-zkSync and StarkNet represent two leading ZK~Rollups pursuing different proof strategies. zkSync uses a PLONK-based proof system and targets full EVM compatibility so developers can write contracts in Solidity~\cite{zksync-paper}. StarkNet uses the Cairo language and a STARK proof system~\cite{starknet2024,cairo2021}. STARKs require no trusted setup and scale efficiently for very large computations, though they produce larger proofs than SNARK counterparts. StarkNet also offers a Volition mode that lets users choose per-transaction whether their data is stored on-chain or off-chain.
+zkSync uses a PLONK-based proof system and targets full EVM compatibility~\cite{zksync-paper}. StarkNet uses the Cairo language with a STARK proof system~\cite{starknet2024,cairo2021}. STARKs scale efficiently for large computations and require no trusted setup, though they produce larger proof objects than SNARKs. Both projects have spent years optimising proof generation on specialized hardware.
 
-The engineering challenge in ZK~Rollups differs from Optimistic systems. Proof generation demands significant computation, and the verification circuit must fit within Ethereum's gas limits. Both zkSync and StarkNet have invested years in hardware acceleration and circuit optimisation. Production documentation and public benchmarks focus on throughput under ideal conditions; behaviour under sequencer failure or Layer~1 disruption receives comparatively little attention.
+These two systems are the baseline against which the ZK path in this framework was designed. The \texttt{ZKVerifier} contract follows the submission-plus-confirmation model from zkSync, and the proof generation step in the ZK sequencer is a deliberate simplification of what these systems actually do: two SHA-256 hashes instead of BN254 pairings. Neither system publishes data on failure behaviour or sequencer downtime, which is part of what motivates the adversarial tests in Chapter~\ref{ch:implementation}.
 
 \section{Gap Analysis and Thesis Contribution}
 
