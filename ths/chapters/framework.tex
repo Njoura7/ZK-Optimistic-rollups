@@ -6,7 +6,7 @@
 
 This chapter describes the design of the testing framework. The goal is straightforward: run both rollup types against the same Layer~1 node and measure what actually happens. The framework needs to let us measure finality latency, recovery time after crashes, and resource costs. It also needs to be reproducible so other researchers can verify the results.
 
-\section{What the Framework Needs to Do}
+\section{Design Requirements}
 
 Based on the gaps in the literature, we identified five requirements that drove the design:
 
@@ -173,3 +173,11 @@ We record every timestamp—submission, inclusion in a block, and finality. The 
 One note on failure handling: If a sequencer crashes during batch assembly, pending transactions are lost. This is a limitation of the test framework (production systems use persistent mempools and recovery mechanisms). However, because the two sequencers are independent processes, a crash in one does not affect the other—we can isolate and measure failures separately.
 
 The batch creation loop is simple: wait for the pool to fill, create a batch, submit it, then sleep and repeat. The ZK sequencer sleeps for 5 seconds and uses a batch of 100 transactions. The Optimistic sequencer sleeps for 8 seconds and uses 200 transactions. These numbers reflect the different trade-offs between proof overhead and Layer~1 gas cost.
+
+\section{What This Chapter Establishes}
+
+The framework gives us a controlled environment in which both rollup types run against identical conditions: the same Layer~1 node, the same hardware, the same network. The design choices documented here---batch sizes, challenge window compression, SHA-256 as a proof stand-in---are deliberate compromises between experimental practicality and architectural faithfulness. Each one is flagged where it appears so that results can be interpreted with appropriate scope.
+
+Two intentional omissions are worth restating before moving to the code. First, transactions are not executed against a real state tree; state roots are derived by hashing batch data, not by applying each transaction to a storage trie. Second, ZK proofs are not verified cryptographically; the contract checks that a proof is present, not that it is correct. Both simplifications preserve the structural properties that matter for the comparison---ZK requires a proof at submission time, Optimistic requires a challenge window before finality---without the hardware and time cost that real cryptographic operations would impose.
+
+Chapter~\ref{ch:implementation} describes how each component was built in code: what the contracts store, how the sequencers decide when to batch, and how the metrics layer records timestamps at each step.
