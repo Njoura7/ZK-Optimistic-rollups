@@ -238,6 +238,15 @@ Table~\ref{tab:test-coverage} maps each tier to the research questions it exerci
     \label{tab:test-coverage}
 \end{table}
 
+Figure~\ref{fig:test-results} shows the full test run output from the GitHub Actions CI log, confirming all 21 tests pass on a clean checkout.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.95\textwidth]{tests.png}
+    \caption{All 21 tests passing in the GitHub Actions CI run: 5 ZK unit, 5 Optimistic unit, 7 integration, and 4 adversarial. No Docker stack is required; all network and contract calls are replaced with mocks at import time.}
+    \label{fig:test-results}
+\end{figure}
+
 \subsection{Running the Tests}
 
 Tests run through the Docker Compose test profile and are separate from the main service stack:
@@ -248,6 +257,23 @@ docker compose --profile test run --rm test-runner \
 \end{verbatim}
 
 Individual tiers can be targeted by path (e.g., \texttt{tests/adversarial/}). The expected result is 21 tests passing in under two minutes. Tests are also executed automatically on every commit that modifies sequencer code, contracts, or test files through the GitHub Actions workflow in \texttt{.github/workflows/ci.yml}.
+
+\section{Extending the Framework}
+\label{sec:extending}
+
+A third sequencer type can be added to the framework without touching any existing code. The required steps are:
+
+\begin{enumerate}
+    \item \textbf{Write a new sequencer class} in Python. It needs three methods: \texttt{submit\_transaction(tx)} to accept transactions over HTTP, \texttt{\_batch()} to assemble and submit a commitment to Layer~1, and a metrics endpoint to expose counters on a new port. The existing ZK and Optimistic sequencers can be used as templates.
+
+    \item \textbf{Deploy a new Solidity contract} that enforces whatever finality rule the new sequencer uses. The contract must implement \texttt{submit()} and \texttt{isFinalized(uint256 id)} so the test suite can treat it the same way it treats \texttt{ZKVerifier} and \texttt{OptimisticVerifier}.
+
+    \item \textbf{Add a service block to \texttt{docker-compose.yml}} pointing to the new sequencer and mapping its port. Set the Layer~1 RPC endpoint to the shared Hardhat service so the new sequencer joins the same controlled environment.
+
+    \item \textbf{Register the new metrics port in \texttt{prometheus.yml}}. Prometheus will then scrape it alongside the existing two sequencers, and the Grafana dashboard will pick it up automatically.
+\end{enumerate}
+
+This is how the framework supports reproducibility beyond simply re-running the existing experiments: another researcher can implement a hybrid rollup, a different proof system, or a Validium variant, and run it against the same contracts, the same Layer~1 node, and the same adversarial scenarios. The only interface it needs to satisfy is the one already used by the two sequencers here.
 
 \section{From Code to Measurement}
 

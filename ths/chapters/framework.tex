@@ -123,8 +123,32 @@ Table~\ref{tab:research-questions} shows how each research question maps to what
 
 \subsection{Technology Stack}
 
-Table~\ref{tab:tech-stack} lists the technologies used for each component along with the rationale for their selection. The primary criteria were maturity, ease of integration, and suitability for rapid prototyping within an academic context. Every tool in the stack is open-source and well-documented, which supports the reproducibility requirement established in Section~\ref{ch:framework}.
+Table~\ref{tab:tech-stack} lists the technologies used and why each was chosen. The criteria were simple: each tool had to be open-source, easy to run locally, and well enough documented that another researcher could replace it if needed.
 
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|l|p{5cm}}
+        \hline
+        \textbf{Component} & \textbf{Technology} & \textbf{Reason for choice} \\
+        \hline
+        Layer~1 node & Hardhat~\cite{hardhat2024} & Deterministic local blocks; no real ETH needed; fast reset between runs \\
+        \hline
+        Smart contracts & Solidity + ethers.js & Standard Ethereum toolchain; compatible with Hardhat out of the box \\
+        \hline
+        Sequencer processes & Python 3 + web3.py & Fast to iterate; logic is readable without compiled-language overhead \\
+        \hline
+        HTTP interface & Flask~\cite{flask2024} & Lightweight; transaction submission endpoint needs nothing heavier \\
+        \hline
+        Metrics export & Prometheus client & Each sequencer exposes counters and histograms on a dedicated port \\
+        \hline
+        Metrics dashboard & Grafana~\cite{grafana2024} & Standard time-series visualisation; queries written in PromQL \\
+        \hline
+        Deployment & Docker Compose~\cite{compose2024} & One command starts all services; environment variables control every parameter \\
+        \hline
+    \end{tabular}
+    \caption{Technology stack and selection rationale}
+    \label{tab:tech-stack}
+\end{table}
 
 \section{Configuration}
 
