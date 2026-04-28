@@ -32,7 +32,14 @@ Kalodner et al.\ discuss sequencer liveness, but the cost of failure recovery ha
 
 \section{Industry Implementations}
 
-Several production Layer~2 systems are deployed on Ethereum mainnet. This section reviews the most prominent ones as context for the design choices in the framework. Each represents a different engineering approach to the same rollup problem.
+The design of this framework drew directly from four production codebases. Figure~\ref{fig:impl-repos} shows the GitHub repositories examined; each contributed specific patterns that appear in the verifier contracts or sequencer logic described in Chapter~\ref{ch:implementation}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.85\textwidth]{implemented-repos.png}
+    \caption{Production Layer~2 repositories studied during framework design. From top: Polygon AggLayer contracts (TypeScript, 309 stars), Scroll monorepo (Go, 743 stars), OpenZeppelin Contracts (Solidity, 27{,}075 stars), zkSync Era (Rust, 3{,}241 stars), and Optimism (Go, 6{,}420 stars). Specific patterns borrowed from each are described in the subsections below.}
+    \label{fig:impl-repos}
+\end{figure}
 
 \subsection{Arbitrum}
 
@@ -51,7 +58,11 @@ The \texttt{OptimisticVerifier} contract in this thesis takes this lifecycle mod
 
 zkSync uses a PLONK-based proof system and targets full EVM compatibility~\cite{zksync-paper}. StarkNet uses the Cairo language with a STARK proof system~\cite{starknet2024,cairo2021}. STARKs scale efficiently for large computations and require no trusted setup, though they produce larger proof objects than SNARKs. Both projects have spent years optimising proof generation on specialized hardware.
 
-These two systems are the baseline against which the ZK path in this framework was designed. The \texttt{ZKVerifier} contract follows the submission-plus-confirmation model from zkSync, and the proof generation step in the ZK sequencer is a deliberate simplification of what these systems actually do: two SHA-256 hashes instead of BN254 pairings. Neither system publishes data on failure behaviour or sequencer downtime, which is part of what motivates the adversarial tests in Chapter~\ref{ch:implementation}.
+The \texttt{ZKVerifier} contract in this framework follows the submission-plus-confirmation model from zkSync Era (see Figure~\ref{fig:impl-repos}): a \texttt{submit()} function that requires a proof object and a finalization check gated on block confirmation count. The proof generation step in the ZK sequencer is a deliberate simplification of what zkSync actually does---two SHA-256 hashes instead of BN254 elliptic-curve pairings---so that the evaluation can iterate without specialist hardware. Neither zkSync nor StarkNet publishes data on sequencer downtime or failure recovery, which is one of the gaps this thesis addresses.
+
+\subsection{OpenZeppelin Contracts}
+
+The \texttt{OptimisticVerifier} and \texttt{ZKVerifier} contracts follow the access-control and event-emission patterns established in the OpenZeppelin Contracts library~\cite{openzeppelin2024}. Specifically, ownable ownership checks on the \texttt{submit()} function and the use of indexed events for off-chain monitoring are taken directly from OpenZeppelin's standard patterns. Using a widely-audited pattern rather than writing custom access control reduces the surface area for correctness errors in the framework's L1 layer.
 
 \section{Gap Analysis and Thesis Contribution}
 
