@@ -22,9 +22,10 @@ CORS(app)
 tx_counter = Counter('l2_transactions_total', 'Total L2 transactions')
 batch_counter = Counter('l2_batches_total', 'Total batches submitted')
 tps_gauge = Gauge('l2_tps', 'Transactions per second')
-finality_time_histogram = Histogram('l2_finality_time_seconds', 'Time to finality', buckets=(5,10,15,30,60))
-proof_generation_time = Histogram('l2_proof_generation_seconds', 'Proof generation time', buckets=(0.1,0.5,1,2,5))
+finality_time_histogram = Histogram('l2_finality_time_seconds', 'ZK L1 submission latency', buckets=(0.05,0.1,0.25,0.5,1.0,2.0,5.0))
+proof_generation_time = Histogram('l2_proof_generation_seconds', 'Proof generation time', buckets=(0.001,0.005,0.01,0.05,0.1,0.5))
 pending_txs_gauge = Gauge('l2_pending_transactions', 'ZK pending transactions')
+batch_gas_gauge = Gauge('l2_batch_gas_used', 'Gas units consumed by last ZK batch submission')
 
 class Sequencer:
     def __init__(self):
@@ -88,12 +89,13 @@ class Sequencer:
             
             finality_duration = time.time() - l1_start
             finality_time_histogram.observe(finality_duration)
-            
+            batch_gas_gauge.set(receipt['gasUsed'])
+
             with self.lock:
                 self.metrics['batches'] += 1
             batch_counter.inc()
-            
-            print(f"✓ ZK Batch: {len(batch)} txs, Proof: {proof_duration:.3f}s, Finality: {finality_duration:.2f}s")
+
+            print(f"✓ ZK Batch: {len(batch)} txs, Gas: {receipt['gasUsed']}, Proof: {proof_duration:.3f}s, Finality: {finality_duration:.2f}s")
         except Exception as e:
             print(f"L1 submit failed: {e}")
     

@@ -5,6 +5,19 @@
 % =============================================================================
 
 % ---------------------------------------------------------------------------
+% Distributed Systems — Foundational Textbook
+% ---------------------------------------------------------------------------
+
+@book{vansteen2023distributed,
+  author    = {van Steen, Maarten and Tanenbaum, Andrew S.},
+  title     = {Distributed Systems},
+  edition   = {4},
+  year      = {2023},
+  url       = {https://www.distributed-systems.net},
+  note      = {Freely available at distributed-systems.net}
+}
+
+% ---------------------------------------------------------------------------
 % Foundational Blockchain References
 % ---------------------------------------------------------------------------
 
@@ -18,27 +31,28 @@
   note      = {EIP-150 revision}
 }
 
-@article{scalability-trilemma,
-  author    = {Buterin, Vitalik},
-  title     = {The Scalability Trilemma},
-  journal   = {Ethereum Foundation Blog},
-  year      = {2021},
-  url       = {https://vitalik.eth.limo/general/2021/04/07/sharding.html}
+@misc{scalability-trilemma,
+  author       = {Buterin, Vitalik},
+  title        = {The Scalability Trilemma},
+  howpublished = {Ethereum Foundation Blog},
+  year         = {2021},
+  url          = {https://vitalik.eth.limo/general/2021/04/07/sharding.html}
 }
 
-@article{nakamoto2008bitcoin,
-  author    = {Nakamoto, Satoshi},
-  title     = {Bitcoin: A Peer-to-Peer Electronic Cash System},
-  year      = {2008},
-  url       = {https://bitcoin.org/bitcoin.pdf}
+@misc{nakamoto2008bitcoin,
+  author       = {Nakamoto, Satoshi},
+  title        = {Bitcoin: A Peer-to-Peer Electronic Cash System},
+  year         = {2008},
+  howpublished = {Self-published whitepaper},
+  url          = {https://bitcoin.org/bitcoin.pdf}
 }
 
-@article{poon2017plasma,
-  author    = {Poon, Joseph and Buterin, Vitalik},
-  title     = {Plasma: Scalable Autonomous Smart Contracts},
-  journal   = {White Paper},
-  year      = {2017},
-  url       = {https://plasma.io/plasma.pdf}
+@misc{poon2017plasma,
+  author       = {Poon, Joseph and Buterin, Vitalik},
+  title        = {Plasma: Scalable Autonomous Smart Contracts},
+  howpublished = {White Paper},
+  year         = {2017},
+  url          = {https://plasma.io/plasma.pdf}
 }
 
 % ---------------------------------------------------------------------------
@@ -71,12 +85,12 @@
 % ZK Rollups and Zero-Knowledge Proofs
 % ---------------------------------------------------------------------------
 
-@article{zksync-paper,
-  author    = {Gluchowski, Alex},
-  title     = {{zkSync}: Scaling {Ethereum} with Zero-Knowledge Proofs},
-  journal   = {Matter Labs Technical Documentation},
-  year      = {2021},
-  url       = {https://docs.zksync.io/}
+@misc{zksync-paper,
+  author       = {Gluchowski, Alex},
+  title        = {{zkSync}: Scaling {Ethereum} with Zero-Knowledge Proofs},
+  howpublished = {Matter Labs Technical Documentation},
+  year         = {2021},
+  url          = {https://docs.zksync.io/}
 }
 
 @inproceedings{zk-efficient-proofs,
@@ -189,11 +203,14 @@
   url       = {https://eips.ethereum.org/EIPS/eip-4844}
 }
 
-@misc{croman2016scaling,
-  author    = {Croman, Kyle and Dec, David and Gao, Jimmy and Liu, Peter and Zhang, Yan},
+@inproceedings{croman2016scaling,
+  author    = {Croman, Kyle and Decker, Christian and Eyal, Ittay and Gencer, Adem Efe and Juels, Ari and Kosba, Ahmed and Miller, Andrew and Saxena, Prateek and Shi, Elaine and G{\"u}n, Emin and Wattenhofer, Roger and Song, Dawn},
   title     = {On Scaling Decentralized Blockchains},
-  howpublished = {Financial Cryptography and Data Security (FC)},
-  year      = {2016}
+  booktitle = {Financial Cryptography and Data Security (FC 2016 Workshops)},
+  year      = {2016},
+  publisher = {Springer},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {9604}
 }
 
 @misc{visa2023capacity,
@@ -208,12 +225,12 @@
 % Additional L2 Concepts
 % ---------------------------------------------------------------------------
 
-@misc{gudgeon2020sok,
-  author    = {Gudgeon, Liam and Perez, Daniel and Defraia, Tobias and Livshits, Benjamin},
-  title     = {SoK: Off the Chain Scaling},
-  howpublished = {GitHub Repository},
+@inproceedings{gudgeon2020sok,
+  author    = {Gudgeon, Lewis and Moreno-Sanchez, Pedro and Roos, Stefanie and McCorry, Patrick and Gervais, Arthur},
+  title     = {{SoK}: Off The Chain Transactions},
+  booktitle = {Financial Cryptography and Data Security (FC 2020)},
   year      = {2020},
-  url       = {https://github.com/l2beat/sok}
+  publisher = {Springer}
 }
 
 % ---------------------------------------------------------------------------

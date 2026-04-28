@@ -83,7 +83,7 @@ The sequencers are implemented as independent Python processes using Flask~\cite
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|c|c}
+    \begin{tabular}{l|>{\centering\arraybackslash}p{4cm}|>{\centering\arraybackslash}p{4.5cm}}
         \hline
         & \textbf{ZK Sequencer} & \textbf{Optimistic Sequencer} \\
         \hline
@@ -93,14 +93,14 @@ The sequencers are implemented as independent Python processes using Flask~\cite
         \hline
         Polling interval & 5 seconds & 8 seconds \\
         \hline
-        L1 gas per submission & $\sim$200,000 (Hardhat only) & $\sim$150,000 (Hardhat only) \\
+        L1 gas per submission & $\sim$165,000 (Hardhat measured) & $\sim$171,000 (Hardhat measured) \\
         \hline
         Contract loading & Per \texttt{\_batch()} call (lazy) & Once in \texttt{\_\_init\_\_} \\
         \hline
         L1 call & \texttt{ZKVerifier.submit(root, proof)} & \texttt{OptimisticVerifier.submit(root)} \\
         \hline
     \end{tabular}
-    \caption{Architectural differences between sequencer types. Gas values are from a local Hardhat node and are not representative of Ethereum mainnet costs.}
+    \caption{Architectural differences between sequencer types. Gas values are measured from a local Hardhat node and are not representative of Ethereum mainnet costs.}
     \label{tab:sequencer-comparison}
 \end{table}
 
@@ -108,7 +108,7 @@ The sequencers are implemented as independent Python processes using Flask~\cite
 
 Conversely, the ZK sequencer's proof generation imposes a computational bottleneck at submission. To keep finality latency low and allow users to see their transactions finalized quickly, the ZK sequencer uses smaller batches and shorter polling intervals. The choice of 100 transactions per batch and 5-second polling is calibrated to keep batch assembly time below 1 second on typical hardware, enabling finality within 5-10 seconds.
 
-The gas allocations (200K vs. 150K) reflect the difference in Layer~1 contract work. The \texttt{ZKVerifier.submit()} function stores both a state root and a proof hash, while \texttt{OptimisticVerifier.submit()} stores only the root and opens a challenge period. Less on-chain work means lower gas cost.
+The gas allocations reflect the difference in Layer~1 contract work. Measured values are $\sim$165,000 for ZK and $\sim$171,000 for Optimistic per submission. Counter-intuitively, Optimistic costs slightly more per submission because the \texttt{OptimisticVerifier.submit()} function writes a 10-field \texttt{Commitment} struct to storage (ten cold SSTOREs at 20,000 gas each), while \texttt{ZKVerifier.submit()} stores fewer fields. The overall gas difference between the two rollup types comes from batch count, not per-submission cost---see Section~\ref{sec:gas} for the full breakdown.
 
 \subsection{Sequencer Implementation Structure}
 
@@ -166,9 +166,9 @@ Underlying the dashboard is a Prometheus~\cite{prometheus2024} metrics collectio
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|l|p{3cm}}
+    \begin{tabular}{>{\ttfamily\small}l|l|>{\raggedright\arraybackslash}p{5.5cm}}
         \hline
-        \textbf{Metric} & \textbf{Type} & \textbf{Interpretation} \\
+        \normalfont\textbf{Metric} & \textbf{Type} & \textbf{Interpretation} \\
         \hline
         l2\_transactions\_total & Counter & Cumulative count of accepted L2 transactions \\
         \hline
@@ -176,7 +176,7 @@ Underlying the dashboard is a Prometheus~\cite{prometheus2024} metrics collectio
         \hline
         l2\_tps & Gauge & Rolling estimate of throughput (tx/sec) \\
         \hline
-        l2\_finality\_time\_seconds & Histogram & Latency from L1 submission to finality, with percentiles (P50, P95, P99) \\
+        l2\_finality\_time\_seconds & Histogram & L1 submission latency per batch; used to compute P95 via PromQL \\
         \hline
         l2\_proof\_generation\_seconds & Histogram & Time to generate mock ZK proof (ZK sequencer only) \\
         \hline
@@ -189,20 +189,7 @@ Underlying the dashboard is a Prometheus~\cite{prometheus2024} metrics collectio
 
 \textbf{Why this instrumentation matters}: The finality latency histogram answers RQ1—we can see exactly how long it takes for transactions to become irreversible, not just an average. The proof generation histogram isolates the computational cost of the ZK path. By comparing these histograms, we can tell whether ZK is faster because of architectural differences, or because our implementation is optimized differently. The pending transaction gauge shows how batching parameters affect how long users wait before their transaction gets included in a batch.
 
-Grafana~\cite{grafana2024} connects to the Prometheus datasource and renders pre-configured dashboards automatically when the Docker Compose~\cite{compose2024} stack starts. This ensures that anyone deploying the framework sees the same visualizations without manual configuration.
-
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.9\textwidth]{dashboards/grafana-comparison.png}
-    \caption{Grafana side-by-side comparison dashboard showing finality time, throughput, batch
-    efficiency, and proof generation time (ZK only).
-    \emph{[Screenshot to be captured per \texttt{ths/images/README.md} Step~2: after running
-    High Load scenario, navigate to \texttt{http://localhost:3001}, open
-    ``ZK / Optimistic Rollup L2 Metrics Comparison'', set time range to Last~5~minutes.
-    Save as \texttt{ths/images/dashboards/grafana-comparison.png}.]}
-    }
-    \label{fig:grafana-comparison}
-\end{figure}
+Grafana~\cite{grafana2024} connects to the Prometheus datasource and renders pre-configured dashboards automatically when the Docker Compose~\cite{compose2024} stack starts. This ensures that anyone deploying the framework sees the same visualizations without manual configuration. The dashboard panels produced by this stack are shown in Chapter~\ref{ch:evaluation} (Figures~\ref{fig:grafana-comparison} and~\ref{fig:throughput-comparison}), where they are discussed alongside the measurement results they display.
 
 \section{Validation Through Automated Tests}
 \label{sec:tests}

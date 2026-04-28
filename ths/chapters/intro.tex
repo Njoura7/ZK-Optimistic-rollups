@@ -6,68 +6,51 @@
 
 \section{The Problem}
 
-Bitcoin~\cite{nakamoto2008bitcoin} solved a specific problem: two strangers can exchange value without a bank. Ethereum~\cite{wood2014ethereum} generalised that idea to programmable computation. Both networks hit the same wall. Bitcoin processes around 7 transactions per second. Ethereum manages roughly 15. Visa handles thousands per second. That gap matters because fees spike under demand and most real applications cannot use the network reliably.
+Bitcoin~\cite{nakamoto2008bitcoin} solved a specific problem: two strangers can exchange value without a bank. Ethereum~\cite{wood2014ethereum} generalised that idea to programmable computation. Both networks face the same ceiling: Bitcoin processes around 7 transactions per second, Ethereum around 15, while traditional payment networks handle thousands~\cite{croman2016scaling}. The gap is structural---every node validates every transaction, which keeps the network secure but limits throughput.
 
-The reason is structural, not accidental. Every node must validate every transaction. That keeps the network secure and decentralised, but it is slow. Making it faster without giving something up is not straightforward.
+Layer~2 systems address this by moving execution off-chain. A sequencer batches transactions, computes a state commitment, and posts it to Layer~1. Layer~1 only validates the commitment, not each transaction individually. Two approaches to this commitment emerged. ZK~Rollups attach a cryptographic proof; Layer~1 verifies it immediately and finalises the batch. Optimistic~Rollups post only the state root and open a window during which anyone can dispute it; if no challenge arrives, the commitment becomes final.
 
-Layer~2 systems try a different route. Instead of validating every transaction on-chain, Layer~1 validates a summary---a single commitment representing thousands of transactions processed in a batch. The commitment is what anchors Layer~2 security to Layer~1. If the commitment is wrong, Layer~1 rejects it. If it is correct, the batch is settled.
+ZK~Rollups finalise faster; Optimistic~Rollups cost less. Both are described well in theory, but empirical data on how they behave when conditions are not ideal is limited.
 
-Two approaches to building that commitment emerged. ZK~Rollups compute a cryptographic proof that the commitment is valid and submit it alongside the state root. Layer~1 checks the proof immediately and finalises the batch. Optimistic~Rollups skip the proof. They post the state root and open a window during which anyone can dispute it. If no valid challenge arrives before the window closes, the commitment becomes final.
+\section{Motivation}
 
-Which is better? It depends on what you care about. ZK~Rollups finalise faster but proof generation is expensive. Optimistic~Rollups cost less but users wait days for settlement in production. The more honest answer is that we have good theoretical descriptions of both and limited empirical data on how they behave when conditions are not ideal.
+My field of study is service and software architecture, so distributed systems is a core subject. My supervisor pointed me to the textbook by van Steen and Tanenbaum~\cite{vansteen2023distributed}, which covers blockchain as a hybrid distributed architecture (Chapter~2) and fault tolerance mechanisms (Chapter~8). The book is a solid foundation but it does not address Layer~2 protocols or how different rollup designs compare under failure conditions.
 
-\section{What Is Missing}
+That gap became the starting point. I was curious about blockchain from a systems perspective---not just the theory but what real implementations do under real conditions. A friend working as a blockchain developer pushed the question further: he pointed out that most Layer~1 scalability problems are addressed and that the active research gaps are now at Layer~2, particularly around rollup behaviour under failures. That conversation shaped the scope of this thesis.
 
-Academic papers describe the theory well. Production systems demonstrate that both approaches can reach useful scale. But the literature is quiet on what actually happens when things break.
+\section{Research Gap}
 
-When Layer~1 undergoes a chain reorganisation---and it does happen---which finality model is more resilient? When a sequencer crashes or disconnects, what can users do and what does recovery cost? When a commitment turns out to be wrong, how does each system catch and handle it?
+Academic papers on Layer~2 protocols cover security proofs and normal-case throughput. Production deployments demonstrate scale. What neither provides is empirical data on failure behaviour: how each architecture responds to sequencer crashes, invalid state submissions, and chain reorganisations, and how the two compare under the same conditions.
 
-These are not edge cases invented for a thesis. Sequencer outages have occurred on live networks. Chain reorganisations are a routine part of how Ethereum works at short depths. Yet there is remarkably little published work that measures ZK versus Optimistic behaviour under these conditions with direct comparison.
-
-The dominant pattern in existing evaluations is to measure throughput when the network is uncongested, latency when sequencers are working, and costs under ideal load. That is useful, but it tests the path that is least likely to go wrong.
-
-\section{What This Thesis Does}
-
-This thesis creates a testing framework and uses it to evaluate both types of rollups in normal functioning and during specific failures. The aim is to understand when each method is better.
-
-The framework tests both sequencers on the same Layer~1 node and observes the outcomes. We simulate sequencer crashes, introduce Layer~1 delays, and submit incorrect states. For each situation, we track finality latency, recovery time, gas costs, and whether any data is lost.
-
-Everything is open-source and can be deployed with just one Docker command. This allows other researchers to check the results, enhance the evaluation, and further develop the work.
+Existing evaluations measure throughput under ideal load, latency when sequencers are working, and cost in uncongested conditions. That covers the path least likely to go wrong. Sequencer outages have occurred on live networks; chain reorganisations are routine at short depths. Yet no published work measures ZK and Optimistic behaviour side by side under these conditions with reproducible methodology.
 
 \section{Research Questions}
 
-This evaluation tackles four key questions.
+\begin{enumerate}
+    \item How does finality latency differ between the two architectures under identical Layer~1 conditions, and does the theoretical gap hold in practice?
+    \item What is the cost of sequencer crash recovery---in time, pending transaction loss, and Layer~1 state integrity?
+    \item Where do the real trade-offs land: proof overhead and throughput?
+    \item Can a reproducible head-to-head comparison be achieved on standard developer hardware?
+\end{enumerate}
 
-First, how long does it take for a transaction to become irreversible? Theory suggests ZK Rollups wrap up in seconds, while Optimistic Rollups take days. What do we actually see in practice?
+\section{Innovation and Contributions}
 
-Second, when a sequencer fails, what’s the recovery cost? Do users lose their transactions? What’s the gas cost to get everything back on track?
+We built a controlled testbed where both rollup architectures run against the same local Ethereum node~\cite{hardhat2024} under identical conditions, including deliberate failures. We simulate sequencer crashes, submit invalid state roots, and record what each design does. The headline result: ZK achieves true finality around 8~times faster than Optimistic in this environment, and the gap grows to roughly 672~times compared to a production seven-day challenge window.
 
-Third, what are the true trade-offs? ZK Rollups create proofs, whereas Optimistic Rollups wait for challenge periods. Where do the actual costs arise?
+Three things make this different from existing work. It is the first controlled head-to-head comparison of both rollup types under adversarial conditions on the same node---existing benchmarks test one architecture in isolation. Every result is reproducible: the testbed starts with one Docker command and produces the same output on any machine. And adding a third rollup type requires only a new Solidity contract and a Python class that follows the existing interface.
 
-Fourth, can we create a fair comparison using standard developer hardware? If we can, the framework is valuable. If not, then it's merely a toy.
-
-
-\section{Why a Framework Rather Than Mainnet Measurement?}
-
-
-Why not just run both systems on mainnet and compare them? Because environmental noise hides key architectural differences. Gas prices fluctuate. Network conditions shift. Sequencer implementations vary in numerous ways. A controlled framework can highlight the essential distinctions.
-
-Why not focus solely on formal analysis? Because real systems often stray from theoretical expectations. Proof generation incurs overhead that varies with batch size, hardware, and implementation choices. Fraud proofs depend on network propagation delays that formal analysis misses. Real bugs crop up in actual systems. Formal analysis offers limits, while measurement provides real data.
-
-\section{Contributions}
-
-Three concrete things come out of this work. First, an open-source framework that runs both sequencer types against the same Layer~1 node, with configurable batch sizes, polling intervals, and gas allocations. Anyone can clone it, adjust a parameter, and re-run the comparison. Second, measured data on finality latency, recovery cost, and proof overhead for both architectures under identical conditions, including the adversarial scenarios that most evaluations skip. Third, an interface specification in the repository documentation so a researcher can implement a new sequencer type---say a hybrid or a different proof system---and plug it into the same contracts and metrics infrastructure.
+One scope note: gas figures in Chapter~\ref{ch:evaluation} are EVM gas units returned by Hardhat through transaction receipts. They reflect real opcode costs and allow direct comparison between ZK and Optimistic submissions. They cannot be converted to ETH or dollar amounts without a gas price that this local environment does not have, so only relative differences are reported.
 
 \section{Thesis Structure}
 
-Chapter~\ref{ch:background} covers the technical foundations: why Layer~1 blockchains are slow by design, and how ZK and Optimistic rollups address that in different ways. Each rollup section ends with a note on how the concept maps to the code in this framework.
+Chapter~\ref{ch:background} covers the technical background: why blockchains are slow by design and how ZK and Optimistic rollups address that differently. Each section maps the theory directly to the code built in this thesis.
 
-Chapter~\ref{ch:relatedwork} reviews what the literature has established about rollup architectures and identifies the specific gaps this work fills.
+Chapter~\ref{ch:relatedwork} surveys existing work and shows where it stops, which is where this thesis begins.
 
-Chapter~\ref{ch:framework} describes the framework design: what it measures, why the components are arranged the way they are, and what the parameter choices mean.
+Chapters~\ref{ch:framework} and~\ref{ch:implementation} describe what was built: the design decisions behind the testing environment, then the contracts, sequencer processes, metrics stack, and automated test suite.
 
-Chapter~\ref{ch:implementation} covers the code: the Layer~1 contracts, the sequencer processes, the metrics stack, and the automated test suite.
+Chapter~\ref{ch:evaluation} reports the measurements under normal and adversarial conditions.
 
-Chapter~\ref{ch:evaluation} reports what we measured, with discussion of what the numbers mean and where the results should be treated with caution.
+Chapter~\ref{ch:security} analyses the security properties of each architecture, separating what was directly tested from what is derived from the design.
 
-Chapter~\ref{ch:conclusion} draws the findings together and describes what a follow-on study would need to test next.
+Chapter~\ref{ch:conclusion} draws the findings together and identifies open questions for follow-on work.

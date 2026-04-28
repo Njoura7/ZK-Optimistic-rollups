@@ -4,51 +4,166 @@
 \chapter{Metrics Reference}
 \label{app:metrics}
 
-\section{Prometheus Metrics}
+This appendix documents the Prometheus metrics exported by each sequencer, the PromQL queries used in the dashboard panels, and the raw metric output recorded during a live evaluation run.
 
-All metrics are tagged with labels for filtering:
+\section{Exported Metrics}
+
+Each sequencer exposes its metrics on a dedicated port: ZK on port~9100, Optimistic on port~9101. A single Prometheus instance scrapes both every five seconds. ZK metrics carry the \texttt{l2\_} prefix; Optimistic metrics carry \texttt{opt\_l2\_}.
+
+\begin{table}[h]
+\centering
+\footnotesize
+\begin{tabular}{>{\ttfamily}l|l|>{\raggedright\arraybackslash}p{5.5cm}}
+\hline
+\normalfont\textbf{Metric} & \textbf{Type} & \textbf{Description} \\
+\hline
+l2\_transactions\_total & Counter & Cumulative ZK L2 transactions accepted \\
+l2\_batches\_total & Counter & Cumulative ZK batches submitted to L1 \\
+l2\_tps & Gauge & ZK transactions per second (2~s window) \\
+l2\_pending\_transactions & Gauge & ZK transactions awaiting next batch \\
+l2\_finality\_time\_seconds & Histogram & L1 submission latency per ZK batch \\
+l2\_proof\_generation\_seconds & Histogram & Simulated proof computation time \\
+l2\_batch\_gas\_used & Gauge & EVM gas used by last ZK batch submission \\
+\hline
+opt\_l2\_transactions\_total & Counter & Cumulative Optimistic L2 transactions \\
+opt\_l2\_batches\_total & Counter & Cumulative Optimistic batches submitted \\
+opt\_l2\_tps & Gauge & Optimistic transactions per second \\
+opt\_l2\_pending\_transactions & Gauge & Optimistic transactions awaiting next batch \\
+opt\_l2\_finality\_time\_seconds & Histogram & L1 submission latency per Optimistic batch \\
+opt\_l2\_batch\_processing\_seconds & Histogram & Batch assembly and hashing time \\
+opt\_l2\_batch\_gas\_used & Gauge & EVM gas used by last Optimistic submission \\
+\hline
+\end{tabular}
+\caption{Prometheus metrics exported by each sequencer}
+\label{tab:metrics-list}
+\end{table}
+
+\section{Live Metric Snapshot}
+
+The listings below reproduce the raw \texttt{/metrics} output captured directly from each port during an evaluation run (900~transactions submitted to each sequencer across multiple demo scenarios). This output is the ground truth from which all performance figures in Chapter~\ref{ch:evaluation} are derived.
 
 \begin{listing}[H]
-    \begin{minted}{text}
-# ZK Rollup Metrics (Port 9100)
-l2_transactions_total{job="zk-sequencer"} = 1250
-l2_batches_total{job="zk-sequencer"} = 13
-l2_tps{job="zk-sequencer"} = 45.3
-l2_finality_time_seconds_bucket{job="zk-sequencer",le="15"} = 120
-l2_proof_generation_seconds_bucket{job="zk-sequencer",le="0.1"} = 8
-l2_pending_transactions{job="zk-sequencer"} = 37
+\begin{minted}{text}
+# Port 9100 — ZK Sequencer
+# Snapshot taken during standard evaluation run (900 tx, 11 batches submitted)
 
-# Optimistic Rollup Metrics (Port 9101)
-opt_l2_transactions_total{job="opt-sequencer"} = 1200
-opt_l2_batches_total{job="opt-sequencer"} = 6
-opt_l2_tps{job="opt-sequencer"} = 32.1
-opt_l2_finality_time_seconds_bucket{job="opt-sequencer",le="10"} = 95
-opt_l2_pending_transactions{job="opt-sequencer"} = 62
-    \end{minted}
-    \caption{Example Prometheus output}
-    \label{lst:prometheus-output}
+l2_transactions_total                         900.0
+l2_batches_total                               11.0
+l2_tps                                          0.0   # idle at snapshot time
+l2_pending_transactions                         0.0
+
+# L1 submission latency histogram (all 11 observations < 50 ms)
+l2_finality_time_seconds_bucket{le="0.05"}    11.0
+l2_finality_time_seconds_bucket{le="0.1"}     11.0
+l2_finality_time_seconds_bucket{le="0.25"}    11.0
+l2_finality_time_seconds_bucket{le="0.5"}     11.0
+l2_finality_time_seconds_bucket{le="1.0"}     11.0
+l2_finality_time_seconds_bucket{le="2.0"}     11.0
+l2_finality_time_seconds_bucket{le="5.0"}     11.0
+l2_finality_time_seconds_bucket{le="+Inf"}    11.0
+l2_finality_time_seconds_count                 11.0
+l2_finality_time_seconds_sum           0.288058 s   # avg 26.2 ms/batch
+
+# Simulated proof generation histogram (all 11 observations < 1 ms)
+l2_proof_generation_seconds_bucket{le="0.001"} 11.0
+l2_proof_generation_seconds_bucket{le="0.005"} 11.0
+l2_proof_generation_seconds_bucket{le="0.01"}  11.0
+l2_proof_generation_seconds_count              11.0
+l2_proof_generation_seconds_sum        0.001256 s   # avg 0.114 ms/batch
+
+# Gas measurement (last batch)
+l2_batch_gas_used                         165293.0   # EVM gas units
+\end{minted}
+\caption{Raw Prometheus output — ZK Sequencer (port~9100)}
+\label{lst:prometheus-zk}
 \end{listing}
 
-\section{Grafana Queries}
+\begin{listing}[H]
+\begin{minted}{text}
+# Port 9101 — Optimistic Sequencer
+# Snapshot taken during same evaluation run (900 tx, 7 batches submitted)
 
-Key queries for analysis:
+opt_l2_transactions_total                     900.0
+opt_l2_batches_total                            7.0
+opt_l2_tps                                      0.0
+opt_l2_pending_transactions                     0.0
+
+# L1 submission latency histogram (all 7 observations < 50 ms)
+opt_l2_finality_time_seconds_bucket{le="0.05"}  7.0
+opt_l2_finality_time_seconds_bucket{le="0.1"}   7.0
+opt_l2_finality_time_seconds_bucket{le="0.25"}  7.0
+opt_l2_finality_time_seconds_bucket{le="0.5"}   7.0
+opt_l2_finality_time_seconds_bucket{le="1.0"}   7.0
+opt_l2_finality_time_seconds_bucket{le="2.0"}   7.0
+opt_l2_finality_time_seconds_bucket{le="5.0"}   7.0
+opt_l2_finality_time_seconds_bucket{le="+Inf"}  7.0
+opt_l2_finality_time_seconds_count               7.0
+opt_l2_finality_time_seconds_sum         0.144820 s   # avg 20.7 ms/batch
+
+# Batch assembly time (SHA-256 only, no proof step)
+opt_l2_batch_processing_seconds_bucket{le="0.001"} 7.0
+opt_l2_batch_processing_seconds_bucket{le="0.005"} 7.0
+opt_l2_batch_processing_seconds_count               7.0
+opt_l2_batch_processing_seconds_sum         0.001087 s   # avg 0.155 ms/batch
+
+# Gas measurement (last batch)
+opt_l2_batch_gas_used                       170937.0   # EVM gas units
+\end{minted}
+\caption{Raw Prometheus output — Optimistic Sequencer (port~9101)}
+\label{lst:prometheus-opt}
+\end{listing}
+
+\subsection*{Derived statistics}
+
+From the snapshots above:
+
+\begin{itemize}
+    \item ZK average L1 submission latency: $0.288\,\text{s} \div 11 = 26.2\,\text{ms}$ per batch
+    \item ZK average simulated proof time: $0.00126\,\text{s} \div 11 = 0.114\,\text{ms}$ per batch
+    \item Optimistic average L1 submission latency: $0.145\,\text{s} \div 7 = 20.7\,\text{ms}$ per batch
+    \item Optimistic average batch assembly time: $0.00109\,\text{s} \div 7 = 0.155\,\text{ms}$ per batch
+    \item ZK average transactions per batch: $900 \div 11 \approx 82$ (threshold 100, some time-triggered)
+    \item Optimistic average transactions per batch: $900 \div 7 \approx 129$ (threshold 200, time-triggered)
+    \item Gas per batch: ZK 165,293 \textbf{vs.} Optimistic 170,937 — nearly identical in the mock proof scenario; Optimistic is slightly higher because its \texttt{Commitment} struct has more storage fields
+\end{itemize}
+
+\textbf{Note on the Grafana ``Finality Time (P95) = 47.5\,ms'' readout.}
+Both the ZK and Optimistic panels display 47.5\,ms. This is a mathematical artifact: when all histogram observations fall below the first bucket boundary (\texttt{le=0.05}, i.e.\ 50\,ms), Prometheus linearly interpolates the P95 as $0.95 \times 0.05\,\text{s} = 47.5\,\text{ms}$. The value is not hardcoded and does not imply the two architectures are identical — it means both submitted batches complete in under 50\,ms on the local Hardhat node. The architectural finality difference (cryptographic proof verification for ZK vs.\ 10-block challenge window for Optimistic) is enforced by the smart contracts and is described in Chapter~\ref{ch:background}, not in these submission-latency metrics.
+
+\section{PromQL Queries Used in the Dashboard}
 
 \begin{listing}[H]
     \begin{minted}{text}
-# Current TPS comparison
-{l2_tps, opt_l2_tps}
+# Snapshot counter values
+l2_transactions_total
+opt_l2_transactions_total
+l2_batches_total
+opt_l2_batches_total
 
-# Finality latency (P95)
-histogram_quantile(0.95, 
+# Gas per batch (last observed value — gauge)
+l2_batch_gas_used
+opt_l2_batch_gas_used
+
+# L1 submission latency P95 (rolling 1-minute window)
+histogram_quantile(0.95,
   rate(l2_finality_time_seconds_bucket[1m]))
+histogram_quantile(0.95,
+  rate(opt_l2_finality_time_seconds_bucket[1m]))
 
-# Batch efficiency
-rate(l2_transactions_total[1m]) / 
-  rate(l2_batches_total[1m])
+# Proof generation overhead (ZK only, in milliseconds)
+histogram_quantile(0.95,
+  rate(l2_proof_generation_seconds_bucket[1m])) * 1000
 
-# 5-minute throughput average
-avg_over_time(l2_tps[5m])
+# Batch assembly overhead (Optimistic, in milliseconds)
+histogram_quantile(0.95,
+  rate(opt_l2_batch_processing_seconds_bucket[1m])) * 1000
+
+# Transaction throughput rate (rolling 1-minute)
+rate(l2_transactions_total[1m])
+rate(opt_l2_transactions_total[1m])
     \end{minted}
-    \caption{Grafana PromQL examples}
-    \label{lst:grafana-queries}
+    \caption{PromQL queries for Grafana panels and direct Prometheus exploration at \texttt{localhost:9090}}
+    \label{lst:promql-queries}
 \end{listing}
+
+\textbf{Important:} Histogram metric base names (e.g.\ \texttt{l2\_proof\_generation\_seconds}) are not directly queryable in Prometheus. Always query the sub-metrics: \texttt{\_bucket}, \texttt{\_count}, or \texttt{\_sum}.
