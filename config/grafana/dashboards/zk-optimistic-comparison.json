@@ -481,7 +481,7 @@
           "refId": "B"
         }
       ],
-      "title": "Transaction Rate Comparison (THESIS)",
+      "title": "Transaction Rate Comparison",
       "type": "timeseries"
     },
     {
@@ -539,7 +539,7 @@
           "legendFormat": "ZK Proof Gen (P95)"
         }
       ],
-      "title": "ZK Proof Generation Time (THESIS)",
+      "title": "ZK Proof Generation Time",
       "type": "timeseries",
       "description": "ZK proof generation latency - impacts L2 throughput"
     },
@@ -594,7 +594,7 @@
           "legendFormat": "Optimistic Batch Processing (P95)"
         }
       ],
-      "title": "Optimistic Batch Processing Time (THESIS)",
+      "title": "Optimistic Batch Processing Time",
       "type": "timeseries",
       "description": "Optimistic batch state-root computation time (no proof) - contrast with ZK proof generation"
     },
@@ -658,8 +658,52 @@
           "legendFormat": "Optimistic Pending"
         }
       ],
-      "title": "Pending Transactions Comparison (THESIS)",
+      "title": "Pending Transactions Comparison",
       "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Gas Units",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": { "tooltip": false, "viz": false, "legend": false },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 37 },
+      "id": 15,
+      "options": {
+        "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        { "expr": "l2_batch_gas_used", "refId": "A", "legendFormat": "ZK Gas per Batch" },
+        { "expr": "opt_l2_batch_gas_used", "refId": "B", "legendFormat": "Optimistic Gas per Batch" }
+      ],
+      "title": "Gas per Batch Comparison",
+      "type": "timeseries",
+      "description": "L1 gas units consumed per batch submission. In the mock-proof environment both are ~165–171K (Optimistic stores a larger struct). In production, real Groth16 pairing adds 200–500K gas per ZK submission."
     }
   ],
   "refresh": "5s",

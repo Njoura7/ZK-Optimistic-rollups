@@ -48,15 +48,15 @@ To deploy the framework, we run a single Docker Compose~\cite{compose2024} comma
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|l|l}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}p{6.5cm}|l}
         \hline
         \textbf{What We Measure} & \textbf{Method} & \textbf{Unit} \\
         \hline
-        Finality time & Record submission block and finality block & Blocks (or seconds) \\
+        Finality time & Record submission block and finality block & Blocks / seconds \\
         \hline
-        Throughput & Count transactions per time window & Transactions/second \\
+        Throughput & Count transactions per time window & Tx/second \\
         \hline
-        Batching & Record batch size and timing & Transactions per batch \\
+        Batching & Record batch size and timing & Tx per batch \\
         \hline
         Proof generation time & Time ZK sequencer spends computing commitment & Seconds (histogram) \\
         \hline
@@ -106,18 +106,21 @@ Table~\ref{tab:research-questions} shows how each research question maps to what
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|l|p{5cm}}
+    \begin{tabular}{l|>{\raggedright\arraybackslash}p{4.5cm}|>{\raggedright\arraybackslash\ttfamily\small}p{5cm}}
         \hline
-        \textbf{Question} & \textbf{What We Measure} & \textbf{Test File} \\
+        \textbf{Question} & \textbf{What We Measure} & \normalfont\textbf{Test File} \\
         \hline
-        RQ1: Finality & Time from submission to finality & \texttt{tests/integration/test\_dual\_sequencer.py} \\
+        RQ1: Finality & Time from submission to finality &
+            tests/integration/ \newline test\_dual\_sequencer.py \\
         \hline
-        RQ2: Recovery & Time and cost to recover after crash & \texttt{tests/adversarial/test\_sequencer\_crash.py} \\
+        RQ2: Recovery & Time and cost to recover after crash &
+            tests/adversarial/ \newline test\_sequencer\_crash.py \\
         \hline
-        RQ3: Security cost & Proof generation time and gas overhead & \texttt{tests/integration/test\_dual\_sequencer.py} \\
+        RQ3: Security cost & Proof generation time and gas overhead &
+            tests/integration/ \newline test\_dual\_sequencer.py \\
         \hline
     \end{tabular}
-    \caption{Research questions and measurements}
+    \caption{Research questions and corresponding test files}
     \label{tab:research-questions}
 \end{table}
 
@@ -127,7 +130,7 @@ Table~\ref{tab:tech-stack} lists the technologies used and why each was chosen. 
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|l|p{5cm}}
+    \begin{tabular}{l|l|>{\raggedright\arraybackslash}p{5cm}}
         \hline
         \textbf{Component} & \textbf{Technology} & \textbf{Reason for choice} \\
         \hline
@@ -156,23 +159,23 @@ The framework parameters are configurable via environment variables. This allows
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|l|l}
+    \begin{tabular}{>{\ttfamily}l|l|>{\raggedright\arraybackslash}p{5.5cm}}
         \hline
-        \textbf{Parameter} & \textbf{Default} & \textbf{Purpose} \\
+        \normalfont\textbf{Parameter} & \textbf{Default} & \textbf{Purpose} \\
         \hline
-        ZK_BATCH_SIZE & 100 & Transactions per ZK batch \\
+        ZK\_BATCH\_SIZE & 100 & Transactions per ZK batch \\
         \hline
-        ZK_BATCH_INTERVAL & 5 & Seconds between ZK batch checks \\
+        ZK\_BATCH\_INTERVAL & 5 & Seconds between ZK batch checks \\
         \hline
-        ZK_GAS_LIMIT & 200000 & Gas limit for ZK submissions (Hardhat estimate; not a mainnet figure) \\
+        ZK\_GAS\_LIMIT & 200\,000 & Gas limit for ZK submissions (Hardhat estimate; not a mainnet figure) \\
         \hline
-        OPT_BATCH_SIZE & 200 & Transactions per Optimistic batch \\
+        OPT\_BATCH\_SIZE & 200 & Transactions per Optimistic batch \\
         \hline
-        OPT_BATCH_INTERVAL & 8 & Seconds between Optimistic batch checks \\
+        OPT\_BATCH\_INTERVAL & 8 & Seconds between Optimistic batch checks \\
         \hline
-        OPT_GAS_LIMIT & 150000 & Gas limit for Optimistic submissions (Hardhat estimate; not a mainnet figure) \\
+        OPT\_GAS\_LIMIT & 300\,000 & Gas limit for Optimistic submissions; raised from 150\,000 after measuring cold SSTORE cost of the 10-field Commitment struct \\
         \hline
-        L1_RPC & http://localhost:8545 & Layer 1 RPC endpoint \\
+        L1\_RPC & \normalfont\small http://localhost:8545 & Layer~1 RPC endpoint \\
         \hline
     \end{tabular}
     \caption{Configurable framework parameters}

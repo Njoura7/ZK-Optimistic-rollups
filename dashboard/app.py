@@ -18,7 +18,6 @@ HTML = """<!DOCTYPE html>
 <div class="header">
     <div class="header-left">
         <h1>L2 Scaling Solutions — Comparative Analysis</h1>
-        <p>MSc Thesis Demo &middot; ELTE Faculty of Informatics</p>
     </div>
     <div class="status-group">
         <div class="status-item" id="status-zk"><span class="status-dot off"></span>ZK :5000</div>
@@ -124,9 +123,9 @@ HTML = """<!DOCTYPE html>
                 </tr>
                 <tr>
                     <td class="property">L1 Gas per Batch</td>
-                    <td class="zk-val">Higher (proof verification)</td>
-                    <td class="opt-val">Lower (no proof)</td>
-                    <td><span class="winner opt-win">OPT</span></td>
+                    <td class="zk-val">~165K (mock; higher in prod)</td>
+                    <td class="opt-val">~171K (10-field struct)</td>
+                    <td><span class="winner draw">Trade-off</span></td>
                 </tr>
             </tbody>
         </table>

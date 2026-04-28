@@ -55,13 +55,11 @@ These two systems are the baseline against which the ZK path in this framework w
 
 \section{Gap Analysis and Thesis Contribution}
 
-Reading across this literature, five areas come up repeatedly where empirical data is missing. The framework addresses four of them directly.
+Reading across this literature, four areas come up repeatedly where empirical data is missing. The framework addresses all four directly.
 
 \textbf{Finality time under real conditions.} The theoretical finality properties of both rollup families are described clearly in the literature. Actual finality latencies under varying Layer~1 conditions have not been measured side by side. The framework records the submission block and finality block for every batch, giving exact latency histograms across scenarios. The key result is in Chapter~\ref{ch:evaluation}: ZK finality runs around 8~times faster in the demo environment, and the gap widens by several orders of magnitude at production challenge window lengths.
 
 \textbf{Recovery cost after a sequencer crash.} When a sequencer crashes mid-batch, the system loses the in-flight transactions and must restart. The time and data loss associated with this have not been empirically studied. The adversarial test suite includes crash-and-restart scenarios for both sequencer types, and the results confirm that both preserve Layer~1 state integrity while losing pending transactions---with the Optimistic sequencer exposing more transactions to loss because its larger batch threshold causes them to accumulate longer before being drained.
-
-\textbf{Censorship resistance.} The ability of honest users to force-include transactions when a sequencer is unresponsive is discussed theoretically in the Arbitrum and Optimism documentation but has not been measured in a controlled comparative setting. This framework addresses it qualitatively in Chapter~\ref{ch:security} and identifies it as a direction for future empirical work.
 
 \textbf{Controlled head-to-head comparison.} Existing benchmarks evaluate a single rollup architecture in isolation, making comparison difficult because environmental conditions differ. Running both sequencers against the same Layer~1 node simultaneously, with identical block timing and gas pricing, is the core design choice that makes the results in Chapter~\ref{ch:evaluation} directly comparable.
 

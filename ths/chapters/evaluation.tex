@@ -48,6 +48,22 @@ Before interpreting results, each screenshot and data export is checked against 
 
 These checks apply when screenshots are captured for Figures~\ref{fig:flask-dashboard}, \ref{fig:grafana-comparison}, \ref{fig:throughput-comparison}, and~\ref{fig:finality-comparison}. Any screenshot that fails a check is not used for analysis; instead the scenario is re-run and a new capture is taken.
 
+Figure~\ref{fig:flask-dashboard} shows the Flask real-time dashboard with both sequencers running. Figure~\ref{fig:grafana-comparison} shows the Grafana metrics dashboard with all comparison panels visible.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.95\textwidth]{dashboards/flask-dashboard-overview.png}
+    \caption{Flask real-time dashboard during an evaluation run. Left panel: ZK~Rollup showing 900~transactions across 11~batches (100~tx/batch). Right panel: Optimistic~Rollup showing 900~transactions across 7~batches (200~tx/batch). The Architectural Comparison table reflects design-level properties; gas values are updated from live measurements.}
+    \label{fig:flask-dashboard}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.95\textwidth]{dashboards/grafana-top-panels.png}
+    \caption{Grafana dashboard top row: transaction counters, batch counts, current TPS, and L1 submission latency P95 for both architectures. The 47.5\,ms P95 value shown for both is a histogram interpolation artefact (all observations below the 50\,ms bucket boundary); see Appendix~\ref{app:metrics} for explanation.}
+    \label{fig:grafana-comparison}
+\end{figure}
+
 \section{Throughput Analysis}
 
 \subsection{Transactions Per Second}
@@ -81,12 +97,8 @@ As a result, the ZK~sequencer processes transactions into L1-committed batches a
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.85\textwidth]{results/throughput-comparison.png}
-    \caption{Peak throughput for each scenario, with ZK and Optimistic bars side by side.
-    \emph{[Generate from Prometheus data after running all three scenarios.
-    Export \texttt{l2\_tps} and \texttt{opt\_l2\_tps} gauge values per scenario, plot as grouped
-    bar chart with $\pm$5\% error bars. Save as \texttt{ths/images/results/throughput-comparison.png}.]}
-    }
+    \includegraphics[width=0.95\textwidth]{dashboards/grafana-bottom-panels.png}
+    \caption{Grafana dashboard lower panels showing the transaction rate comparison (ZK and Optimistic TX rates overlaid), ZK proof generation time, Optimistic batch processing time, pending transaction queues, and gas per batch comparison. Peak ZK transaction rate: 15.3\,ops/s; peak Optimistic rate: 16.6\,ops/s. Gas per batch: ZK~165\,K, Optimistic~171\,K (mock-proof environment).}
     \label{fig:throughput-comparison}
 \end{figure}
 
@@ -124,29 +136,30 @@ This result illustrates a fundamental trade-off: the ZK~Rollup prioritizes low-l
 
 \section{Finality Analysis}
 
-\subsection{L1 Inclusion Time}
-Table~\ref{tab:l1-latency} shows the L1 inclusion latency---the time elapsed between the sequencer submitting a batch transaction and that transaction being mined into an L1 block---measured at several percentiles.
+\subsection{L1 Submission Latency}
+
+Table~\ref{tab:l1-latency} shows the measured time from \texttt{send\_raw\_transaction} to receipt, derived from the Prometheus histogram snapshots in Appendix~\ref{app:metrics}. Hardhat's automining mode mines each transaction immediately, so these times reflect Python RPC overhead rather than block production wait time.
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|c|c|c}
+    \begin{tabular}{l|c|c}
         \hline
-        \textbf{Latency} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{L1 Baseline} \\
+        \textbf{Metric} & \textbf{ZK Rollup} & \textbf{Optimistic} \\
         \hline
-        P50 (median) & 4.2s & 4.3s & 4.0s \\
+        Batches submitted & 11 & 7 \\
         \hline
-        P95 & 4.75s & 4.75s & 4.7s \\
+        Total submission time & 288\,ms & 145\,ms \\
         \hline
-        P99 & 5.2s & 5.1s & 5.0s \\
+        Average per batch & 26.2\,ms & 20.7\,ms \\
         \hline
-        Maximum & 8.3s & 8.1s & 8.0s \\
+        All observations within & $<50$\,ms & $<50$\,ms \\
         \hline
     \end{tabular}
-    \caption{L1 inclusion latency in seconds}
+    \caption{L1 submission latency from Prometheus histograms (Hardhat automining)}
     \label{tab:l1-latency}
 \end{table}
 
-Both rollups achieve L1 inclusion in approximately 4.75~seconds at the P95 level, which is nearly identical to the L1 baseline (a plain Ethereum transaction on the same Hardhat node). This confirms that \textbf{L1 block production time is the dominant factor} in inclusion latency, and neither sequencer introduces significant additional delay at this stage.
+Both sequencers complete L1 submission in under 50\,ms in every observed batch. The Grafana panels display ``P95 = 47.5\,ms'' for both architectures; this is a histogram interpolation artefact that occurs when all observations fall below the first bucket boundary (50\,ms)---see Appendix~\ref{app:metrics} for the mathematical explanation. L1 submission latency is effectively identical for both architectures. The finality difference is enforced by contract logic, not the submission step.
 
 \subsection{True Finality (Architecture-Specific)}
 
@@ -181,14 +194,8 @@ This represents a difference of roughly 672$\times$ in finality time, which has 
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.85\textwidth]{results/finality-comparison.png}
-    \caption{Cumulative distribution of finality times for 400 test transactions: ZK plateaus
-    at $\sim$15\,s; Optimistic reaches $\sim$2\,minutes.
-    \emph{[Generate from \texttt{l2\_finality\_time\_seconds\_bucket} and
-    \texttt{opt\_l2\_finality\_time\_seconds\_bucket} histograms exported from Prometheus.
-    Plot as CDF with P50/P95/P99 markers. Save as
-    \texttt{ths/images/results/finality-comparison.png}.]}
-    }
+    \includegraphics[width=0.95\textwidth]{dashboards/grafana-top-panels.png}
+    \caption{Grafana finality time comparison panel (right half of dashboard). Both architectures show P95 = 47.5\,ms for L1 \emph{submission} latency in Hardhat automining mode. Architectural finality---5-block confirmation window for ZK ($\approx$15\,s) and 10-block challenge window for Optimistic ($\approx$2\,min in demo)---is enforced by the smart contracts, not captured in this submission-latency metric.}
     \label{fig:finality-comparison}
 \end{figure}
 
@@ -200,30 +207,26 @@ The ZK~Rollup incurs a computational cost that the Optimistic~Rollup avoids: gen
     \centering
     \begin{tabular}{l|c|c}
         \hline
-        \textbf{Statistic} & \textbf{Time (ms)} & \textbf{Interpretation} \\
+        \textbf{Metric} & \textbf{ZK (proof)} & \textbf{Optimistic (batch hash)} \\
         \hline
-        Minimum & 45 & Low overhead \\
+        Total time (11 / 7 batches) & 1.256\,ms & 1.087\,ms \\
         \hline
-        P50 (median) & 78 & Typical per-batch cost \\
+        Average per batch & 0.114\,ms & 0.155\,ms \\
         \hline
-        P95 & 95 & Occasional higher latency \\
-        \hline
-        P99 & 120 & Rare spike \\
-        \hline
-        Average & 82 & Mean per-batch cost \\
+        All observations within & $<1$\,ms & $<1$\,ms \\
         \hline
     \end{tabular}
-    \caption{ZK proof generation latency distribution}
+    \caption{Batch computation overhead: ZK proof (SHA-256 mock) vs.\ Optimistic batch hash (SHA-256)}
     \label{tab:proof-latency}
 \end{table}
 
-At the P95 level, proof generation takes 95~ms. Relative to the 5-second batching interval, this represents a modest overhead:
+Both sequencers perform a single SHA-256 hash per batch as their computation step (ZK chains two hashes to simulate a proof commitment; Optimistic hashes the batch data for the state root). The measured average is 0.114\,ms for ZK and 0.155\,ms for Optimistic. Both are sub-millisecond and effectively zero relative to the batching intervals (5\,s and 8\,s respectively):
 
 \begin{equation}
-\text{Batch Overhead} = \frac{\text{Proof Time}}{\text{Batch Interval}} = \frac{95 \text{ ms}}{5000 \text{ ms}} = 1.9\%
+\text{Batch Overhead}_\text{ZK} = \frac{0.114\,\text{ms}}{5000\,\text{ms}} \approx 0.002\%
 \end{equation}
 
-This indicates that, in our test environment, proof generation consumes less than 2\% of the available time per batch cycle. While production ZK proof systems operating over more complex circuits will incur significantly higher costs, this result demonstrates that proof generation does not represent a fundamental bottleneck in the architecture---particularly as proof systems continue to improve in efficiency.
+This figure is a lower bound specific to the mock proof. In production, real Groth16 proof generation over the BN254 curve takes 500\,ms to several minutes depending on circuit complexity and hardware. The simulation confirms the structural pipeline is correct; the overhead figure cannot be extrapolated to real prover hardware.
 
 \section{Security Model Comparison}
 
@@ -231,7 +234,7 @@ In addition to performance metrics, the evaluation also compared the security be
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|p{4cm}|p{4cm}}
+    \begin{tabular}{l|>{\raggedright\arraybackslash}p{4cm}|>{\raggedright\arraybackslash}p{4cm}}
         \hline
         \textbf{Property} & \textbf{ZK Rollup} & \textbf{Optimistic Rollup} \\
         \hline
@@ -281,7 +284,7 @@ In summary, the ZK~Rollup detects invalidity through a cryptographic mechanism (
 
 \subsection{Per-Submission Gas (Hardhat measurements)}
 
-Table~\ref{tab:gas-costs} reports the gas consumed per L1 submission for each architecture, measured from transaction receipts in the Hardhat environment.
+Table~\ref{tab:gas-costs} reports the gas consumed per L1 submission measured directly from transaction receipts via \texttt{tx.gasUsed} in the Hardhat environment (see Appendix~\ref{app:metrics} for raw values).
 
 \begin{table}[h]
     \centering
@@ -289,31 +292,33 @@ Table~\ref{tab:gas-costs} reports the gas consumed per L1 submission for each ar
         \hline
         \textbf{Metric} & \textbf{ZK Rollup} & \textbf{Optimistic} \\
         \hline
-        Gas per submission & $\sim$180,000 & $\sim$120,000 \\
+        Gas per submission (measured) & 165,293 & 170,937 \\
         \hline
-        Submissions per 400~tx & 7 & 4 \\
+        Submissions for 900~tx & 11 & 7 \\
         \hline
-        Total gas (400~tx) & $\sim$1,260,000 & $\sim$480,000 \\
+        Total gas (900~tx) & 1,818,223 & 1,196,559 \\
         \hline
-        Gas per transaction & $\sim$3,150 & $\sim$1,200 \\
+        Avg gas per transaction & $\approx$2,020 & $\approx$1,330 \\
         \hline
     \end{tabular}
-    \caption{L1 gas cost comparison}
+    \caption{L1 gas cost comparison --- measured from Hardhat transaction receipts}
     \label{tab:gas-costs}
 \end{table}
 
-The ZK~Rollup consumes approximately 2.6$\times$ more total L1 gas than the Optimistic~Rollup for the same transaction volume. This comes from two sources: each ZK submission carries a proof payload that increases calldata size, and the ZK verifier stores both a state root and a proof hash, while the Optimistic verifier stores only the state root. In a production deployment using real Groth16 pairing verification, the per-submission cost would be substantially higher—typically an additional 200K–500K gas for the pairing check alone.
+The per-submission gas costs are nearly identical in the mock-proof environment (165,293 for ZK vs.\ 170,937 for Optimistic). The Optimistic contract costs slightly more per submission because its \texttt{Commitment} struct writes ten storage fields on first insertion, whereas the ZK verifier writes fewer. The difference is $\approx$3.4\% and within noise.
+
+The total gas advantage for Optimistic ($1.52\times$ lower) comes entirely from \textbf{batch count}: ZK submits 11 batches compared to Optimistic's 7 for the same 900 transactions. This is a direct consequence of the batch size configuration (100 vs.\ 200 transactions). In a production deployment with real Groth16 pairing verification, the ZK per-submission cost would increase by 200K--500K gas for the BN254 \texttt{ecPairing} precompile, making ZK substantially more expensive per submission as well.
 
 \subsection{Per-Transaction Cost}
 
-Amortizing the per-submission cost across batch size gives the effective gas cost per transaction:
+Amortizing the per-submission cost across the actual average batch fill gives the effective gas cost per transaction:
 
 \begin{equation}
-\text{Cost}_{\text{ZK}} = \frac{180{,}000}{100} = 1{,}800 \text{ gas/tx}, \quad
-\text{Cost}_{\text{Opt}} = \frac{120{,}000}{200} = 600 \text{ gas/tx}
+\text{Cost}_{\text{ZK}} = \frac{165{,}293}{82} \approx 2{,}016 \text{ gas/tx}, \quad
+\text{Cost}_{\text{Opt}} = \frac{170{,}937}{129} \approx 1{,}325 \text{ gas/tx}
 \end{equation}
 
-The Optimistic path uses 3$\times$ less gas per transaction, driven by both its lower per-submission cost and its larger batch size. This ratio is the meaningful result: the relative difference between the two architectures is stable regardless of gas price. Translating either figure into a dollar cost requires a real mainnet gas price, which varies too much to quote reliably here.
+The Optimistic path uses $\approx$$1.52\times$ less gas per transaction, driven by its larger batch size. Translating either figure into a dollar cost requires a real mainnet gas price, which the local Hardhat environment does not provide.
 
 \section{Adversarial Scenario Results}
 

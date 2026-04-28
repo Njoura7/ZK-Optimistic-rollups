@@ -12,7 +12,7 @@ from prometheus_client import Counter, Gauge, Histogram, start_http_server
 # Configuration from environment (with defaults matching current values)
 OPT_BATCH_THRESHOLD = int(os.getenv('OPT_BATCH_SIZE', '200'))
 OPT_BATCH_INTERVAL = int(os.getenv('OPT_BATCH_INTERVAL', '8'))
-OPT_GAS_LIMIT = int(os.getenv('OPT_GAS_LIMIT', '150000'))
+OPT_GAS_LIMIT = int(os.getenv('OPT_GAS_LIMIT', '300000'))
 L1_RPC = os.getenv('L1_RPC', 'http://localhost:8545')
 
 app = Flask(__name__)
@@ -22,9 +22,10 @@ CORS(app)
 tx_counter = Counter('opt_l2_transactions_total', 'Total Optimistic L2 transactions')
 batch_counter = Counter('opt_l2_batches_total', 'Total Optimistic batches submitted')
 tps_gauge = Gauge('opt_l2_tps', 'Optimistic transactions per second')
-finality_time_histogram = Histogram('opt_l2_finality_time_seconds', 'Optimistic finality time', buckets=(5,10,15,30,60,120))
+finality_time_histogram = Histogram('opt_l2_finality_time_seconds', 'Optimistic L1 submission latency', buckets=(0.05,0.1,0.25,0.5,1.0,2.0,5.0))
 pending_txs_gauge = Gauge('opt_l2_pending_transactions', 'Optimistic pending transactions')
-batch_processing_time = Histogram('opt_l2_batch_processing_seconds', 'Optimistic batch processing time', buckets=(0.01,0.05,0.1,0.5,1,2))
+batch_processing_time = Histogram('opt_l2_batch_processing_seconds', 'Optimistic batch processing time', buckets=(0.001,0.005,0.01,0.05,0.1,0.5))
+batch_gas_gauge = Gauge('opt_l2_batch_gas_used', 'Gas units consumed by last Optimistic batch submission')
 
 class OptimisticSequencer:
     def __init__(self):
@@ -129,8 +130,9 @@ class OptimisticSequencer:
             
             finality_duration = time.time() - l1_start
             finality_time_histogram.observe(finality_duration)
-            
-            print(f"✓ Optimistic batch: {len(batch)} txs, Finality: {finality_duration:.2f}s, Total: {self.metrics['batches']}")
+            batch_gas_gauge.set(receipt['gasUsed'])
+
+            print(f"✓ Optimistic batch: {len(batch)} txs, Gas: {receipt['gasUsed']}, Finality: {finality_duration:.2f}s, Total: {self.metrics['batches']}")
         except Exception as e:
             print(f"Optimistic L1 submit skipped: {e}")
     

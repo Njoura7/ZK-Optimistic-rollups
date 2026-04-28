@@ -35,7 +35,7 @@ docker-compose up --build
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|c|p{5cm}}
+    \begin{tabular}{l|c|>{\raggedright\arraybackslash}p{5cm}}
         \hline
         \textbf{Service} & \textbf{URL/Port} & \textbf{Purpose} \\
         \hline
@@ -55,3 +55,14 @@ docker-compose up --build
     \caption{Service access points}
     \label{tab:services}
 \end{table}
+
+\section{Running Container State}
+
+Figure~\ref{fig:docker-containers} shows Docker Desktop during a standard evaluation run. All four services start together: \texttt{zk-rollup-demo} (main application container running both sequencers, the Flask dashboard, and the Hardhat L1 node), \texttt{zk-prometheus} (metrics collection), and \texttt{zk-grafana} (visualization). Total memory footprint is approximately 870\,MB across all containers.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.95\textwidth]{dashboards/docker-containers.png}
+    \caption{Docker Desktop showing the four running containers during an evaluation run. All services start with \texttt{docker compose up -{}-build} and are healthy within approximately two minutes.}
+    \label{fig:docker-containers}
+\end{figure}
