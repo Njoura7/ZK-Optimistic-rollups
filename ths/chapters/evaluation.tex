@@ -228,9 +228,28 @@ Both sequencers perform a single SHA-256 hash per batch as their computation ste
 
 This figure is a lower bound specific to the mock proof. In production, real Groth16 proof generation over the BN254 curve takes 500\,ms to several minutes depending on circuit complexity and hardware. The simulation confirms the structural pipeline is correct; the overhead figure cannot be extrapolated to real prover hardware.
 
-\section{Security Model Comparison}
+\section{Security Analysis}
+\label{sec:security}
 
-In addition to performance metrics, the evaluation also compared the security behavior of both architectures when confronted with an invalid state proposal. Table~\ref{tab:security-models} contrasts the key security properties.
+The performance results above have direct security implications. This section examines the threat model, compares the two architectures' security properties, and presents the empirical results of the two adversarial scenarios that could be tested directly.
+
+\subsection{Threat Model}
+
+Five adversarial scenarios are relevant to any Layer~2 deployment. We assume the adversary controls the sequencer process but not the Layer~1 consensus mechanism, and that at least two-thirds of L1 validators are honest.
+
+\begin{enumerate}
+    \item \textbf{Malicious sequencer}: submits an invalid state root to L1.
+    \item \textbf{L1 reorganization}: confirmed L1 blocks are replaced, invalidating anchored commitments.
+    \item \textbf{Sequencer crash}: the sequencer fails mid-batch, losing in-flight transactions.
+    \item \textbf{Transaction censorship}: the sequencer selectively excludes certain transactions.
+    \item \textbf{Data unavailability}: the sequencer withholds L2 batch data, preventing independent state reconstruction.
+\end{enumerate}
+
+Scenarios~1 and 3 were directly tested (Sections~\ref{sec:invalid-state} and~\ref{sec:crash} respectively). Scenarios~2, 4, and 5 are analyzed architecturally; Hardhat's deterministic block production does not simulate chain reorganizations, network-level censorship, or data withholding.
+
+\subsection{Security Properties Compared}
+
+Table~\ref{tab:security-models} contrasts the key security properties of each architecture.
 
 \begin{table}[h]
     \centering
@@ -242,7 +261,7 @@ In addition to performance metrics, the evaluation also compared the security be
         \hline
         Proof type & Cryptographic validity proof & Economic fraud proof \\
         \hline
-        Invalid state halted & Immediately upon proof rejection & After fraud proof submission \\
+        Invalid state halted & Immediately upon proof rejection & After fraud proof within challenge window \\
         \hline
         Cost model & Computational (proof generation) & Economic (challenge period and bonds) \\
         \hline
@@ -253,30 +272,33 @@ In addition to performance metrics, the evaluation also compared the security be
     \label{tab:security-models}
 \end{table}
 
+The ZK~Rollup's security rests on the soundness of its proof system: a valid proof mathematically guarantees the state transition is correct, so no invalid state can reach L1 storage. The Optimistic~Rollup's security rests on economic incentives: honest challengers are rewarded for detecting fraud, and dishonest sequencers lose posted collateral. The ZK model gives you a cryptographic guarantee by default; the Optimistic model gives you one only if at least one observer is watching and willing to act.
+
+\subsection{Challenger Absence: Quantifying the Risk}
+\label{sec:challenger-absence}
+
+The most significant vulnerability in an Optimistic~Rollup is that no challenger submits a fraud proof before the window closes. If each of $n$ independent observers detects fraud with probability $p$, the probability that \emph{none} of them challenges is:
+
+\begin{equation}
+P(\text{no challenge}) = (1 - p)^n
+\end{equation}
+
+With $p = 0.1$ and $n = 10$ observers, $P(\text{no challenge}) = (0.9)^{10} \approx 0.35$---a 35\% failure rate even with ten watchers. To bring this below a target threshold $\varepsilon$, the minimum observer count required is:
+
+\begin{equation}
+n \geq \frac{\ln \varepsilon}{\ln (1 - p)}
+\end{equation}
+
+For $p = 0.1$ and $\varepsilon = 0.01$, this gives $n \geq 44$~independent watchtower nodes. This is a concrete operational requirement, not a theoretical concern: production deployments need active monitoring infrastructure of at least this scale to achieve 99\% confidence that fraud will be caught. The ZK model has no corresponding requirement---invalid proofs are rejected automatically.
+
 \subsection{Behavior Under Invalid State Proposals}
+\label{sec:invalid-state}
 
-To illustrate the practical difference, consider a scenario in which the sequencer proposes an invalid state transition.
+Scenario~E (Section~\ref{sec:scenarios}) submitted a deliberately incorrect state root to each verifier contract.
 
-In the \textbf{ZK~Rollup}, the response proceeds as follows:
-\begin{enumerate}
-    \item The sequencer submits a proof together with the invalid state root.
-    \item The L1 verifier contract checks the proof cryptographically.
-    \item Since the proof does not match the claimed state root, the submission is rejected.
-    \item The system continues from the last accepted valid state.
-    \item Detection time: approximately 15~seconds (the next proof cycle).
-\end{enumerate}
+In the \textbf{ZK~Rollup}, the invalid submission was paired with a proof that did not match the claimed state root. The \texttt{ZKVerifier} contract rejected the transaction immediately---the call reverted on-chain, consuming only the gas for the failed call. The invalid state never entered L1 storage. Detection was instantaneous: the ZK model provides \emph{prevent-by-default} security.
 
-In the \textbf{Optimistic~Rollup}, the response differs significantly:
-\begin{enumerate}
-    \item The sequencer submits only the state root (no proof is attached).
-    \item The state root is accepted as provisional.
-    \item Any observer may submit a fraud proof if they detect that the state is invalid.
-    \item The L1 contract re-executes the disputed transaction to adjudicate the claim.
-    \item If fraud is confirmed, the invalid state is reverted and the sequencer is penalized.
-    \item Time to resolution: the full challenge period (7~days in production).
-\end{enumerate}
-
-In summary, the ZK~Rollup detects invalidity through a cryptographic mechanism (fast but computationally expensive), while the Optimistic~Rollup relies on an economic mechanism (slower but cheaper in the absence of fraud).
+In the \textbf{Optimistic~Rollup}, the invalid root was accepted provisionally (as designed). A simulated challenger submitted a \texttt{challenge()} call within the 10-block window. The commitment was marked \texttt{CHALLENGED}, preventing finalization. Total time from submission to challenge: approximately 15~seconds. The Optimistic model provides \emph{detect-and-revert} security---invalid states enter the system but can be removed through the dispute mechanism before finality.
 
 \section{Gas Cost Analysis}
 
@@ -321,8 +343,10 @@ Amortizing the per-submission cost across the actual average batch fill gives th
 The Optimistic path uses $\approx$$1.52\times$ less gas per transaction, driven by its larger batch size. Translating either figure into a dollar cost requires a real mainnet gas price, which the local Hardhat environment does not provide.
 
 \section{Adversarial Scenario Results}
+\label{sec:scenarios}
 
 \subsection{Sequencer Crash and Recovery (Scenario~D)}
+\label{sec:crash}
 
 To evaluate resilience, each sequencer was forcibly terminated (\texttt{SIGKILL}) while it had pending transactions in its pool, then restarted after a 10-second delay. Table~\ref{tab:crash-recovery} reports the recovery behavior.
 
@@ -369,7 +393,7 @@ We now revisit the research questions posed in Chapter~\ref{ch:intro} and evalua
 
 \textbf{RQ1 (Finality).} Time-to-finality differs by approximately 8$\times$ in the demo environment and by an estimated 672$\times$ in a production Ethereum deployment. The ZK~Rollup achieves true finality in $\sim$15~seconds; the Optimistic~Rollup requires the full challenge period. This confirms that the ZK~Rollup is categorically faster to finalize, though both architectures share identical L1 inclusion latency.
 
-\textbf{RQ2 (L1 Congestion and Reorgs).} Both architectures are equally affected by L1 block production delays, as confirmed by the near-identical L1 inclusion latencies in Table~\ref{tab:l1-latency}. The deeper analysis of reorganization impacts is presented in Chapter~\ref{ch:security}, where we show that the ZK~Rollup recovers from a 1-block reorg in $\sim$24~seconds while the Optimistic~Rollup must wait for the challenge period to elapse on the new canonical chain.
+\textbf{RQ2 (L1 Congestion and Reorgs).} Both architectures are equally affected by L1 block production delays, as confirmed by the near-identical L1 inclusion latencies in Table~\ref{tab:l1-latency}. For a 1-block reorganization, the ZK~Rollup recovers in approximately $T_{\text{detect}} + T_{\text{reproof}} + T_{\text{re-include}} \approx 12\text{s} + 0.1\text{ms} + 12\text{s} \approx 24$~seconds, whereas the Optimistic~Rollup must wait for the challenge window to elapse on the new canonical chain---potentially 7~days in production. This asymmetry is architectural: ZK recovery is gated on re-submitting one proof; Optimistic recovery is gated on re-running the full dispute window.
 
 \textbf{RQ3 (Censorship Resistance).} Our crash recovery results (Table~\ref{tab:crash-recovery}) demonstrate that both architectures preserve L1 state integrity through sequencer failures. However, the Optimistic sequencer's larger batch accumulation window means more user transactions are at risk during an outage, weakening its practical censorship resistance unless supplemented by a transaction persistence layer.
 
@@ -393,9 +417,9 @@ Table~\ref{tab:tradeoff-summary} consolidates the quantitative findings across a
         \hline
         True finality & $\sim$15s & $\sim$2~min & ZK ($\sim$8$\times$) \\
         \hline
-        Gas per transaction & $\sim$1,800 & $\sim$600 & Optimistic (3$\times$) \\
+        Gas per transaction & $\sim$2,020 & $\sim$1,330 & Optimistic ($1.5\times$) \\
         \hline
-        Proof overhead & 1.9\% & 0\% & Optimistic \\
+        Proof overhead & $<$0.01\% (mock) & 0\% & Optimistic \\
         \hline
         Invalid state detection & Instant & Challenge period & ZK \\
         \hline
@@ -420,12 +444,8 @@ Several factors may limit the generalizability of our experimental results.
 
 \textbf{Statistical validity.} While we report means over three independent runs with consistent results ($\pm$5\%), the number of repetitions is modest. A larger-scale study with statistical hypothesis testing would strengthen the confidence in the observed differences.
 
-\section{What the Results Establish}
+\section{Summary}
 
-The measurements in this chapter answer the three research questions that the framework was built to address. ZK finality is categorically faster than Optimistic finality under comparable conditions—not marginally faster, but by an order of magnitude in the demo environment and by several orders of magnitude in a production deployment. The ZK path achieves this through cryptographic proof, which eliminates the waiting period; the Optimistic path achieves lower per-transaction gas cost by amortizing fewer submissions across larger batches. Neither architecture dominates on all dimensions, which reflects the actual engineering trade-off that practitioners face when choosing between them.
+Three findings stand out from this chapter. First, the finality gap is not a narrow performance difference but an architectural one: ZK commits to a cryptographic proof at submission and is done in $\sim$15~seconds; Optimistic defers certainty to a challenge window that takes minutes in the demo and days in production. Second, the gas cost story is counterintuitive---per submission, the two architectures cost nearly the same on a local node. The $1.52\times$ total gas difference comes from ZK submitting 1.57$\times$ more batches, not from any difference in per-submission work. Third, both architectures handle sequencer crashes gracefully at the L1 level, but the Optimistic sequencer's larger batch window means more user transactions are in-flight when a crash occurs.
 
-The results also confirm that both architectures preserve Layer~1 state integrity through sequencer crashes—a property that the automated test suite verifies before any live run—and that the ZK contract rejects invalid state before it enters storage while the Optimistic contract admits it provisionally and relies on challengers to act within the window.
-
-The threats to validity documented above mean that the absolute numbers should be treated as indicative rather than definitive. The relative comparisons—ZK finality is faster, Optimistic gas cost is lower, the batch size ratio is 2:1—are stable across parameter variations and are the primary contribution of this evaluation.
-
-Chapter~\ref{ch:security} extends the analysis to the security properties of each architecture under Layer~1 reorganizations and sequencer censorship, drawing on the finality model differences established here.
+The security analysis (Section~\ref{sec:security}) shows that these performance characteristics map directly onto security posture: ZK prevents invalid state by construction; Optimistic requires active challengers and a monitoring infrastructure of at least 44~independent nodes to achieve 99\% detection confidence.

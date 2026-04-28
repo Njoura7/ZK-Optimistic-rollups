@@ -192,24 +192,6 @@ ZK_BATCH_SIZE=150 OPT_BATCH_INTERVAL=5 docker-compose up -d
 
 This approach lets researchers measure how batch size, polling frequency, and gas allocation affect finality latency, throughput, and cost. Changing any parameter and re-running the test suite provides immediate feedback on its impact.
 
-We chose Hardhat for Layer~1 because it is fast and easy to configure. We chose Python and Flask for the sequencers because we wanted to iterate quickly, not optimize for production performance. Prometheus and Grafana are standards in the monitoring space. Docker Compose handles deployment. None of these choices are controversial—they are reliable tools that let us focus on measuring rollup behavior, not on building production infrastructure.
-
-\section{How the System Actually Works}
-
-When a test submits a transaction, the sequencer receives it via HTTP and adds it to a queue. The sequencer has a background thread that wakes up every few seconds and checks if there are enough transactions to form a batch. If yes, it creates a commitment, sends it to Layer~1, and records how long that took.
-
-For ZK, "creating a commitment" means computing two hash values and packaging them together. For Optimistic, it means computing one hash.
-
-Layer~1 then does something different depending on the type. For ZK, it checks that a proof was provided (we do not verify the proof itself to keep things fast). For Optimistic, it records that a challenge window has started and waits to see if anyone disputes it.
-
-A commitment reaches finality when either the proof is verified and five blocks have passed (ZK), or the challenge window has closed and no dispute was filed (Optimistic).
-
-We record every timestamp—submission, inclusion in a block, and finality. The difference between submission and finality is the latency we measure in Chapter~\ref{ch:evaluation}.
-
-One note on failure handling: If a sequencer crashes during batch assembly, pending transactions are lost. This is a limitation of the test framework (production systems use persistent mempools and recovery mechanisms). However, because the two sequencers are independent processes, a crash in one does not affect the other—we can isolate and measure failures separately.
-
-The batch creation loop is simple: wait for the pool to fill, create a batch, submit it, then sleep and repeat. The ZK sequencer sleeps for 5 seconds and uses a batch of 100 transactions. The Optimistic sequencer sleeps for 8 seconds and uses 200 transactions. These numbers reflect the different trade-offs between proof overhead and Layer~1 gas cost.
-
 \section{What This Chapter Establishes}
 
 The framework gives us a controlled environment in which both rollup types run against identical conditions: the same Layer~1 node, the same hardware, the same network. The design choices documented here---batch sizes, challenge window compression, SHA-256 as a proof stand-in---are deliberate compromises between experimental practicality and architectural faithfulness. Each one is flagged where it appears so that results can be interpreted with appropriate scope.

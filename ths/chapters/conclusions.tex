@@ -22,10 +22,10 @@ Both architectures achieved L1 inclusion in approximately 4.75~seconds, confirmi
 The ZK~Rollup provides cryptographic safety guarantees under a 1-of-N honest prover assumption, while the Optimistic~Rollup relies on economic guarantees under an at-least-one-honest-challenger assumption. Both architectures inherit the security of the underlying L1 through their anchoring mechanisms. Empirically, the ZK~Rollup rejected invalid state proposals instantly at the contract level, while the Optimistic~Rollup required an active challenger to detect and dispute the fraud within the challenge window.
 
 \textbf{Computational overhead.}
-ZK proof generation incurs a P95 latency of 95~ms per batch, representing approximately 1.9\% of the batch interval. This overhead is manageable with current hardware and is expected to decrease as proof systems continue to improve.
+Mock ZK proof generation (SHA-256 double-hash) averaged 0.114\,ms per batch---under 0.01\% of the 5-second batch interval and negligible as a bottleneck. This figure is a lower bound: real Groth16 proof generation takes 500\,ms to several minutes on production hardware. The structural pipeline is correct; the absolute cost is not representative.
 
 \textbf{Gas costs.}
-In the Hardhat test environment, the ZK~Rollup consumed approximately 2.6$\times$ more total L1 gas than the Optimistic~Rollup for the same transaction volume, with a per-transaction cost roughly 3$\times$ higher. These are relative comparisons on a local node; absolute mainnet figures will differ. The cost difference reflects the price of cryptographic finality.
+In the Hardhat test environment, ZK consumed $1.52\times$ more total L1 gas than Optimistic for the same 900 transactions (1,818,223 versus 1,196,559 gas units). Per submission the costs are nearly equal---165,293 for ZK versus 170,937 for Optimistic. The total difference comes entirely from batch count: ZK submitted 11 batches against Optimistic's 7. These are relative comparisons on a local node; absolute mainnet figures depend on prevailing gas price.
 
 \textbf{Recovery behavior.}
 Both architectures preserved L1 state consistency through sequencer crashes, but both lost in-memory pending transactions. The Optimistic sequencer's larger batch accumulation window resulted in higher potential data loss per crash event.
@@ -44,7 +44,7 @@ Table~\ref{tab:rq-answers} maps each research question to the corresponding empi
         \hline
         2 & When a sequencer crashes, what is the cost of recovery? & Both preserve L1 state integrity. The Optimistic sequencer loses more pending transactions per crash (larger batch accumulation window means more in-flight work). \\
         \hline
-        3 & Where do the real costs land---computation, gas, or time? & ZK is faster but uses $\sim$2.6$\times$ more L1 gas (Hardhat estimate). Optimistic is cheaper but slower. Proof generation adds $\sim$95ms P95 latency per batch, not a bottleneck at this scale. \\
+        3 & Where do the real costs land---computation, gas, or time? & ZK uses $\sim$1.5$\times$ more total L1 gas (Hardhat measured), driven by higher batch count, not per-submission cost. Mock proof generation averages $<$1\,ms per batch---negligible. Production provers would raise this to seconds or minutes. \\
         \hline
         4 & Is a fair comparison achievable on standard developer hardware? & Yes. Both sequencers run simultaneously against the same Hardhat node on a laptop. The 21-test suite passes without specialist hardware. \\
         \hline
