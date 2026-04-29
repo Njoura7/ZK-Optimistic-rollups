@@ -4,7 +4,7 @@
 \chapter{Related Work}
 \label{ch:relatedwork}
 
-Most rollup research falls into one of two categories: formal security proofs and throughput benchmarks on mainnet. Neither gives you a direct measurement of what happens when things go wrong. This chapter reviews what has been established, notes where it stops short, and describes how this framework fills the gap.
+The rollup literature covers two things well: formal security analysis and mainnet throughput under normal load. What it does not cover is failure---both architectures tested under the same adverse conditions, measured with the same instrumentation. This chapter reviews what exists, identifies where it stops, and explains what this framework contributes.
 
 \section{Academic Research on Layer~2 Protocols}
 
@@ -12,7 +12,7 @@ Most rollup research falls into one of two categories: formal security proofs an
 
 Thibault et al.\ provide the most thorough systematisation of Layer~2 blockchain protocols~\cite{sok-layer2}. Their taxonomy organises the design space into four families. Payment channels, exemplified by the Lightning Network and Raiden, enable bidirectional off-chain transfers between fixed pairs of participants. Sidechains, including Plasma and various commit-chain designs, operate as semi-independent chains that periodically anchor their state to the parent chain. Rollups, encompassing both ZK and Optimistic variants, post transaction data on-chain while moving execution off-chain. Hybrid approaches such as Validium and Volition blend on-chain and off-chain data availability to offer a configurable trade-off between cost and security.
 
-The systematisation provides a useful taxonomy and analyses security properties at a theoretical level. What it does not include is any empirical measurement of how these systems behave under failure conditions. The absence of controlled experiments leaves open the practical question of whether theoretical security guarantees translate into usable resilience.
+The systematisation provides a useful taxonomy and analyses security properties at a theoretical level. What it does not include is any empirical measurement of how these systems behave under failure conditions. The absence of controlled experiments leaves open whether the theoretical security guarantees hold under real failure conditions.
 
 \subsection{ZK Rollup Research}
 
@@ -78,6 +78,5 @@ Reading across this literature, four areas come up repeatedly where empirical da
 
 \section{Where the Existing Literature Leaves Off}
 
-Both academic work and industry implementations have made substantial progress on rollup architecture. What the literature has not done is measure both approaches under the same conditions, with the same instrumentation, including scenarios that break things deliberately. Production systems optimise for the normal case, and academic papers analyse theoretical properties. The space between---empirical comparison under adversarial conditions---is what this framework occupies.
-
+Existing work is either production systems optimised for the happy path, or academic papers analysing theoretical properties. What is missing is a direct empirical comparison of both approaches under the same conditions, with the same instrumentation, and under adversarial scenarios. That is the gap this framework attempts to fill.
 Chapter~\ref{ch:framework} describes the design choices that make a controlled comparison possible. Chapter~\ref{ch:implementation} covers the code.
