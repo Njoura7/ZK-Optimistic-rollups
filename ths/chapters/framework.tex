@@ -46,7 +46,7 @@ Figure~\ref{fig:architecture} shows how these pieces connect.
 
 To deploy the framework, we run a single Docker Compose~\cite{compose2024} command. This starts all components at once. Table~\ref{tab:eval-dimensions} lists what we measure and how.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
     \begin{tabular}{>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}p{6.5cm}|l}
         \hline
@@ -100,7 +100,7 @@ Each sequencer exports metrics to Prometheus on a dedicated port. The metrics ar
 
 Table~\ref{tab:research-questions} shows how each research question maps to what we measure.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
     \begin{tabular}{l|>{\raggedright\arraybackslash}p{4.5cm}|>{\raggedright\arraybackslash\ttfamily\small}p{5cm}}
         \hline
@@ -124,7 +124,7 @@ Table~\ref{tab:research-questions} shows how each research question maps to what
 
 Table~\ref{tab:tech-stack} lists the technologies used and why each was chosen. The criteria were simple: each tool had to be open-source, easy to run locally, and well enough documented that another researcher could replace it if needed.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
     \begin{tabular}{l|l|>{\raggedright\arraybackslash}p{5cm}}
         \hline
@@ -153,7 +153,7 @@ Table~\ref{tab:tech-stack} lists the technologies used and why each was chosen. 
 
 The framework parameters are configurable via environment variables. This allows researchers to test how different architectural choices affect performance.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
     \begin{tabular}{>{\ttfamily}l|l|>{\raggedright\arraybackslash}p{5.5cm}}
         \hline

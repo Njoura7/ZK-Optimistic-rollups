@@ -7,6 +7,13 @@
 	%final, % Set final to hide todos
 ]{elteikthesis}[2024/04/26]
 
+% Suppress two known load-order warnings caused by elteikthesis.cls loading
+% csquotes before minted loads fvextra/lineno.  The silence package filters
+% the messages without affecting functionality.
+\usepackage{silence}
+\WarningFilter{fvextra}{csquotes should be loaded after fvextra}
+\WarningFilter{lineno}{Command \@parboxrestore has changed}
+
 % The minted package is also supported for source highlighting
 % See elteikthesis_minted.tex for example
 \usepackage[newfloat]{minted}
