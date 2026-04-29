@@ -79,12 +79,8 @@ We record timestamps at each step. The difference between submission block and f
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.85\textwidth, height=0.45\textheight, keepaspectratio]{architecture/batch-flow.png}
-    \caption{The \texttt{\_batch()} function in both sequencer processes.
-    The two paths diverge at the SHA-256 step: the ZK sequencer computes a second
-    hash as a mock proof and reads \texttt{/app/contracts.json} on every call;
-    the Optimistic sequencer uses a contract handle loaded at startup and increments
-    its batch counter before the L1 call.}
+    \includegraphics[width=0.70\textwidth]{architecture/batch-flow.png}
+    \caption{The \texttt{\_batch()} function in both sequencers: the ZK path adds a mock proof hash and reloads \texttt{contracts.json} each call; the Optimistic path uses a preloaded handle and increments a batch counter.}
     \label{fig:batch-flow}
 \end{figure}
 
