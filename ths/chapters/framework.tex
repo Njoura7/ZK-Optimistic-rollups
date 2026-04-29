@@ -34,7 +34,7 @@ The fourth component is the metrics stack. Prometheus~\cite{prometheus2024} scra
 
 Figure~\ref{fig:architecture} shows how these pieces connect.
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=0.85\textwidth]{architecture/system-architecture.png}
     \caption{System architecture showing the four main components—Hardhat L1 node,
@@ -77,9 +77,9 @@ The Layer~1 contract either verifies the proof (ZK) or opens a challenge window 
 
 We record timestamps at each step. The difference between submission block and finality block is the latency we measure. This latency includes both on-chain delays and off-chain computation.
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.85\textwidth]{architecture/batch-flow.png}
+    \includegraphics[width=0.85\textwidth, height=0.45\textheight, keepaspectratio]{architecture/batch-flow.png}
     \caption{The \texttt{\_batch()} function in both sequencer processes.
     The two paths diverge at the SHA-256 step: the ZK sequencer computes a second
     hash as a mock proof and reads \texttt{/app/contracts.json} on every call;

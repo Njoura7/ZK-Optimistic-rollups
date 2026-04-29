@@ -34,7 +34,7 @@ Kalodner et al.\ discuss sequencer liveness, but the cost of failure recovery ha
 
 The design of this framework drew directly from four production codebases. Figure~\ref{fig:impl-repos} shows the GitHub repositories examined; each contributed specific patterns that appear in the verifier contracts or sequencer logic described in Chapter~\ref{ch:implementation}.
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=0.85\textwidth]{implemented-repos.png}
     \caption{Production Layer~2 repositories studied during framework design. From top: Polygon AggLayer contracts (TypeScript, 309 stars), Scroll monorepo (Go, 743 stars), OpenZeppelin Contracts (Solidity, 27{,}075 stars), zkSync Era (Rust, 3{,}241 stars), and Optimism (Go, 6{,}420 stars). Specific patterns borrowed from each are described in the subsections below.}

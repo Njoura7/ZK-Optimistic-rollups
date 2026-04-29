@@ -50,14 +50,14 @@ These checks apply when screenshots are captured for Figures~\ref{fig:flask-dash
 
 Figure~\ref{fig:flask-dashboard} shows the Flask real-time dashboard with both sequencers running. Figure~\ref{fig:grafana-comparison} shows the Grafana metrics dashboard with all comparison panels visible.
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{dashboards/flask-dashboard-overview.png}
     \caption{Flask real-time dashboard during an evaluation run. Left panel: ZK~Rollup showing 900~transactions across 11~batches (100~tx/batch). Right panel: Optimistic~Rollup showing 900~transactions across 7~batches (200~tx/batch). The Architectural Comparison table reflects design-level properties; gas values are updated from live measurements.}
     \label{fig:flask-dashboard}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{dashboards/grafana-top-panels.png}
     \caption{Grafana dashboard top row: transaction counters, batch counts, current TPS, and L1 submission latency P95 for both architectures. The 47.5\,ms P95 value shown for both is a histogram interpolation artefact (all observations below the 50\,ms bucket boundary); see Appendix~\ref{app:metrics} for explanation.}
@@ -95,7 +95,7 @@ Across all three scenarios, the ZK~Rollup achieves 39--43\% higher peak throughp
 
 As a result, the ZK~sequencer processes transactions into L1-committed batches at a faster rate. However, this comes at the cost of a higher number of L1 submissions, which we analyze in the next subsection.
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{dashboards/grafana-bottom-panels.png}
     \caption{Grafana dashboard lower panels showing the transaction rate comparison (ZK and Optimistic TX rates overlaid), ZK proof generation time, Optimistic batch processing time, pending transaction queues, and gas per batch comparison. Peak ZK transaction rate: 15.3\,ops/s; peak Optimistic rate: 16.6\,ops/s. Gas per batch: ZK~165\,K, Optimistic~171\,K (mock-proof environment).}
@@ -192,7 +192,7 @@ This distinction is critical. In our demo environment, the ZK~Rollup achieves tr
 
 This represents a difference of roughly 672$\times$ in finality time, which has direct implications for applications that depend on fast settlement (such as decentralized exchanges and cross-chain bridges).
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{dashboards/grafana-top-panels.png}
     \caption{Grafana finality time comparison panel (right half of dashboard). Both architectures show P95 = 47.5\,ms for L1 \emph{submission} latency in Hardhat automining mode. Architectural finality---5-block confirmation window for ZK ($\approx$15\,s) and 10-block challenge window for Optimistic ($\approx$2\,min in demo)---is enforced by the smart contracts, not captured in this submission-latency metric.}
@@ -294,13 +294,14 @@ For $p = 0.1$ and $\varepsilon = 0.01$, this gives $n \geq 44$~independent watch
 \subsection{Behavior Under Invalid State Proposals}
 \label{sec:invalid-state}
 
-Scenario~E (Section~\ref{sec:scenarios}) submitted a deliberately incorrect state root to each verifier contract.
+Scenario~E submitted a deliberately incorrect state root to each verifier contract.
 
 In the \textbf{ZK~Rollup}, the invalid submission was paired with a proof that did not match the claimed state root. The \texttt{ZKVerifier} contract rejected the transaction immediately---the call reverted on-chain, consuming only the gas for the failed call. The invalid state never entered L1 storage. Detection was instantaneous: the ZK model provides \emph{prevent-by-default} security.
 
 In the \textbf{Optimistic~Rollup}, the invalid root was accepted provisionally (as designed). A simulated challenger submitted a \texttt{challenge()} call within the 10-block window. The commitment was marked \texttt{CHALLENGED}, preventing finalization. Total time from submission to challenge: approximately 15~seconds. The Optimistic model provides \emph{detect-and-revert} security---invalid states enter the system but can be removed through the dispute mechanism before finality.
 
 \section{Gas Cost Analysis}
+\label{sec:gas}
 
 \emph{Important scope note:} The gas figures in this section come from a local Hardhat node. Hardhat uses a fixed gas price and deterministic block production; it does not replicate Ethereum mainnet's market-driven fee auction, EIP-1559 base fee, or real-world congestion. The numbers here are useful for comparing the two architectures \emph{relative to each other}—the ZK path consistently uses more gas than the Optimistic path because of the proof payload and extra contract storage—but they should not be treated as absolute production cost estimates. Actual mainnet costs depend on gas price, which can vary by an order of magnitude day to day.
 
@@ -375,16 +376,6 @@ Both sequencers lost all in-memory pending transactions upon crash, as neither i
 
 The Optimistic sequencer had more transactions in its pool at the time of the crash (142 versus 73) because its larger batch threshold causes transactions to accumulate longer before being drained. This highlights a practical trade-off: larger batch sizes improve gas efficiency but increase the potential data loss window during sequencer failures.
 
-\subsection{Invalid State Proposal (Scenario~E)}
-
-To test the detection of fraudulent state commitments, we submitted a deliberately incorrect state root to each verifier contract.
-
-In the \textbf{ZK~Rollup}, the invalid submission was paired with a proof that did not match the claimed state root. The \texttt{ZKVerifier} contract's proof validation logic rejected the transaction immediately---the submission reverted on-chain, consuming only the gas for the failed call. Detection was instantaneous: the invalid state never entered L1 storage.
-
-In the \textbf{Optimistic~Rollup}, the invalid state root was accepted provisionally (as expected by design). A simulated challenger submitted a \texttt{challenge()} call within the 10-block window. The commitment was marked as challenged, preventing finalization. The total time from submission to challenge was approximately 15~seconds (one and a half L1 blocks), and the challenged commitment remained in the \texttt{CHALLENGED} state permanently, as intended.
-
-This result empirically confirms the theoretical distinction: the ZK~Rollup provides \textit{prevent-by-default} security (invalid states cannot enter the system), while the Optimistic~Rollup provides \textit{detect-and-revert} security (invalid states enter provisionally but can be removed through the dispute mechanism).
-
 \section{Discussion}
 
 \subsection{Answering the Research Questions}
@@ -399,7 +390,7 @@ We now revisit the research questions posed in Chapter~\ref{ch:intro} and evalua
 
 \textbf{RQ4 (Fault-Escape Mechanisms).} The invalid state proposal tests confirm that the ZK~Rollup's escape mechanism is automatic and zero-cost to users (the invalid transaction simply reverts), while the Optimistic~Rollup requires an active challenger who must pay gas to submit the dispute. The economic asymmetry favors the ZK model for user safety.
 
-\textbf{RQ5 (Data Availability).} Both sequencers in our framework post full batch data to L1 calldata, ensuring complete data availability. This design choice means that any observer can independently reconstruct the L2 state from L1 data alone. The cost implications are captured in the gas analysis (Section~6.6): the ZK path pays more per transaction for this guarantee.
+\textbf{RQ5 (Data Availability).} Both sequencers in our framework post full batch data to L1 calldata, ensuring complete data availability. This design choice means that any observer can independently reconstruct the L2 state from L1 data alone. The cost implications are captured in the gas analysis (Section~\ref{sec:gas}): the ZK path pays more per transaction for this guarantee.
 
 \subsection{Summary of Trade-offs}
 

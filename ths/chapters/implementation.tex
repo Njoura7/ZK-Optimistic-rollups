@@ -30,6 +30,31 @@ Both contracts follow patterns established in production systems. The \texttt{ZK
 
 The essential architectural difference between the two approaches manifests in the data each contract stores. For ZK, a commitment is final once its proof has been verified and a confirmation delay has elapsed. For Optimistic, a commitment enters a challenge period and becomes final only after that period expires without a successful dispute. Table~\ref{tab:contract-diffs} summarizes the data structures that implement this difference.
 
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|>{\raggedright\arraybackslash}p{4.5cm}|>{\raggedright\arraybackslash}p{4.5cm}}
+        \hline
+        \textbf{Field} & \textbf{ZKVerifier} & \textbf{OptimisticVerifier} \\
+        \hline
+        State root & \texttt{bytes32 stateRoot} & \texttt{bytes32 stateRoot} \\
+        \hline
+        Proof & \texttt{bytes proof} & --- (not required) \\
+        \hline
+        Submission block & \texttt{uint256 submissionBlock} & \texttt{uint256 submissionBlock} \\
+        \hline
+        Challenge deadline & --- & \texttt{uint256 challengeDeadline} \\
+        \hline
+        Finality flags & \texttt{bool isFinalized} & \texttt{bool isFinalized}, \texttt{bool isChallenged} \\
+        \hline
+        Submitter & --- & \texttt{address submitter} \\
+        \hline
+        \multicolumn{3}{l}{\small\textit{Total cold SSTOREs on first insert: ZK~$\approx$3, Optimistic~$\approx$10}} \\
+        \hline
+    \end{tabular}
+    \caption{Commitment struct fields stored by each L1 contract. The Optimistic struct writes roughly $3\times$ more storage slots on first insertion, explaining the higher gas cost per submission measured in Chapter~\ref{ch:evaluation}.}
+    \label{tab:contract-diffs}
+\end{table}
+
 \subsection{ZKVerifier Contract}
 
 The \texttt{ZKVerifier} contract is the on-chain anchor for the ZK~Rollup path. It accepts proofs submitted by the sequencer and enforces a finality delay before commitments are irreversible. The contract implements two core functions:
@@ -150,17 +175,7 @@ The framework includes a Flask~\cite{flask2024}-based web dashboard that aggrega
     \item \textbf{Test control API}: Endpoints to submit test transactions, query sequencer health, and trigger adversarial scenarios (crash simulation, delay injection).
 \end{itemize}
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.9\textwidth]{dashboards/flask-dashboard-overview.png}
-    \caption{Flask dashboard showing real-time metrics from both sequencers (transaction counts,
-    current TPS, batch totals, and throughput over time). \emph{[Screenshot to be captured
-    per \texttt{ths/images/README.md} Step~1: run stack, trigger Normal~150 scenario on each
-    sequencer, screenshot \texttt{http://localhost:3000}. Save as
-    \texttt{ths/images/dashboards/flask-dashboard-overview.png}.]}
-    }
-    \label{fig:flask-dashboard}
-\end{figure}
+The dashboard during a live evaluation run is shown in Chapter~\ref{ch:evaluation} (Figure~\ref{fig:flask-dashboard}), where the transaction counts and batch totals it displays are discussed alongside the measurements they represent.
 
 Underlying the dashboard is a Prometheus~\cite{prometheus2024} metrics collection layer. Each sequencer exports metrics to a dedicated HTTP endpoint (ports 9100 and 9101) that Prometheus scrapes at 15-second intervals. Table~\ref{tab:metrics-exported} lists the metrics collected.
 
@@ -227,7 +242,7 @@ Table~\ref{tab:test-coverage} maps each tier to the research questions it exerci
 
 Figure~\ref{fig:test-results} shows the full test run output from the GitHub Actions CI log, confirming all 21 tests pass on a clean checkout.
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{tests.png}
     \caption{All 21 tests passing in the GitHub Actions CI run: 5 ZK unit, 5 Optimistic unit, 7 integration, and 4 adversarial. No Docker stack is required; all network and contract calls are replaced with mocks at import time.}
