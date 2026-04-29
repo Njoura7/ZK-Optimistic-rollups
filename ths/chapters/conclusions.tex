@@ -4,152 +4,38 @@
 \chapter{Conclusions and Future Work}
 \label{ch:conclusion}
 
-This chapter draws together the main findings, offers practical guidance for choosing between the two architectures, and identifies what a follow-on study would need to test next.
+The two questions that shaped this thesis both have clear answers. ZK and Optimistic rollups differ meaningfully under controlled conditions, and the comparison can be done reproducibly on a standard laptop. What the experiments revealed is not just that the two architectures behave differently---theory already predicts that---but how consistently those differences appear even in a simplified framework where the ZK proof is mocked and the challenge window is compressed to ten blocks.
 
-\section{Summary of Findings}
+\section{What We Found}
 
-We built a testing framework that runs both rollup types against the same Layer~1 node and measures what happens under normal operation and deliberate failures. The principal findings are below.
+The finality gap is the headline result. ZK achieves true finality around eight times faster than Optimistic in the demo environment; scaled to production parameters---seconds versus a seven-day challenge window---the ratio grows to roughly 672 to one. That is not a framework artefact. It follows directly from the design: one architecture requires a proof before accepting a state transition, the other waits to see if anyone objects.
 
-\subsection{Key Results}
+Throughput and gas tell a more balanced story. ZK processes more transactions per second because its smaller batch threshold keeps the pipeline moving. Optimistic submits fewer batches and spends less total L1 gas for the same workload. Recovery from crashes was symmetric in kind but not in scale: both architectures preserved Layer~1 state integrity and both lost pending transactions, with Optimistic consistently losing more because its larger batch window lets more accumulate before being drained.
 
-\textbf{Throughput.}
-The ZK~Rollup achieved 39--43\% higher peak throughput than the Optimistic~Rollup, due to its smaller batch size and shorter batching interval. However, the Optimistic~Rollup produced 43\% fewer L1 submissions by using larger batches, resulting in lower per-transaction L1 gas costs. This illustrates a fundamental trade-off between throughput and L1 cost efficiency.
+The practical reading is not that one architecture wins. The right choice depends on what the application cannot afford to compromise: if withdrawal latency is critical, ZK; if L1 cost matters more, Optimistic.
 
-\textbf{Finality.}
-Both architectures achieved L1 inclusion in approximately 4.75~seconds, confirming that L1 block production is the dominant latency factor. However, true finality---the point at which a transaction becomes irreversible---differs dramatically: approximately 15~seconds for the ZK~Rollup versus approximately 7~days for the Optimistic~Rollup in a production setting, a difference of roughly 672$\times$.
+\section{What This Work Contributes}
 
-\textbf{Security.}
-The ZK~Rollup provides cryptographic safety guarantees under a 1-of-N honest prover assumption, while the Optimistic~Rollup relies on economic guarantees under an at-least-one-honest-challenger assumption. Both architectures inherit the security of the underlying L1 through their anchoring mechanisms. Empirically, the ZK~Rollup rejected invalid state proposals instantly at the contract level, while the Optimistic~Rollup required an active challenger to detect and dispute the fraud within the challenge window.
+Three things come out of this that did not exist before. A testing environment that runs both sequencer types against the same Layer~1 node simultaneously under identical conditions, including deliberate failures---so any comparison between the two is honest rather than circumstantial. A set of measured results on finality, gas cost, and recovery that anyone can verify by cloning the repository and running one command. And a sequencer interface specification that defines exactly what a new architecture must implement to plug into the existing contracts and metrics stack without touching what is already there.
 
-\textbf{Computational overhead.}
-Mock ZK proof generation (SHA-256 double-hash) averaged 0.114\,ms per batch---under 0.01\% of the 5-second batch interval and negligible as a bottleneck. This figure is a lower bound: real Groth16 proof generation takes 500\,ms to several minutes on production hardware. The structural pipeline is correct; the absolute cost is not representative.
+That last point shapes what comes next.
 
-\textbf{Gas costs.}
-In the Hardhat test environment, ZK consumed $1.52\times$ more total L1 gas than Optimistic for the same 900 transactions (1,818,223 versus 1,196,559 gas units). Per submission the costs are nearly equal---165,293 for ZK versus 170,937 for Optimistic. The total difference comes entirely from batch count: ZK submitted 11 batches against Optimistic's 7. These are relative comparisons on a local node; absolute mainnet figures depend on prevailing gas price.
+\section{Limitations Worth Naming}
 
-\textbf{Recovery behavior.}
-Both architectures preserved L1 state consistency through sequencer crashes, but both lost in-memory pending transactions. The Optimistic sequencer's larger batch accumulation window resulted in higher potential data loss per crash event.
+Two limitations are structural and worth stating plainly. The ZK proof in the framework is a double SHA-256 hash. It plays the structural role of a proof---submission is gated on it, finality follows immediately---but it contributes nothing meaningful to the overhead figures. Real Groth16 proof generation runs from several hundred milliseconds to minutes on production hardware. The Hardhat environment adds a second layer of simplification: deterministic blocks, zero network latency, no mempool congestion. These were the right trade-offs for a controlled comparison, but they mean the absolute numbers are not portable to a deployed system without adjustment.
 
-\subsection{Answers to Research Questions}
+\section{Where This Framework Could Go}
 
-Table~\ref{tab:rq-answers} maps each research question to the corresponding empirical finding.
+The most direct extension is connecting the same stack to a public testnet. Sepolia and Holesky both provide free test ETH from faucets and real network conditions without mainnet costs. That change alone would introduce stochastic block times and gas price variation that the current setup controls away, giving the finality measurements a second data point grounded in something closer to a real deployment---and it would not require rewriting any of the framework code.
 
-\begin{table}[h]
-    \centering
-    \begin{tabular}{c|>{\raggedright\arraybackslash}p{4.5cm}|>{\raggedright\arraybackslash}p{5.5cm}}
-        \hline
-        \textbf{RQ} & \textbf{Question} & \textbf{Finding} \\
-        \hline
-        1 & How long does a transaction take to become irreversible? & ZK achieves true finality in $\sim$15s; Optimistic requires 7~days in production---a $\sim$672$\times$ difference. In the demo environment the gap is $\sim$8$\times$ (10-block window). \\
-        \hline
-        2 & When a sequencer crashes, what is the cost of recovery? & Both preserve L1 state integrity. The Optimistic sequencer loses more pending transactions per crash (larger batch accumulation window means more in-flight work). \\
-        \hline
-        3 & Where do the real costs land---computation, gas, or time? & ZK uses $\sim$1.5$\times$ more total L1 gas (Hardhat measured), driven by higher batch count, not per-submission cost. Mock proof generation averages $<$1\,ms per batch---negligible. Production provers would raise this to seconds or minutes. \\
-        \hline
-        4 & Is a fair comparison achievable on standard developer hardware? & Yes. Both sequencers run simultaneously against the same Hardhat node on a laptop. The 21-test suite passes without specialist hardware. \\
-        \hline
-    \end{tabular}
-    \caption{Research questions and empirical findings}
-    \label{tab:rq-answers}
-\end{table}
+A direction that feels more interesting to us is cloud deployment. The stack is already packaged into a single Docker compose file. Running that on a cloud instance rather than a local machine would make the framework accessible to researchers without the hardware to run a local Ethereum node alongside two sequencers and a monitoring stack simultaneously. It would also allow longer experiments and larger transaction volumes than a laptop can sustain. More importantly, it changes the research workflow: instead of asking a collaborator to clone a repository and reproduce the environment locally, you share a running instance. That is a meaningful difference for empirical research that is meant to be challenged and extended.
 
-\subsection{Contributions}
+The sequencer interface is already built for this kind of extension. Adding a third architecture---a Validium variant, or a hybrid that uses ZK proofs for finality but Optimistic data posting---requires a new Solidity contract and a Python class that follows the existing pattern. The measurement infrastructure picks it up automatically.
 
-Three concrete things come out of this work:
+The one gap this thesis cannot close is an honest ZK proof generation cost. Replacing the mock with a real Groth16 prover on even a single batch would provide that lower bound without changing anything else about the framework.
 
-\begin{enumerate}
-    \item An \textbf{open-source, reproducible framework} that runs both sequencer types against the same Layer~1 node with configurable batch sizes, polling intervals, and gas allocations. Another researcher can clone it, adjust a parameter, and re-run the comparison.
+\section{Why This Problem Is Worth Studying}
 
-    \item \textbf{Measured data} on finality latency, recovery cost, and proof overhead for both architectures under identical conditions, including the adversarial scenarios that most evaluations skip.
+The real motivation for studying this space is rarely theoretical. Anyone who has tried to move funds out of an L2 under time pressure, or bridge assets between ecosystems that were not designed to talk to each other, has already lived the experiment this thesis tries to instrument. The seven-day withdrawal window is not a specification detail. It is a constraint that shapes what applications can be built and who is willing to use them.
 
-    \item An \textbf{interface specification} documented in the repository so a researcher can implement a new sequencer type---say a hybrid or a different proof system---and plug it into the same contracts and metrics infrastructure.
-\end{enumerate}
-
-\section{Practical Recommendations}
-
-Based on the experimental results and security analysis, we offer the following guidance for selecting a rollup architecture.
-
-\subsection{When to Prefer a ZK~Rollup}
-
-A ZK~Rollup is the right choice for applications where:
-\begin{itemize}
-    \item fast finality is critical, such as decentralized exchanges or derivatives platforms;
-    \item withdrawal latency must be minimized to provide an acceptable user experience;
-    \item the application can afford the computational overhead of proof generation;
-    \item strong cryptographic safety guarantees are preferred over economic ones.
-\end{itemize}
-
-Typical use cases include automated market makers, cross-chain bridges (where fast settlement prevents double-spending), and payment applications.
-
-\subsection{When to Prefer an Optimistic~Rollup}
-
-An Optimistic~Rollup fits better when:
-\begin{itemize}
-    \item minimizing L1 gas costs is a top priority;
-    \item the application can tolerate a 7-day withdrawal delay (or users are willing to use liquidity providers);
-    \item full EVM compatibility is required, avoiding the need to redesign application logic as arithmetic circuits;
-    \item computational resources are constrained.
-\end{itemize}
-
-Typical use cases include general-purpose smart contract platforms, gaming with infrequent settlements, governance applications, and migrations of existing decentralized applications.
-
-\section{Limitations}
-
-While the framework achieves its design objectives, several limitations should be acknowledged.
-
-\textbf{Simulated proof generation.} The ZK proof in our framework is a SHA-256 double-hash rather than a genuine SNARK or STARK. This preserves the structural pattern of the ZK pipeline but vastly underestimates the computational cost of production proof generation. The 1.9\% overhead figure reported in Chapter~\ref{ch:evaluation} is a lower bound; real-world ZK~Rollups require specialized hardware (GPUs, FPGAs) and report proof times ranging from seconds to minutes per batch.
-
-\textbf{Local L1 environment.} The Hardhat node provides deterministic, instant block production with zero network latency. Experiments on a public testnet or mainnet would introduce stochastic block times, mempool congestion, gas price competition, and network propagation delays that our framework does not capture.
-
-\textbf{Single-parameter configuration.} Each architecture was tested with a single set of batch parameters (100/5s for ZK, 200/8s for Optimistic). The observed trade-offs may shift under different configurations. A parameter sweep would provide a more complete picture of the Pareto frontier between throughput, cost, and finality.
-
-\textbf{No persistent mempool.} Neither sequencer persists its transaction pool to disk, which means crash recovery always loses pending transactions. Production systems mitigate this with write-ahead logs or redundant sequencers, neither of which is implemented in the current framework.
-
-\textbf{Simplified dispute resolution.} The Optimistic verifier's challenge mechanism accepts any \texttt{challenge()} call as valid. A production dispute system involves multi-round interactive proofs (as in Arbitrum's Cannon or Optimism's MIPS-based fault proofs) that are significantly more complex and costly.
-
-Despite these limitations, the framework achieves its central goal: providing a controlled, reproducible environment for direct comparison. The relative differences between the two architectures are robust to these simplifications, because both sides operate under the same constraints.
-
-\section{Future Research Directions}
-
-Several promising directions for future work emerge from this thesis.
-
-\subsection{Short-Term Extensions}
-
-\begin{enumerate}
-    \item \textbf{Additional L2 architectures}: extending the framework to include Plasma and Validium implementations would broaden the scope of the comparison.
-    \item \textbf{Public testnet integration}: running the experiments against public Ethereum testnets (e.g., Sepolia) would provide more realistic L1 conditions.
-    \item \textbf{Adversarial scenario automation}: implementing automated sequencer failover, malicious proposer injection, and censorship simulation would strengthen the failure-mode analysis.
-    \item \textbf{Gas cost modeling}: analyzing L1 gas costs under different fee regimes (e.g., EIP-1559 base fee fluctuations) would add an economic dimension to the evaluation.
-\end{enumerate}
-
-\subsection{Medium-Term Directions}
-
-\begin{enumerate}
-    \item \textbf{Data availability sampling}: evaluating the impact of data availability sampling (DAS) techniques on rollup data availability and cost.
-    \item \textbf{Cross-rollup interoperability}: studying how L2-to-L2 transfers and message passing affect finality guarantees.
-    \item \textbf{Proof system comparison}: benchmarking different ZK proof families (PLONK, STARK, Groth16) within the same framework.
-    \item \textbf{Sequencer economics}: modeling the effects of MEV extraction and sequencer competition on system fairness.
-\end{enumerate}
-
-\subsection{Long-Term Research}
-
-\begin{enumerate}
-    \item \textbf{Hybrid rollups}: exploring architectures that combine ZK proofs for finality with Optimistic mechanisms for general computation.
-    \item \textbf{Recursive proofs}: investigating L2-of-L2 constructions enabled by recursive proof composition.
-    \item \textbf{Post-quantum security}: evaluating the resilience of current proof systems to quantum computing advances and assessing post-quantum alternatives.
-    \item \textbf{Privacy-preserving Layer~2}: integrating privacy-preserving techniques into the rollup architecture without sacrificing verifiability.
-\end{enumerate}
-
-\section{Broader Impact}
-
-For other researchers, the main benefit is that you do not need to build evaluation infrastructure from scratch. The framework is open-source, starts with one Docker command, and produces reproducible results that can be extended or challenged.
-
-For developers choosing an L2 architecture, the quantified trade-offs in Chapter~\ref{ch:evaluation} give a concrete basis for that decision rather than relying on vendor benchmarks taken under ideal conditions.
-
-More broadly, cheaper and faster Layer~2 settlement has real consequences: lower transaction fees improve accessibility, and reducing the amount of computation that must run on-chain reduces energy consumption. Neither point is unique to this thesis, but the framework provides a way to measure how specific architectural choices affect both.
-
-\section{Closing Remarks}
-
-Layer~2 scaling is not a single solution. It is a spectrum of trade-offs, and the right point on that spectrum depends on what the application actually needs. ZK~Rollups give you fast, cryptographically certain finality at a higher gas cost. Optimistic~Rollups give you cheaper settlement at the cost of a long wait before withdrawal is truly final.
-
-What this thesis adds is not a verdict but a measurement. The numbers in Chapter~\ref{ch:evaluation} come from a controlled environment where both systems run against the same node under identical conditions. Anyone who disagrees with the conclusions can clone the repository, change the parameters, and check. That reproducibility is the part of this work that outlasts any specific benchmark figure.
+The framework does not resolve that tension. What it does is make the trade-off legible---measured, reproducible, and open to anyone who wants to test a different set of assumptions.

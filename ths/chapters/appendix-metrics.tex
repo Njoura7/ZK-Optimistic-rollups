@@ -43,7 +43,7 @@ opt\_l2\_batch\_gas\_used & Gauge & EVM gas used by last Optimistic submission \
 The listings below reproduce the raw \texttt{/metrics} output captured directly from each port during an evaluation run (900~transactions submitted to each sequencer across multiple demo scenarios). This output is the ground truth from which all performance figures in Chapter~\ref{ch:evaluation} are derived.
 
 \begin{listing}[H]
-\begin{minted}{text}
+\begin{minted}[breaklines=true, breakanywhere=true, fontsize=\footnotesize]{text}
 # Port 9100 — ZK Sequencer
 # Snapshot taken during standard evaluation run (900 tx, 11 batches submitted)
 
@@ -79,7 +79,7 @@ l2_batch_gas_used                         165293.0   # EVM gas units
 \end{listing}
 
 \begin{listing}[H]
-\begin{minted}{text}
+\begin{minted}[breaklines=true, breakanywhere=true, fontsize=\footnotesize]{text}
 # Port 9101 — Optimistic Sequencer
 # Snapshot taken during same evaluation run (900 tx, 7 batches submitted)
 
@@ -133,7 +133,7 @@ Both the ZK and Optimistic panels display 47.5\,ms. This is a mathematical artif
 \section{PromQL Queries Used in the Dashboard}
 
 \begin{listing}[H]
-    \begin{minted}{text}
+    \begin{minted}[breaklines=true, breakanywhere=true, fontsize=\footnotesize]{text}
 # Snapshot counter values
 l2_transactions_total
 opt_l2_transactions_total
