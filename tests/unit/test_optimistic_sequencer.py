@@ -34,13 +34,20 @@ sys.modules["flask_cors"] = MagicMock()
 # Ensure the l2-optimistic/ package is importable regardless of the working
 # directory from which pytest is invoked.
 # ---------------------------------------------------------------------------
-_L2_OPT_DIR = str(pathlib.Path(__file__).resolve().parents[2] / "l2-optimistic")
+# Evict the competing directory from sys.path so Python always picks
+# l2-optimistic/sequencer.py regardless of collection order across test files.
+_ROOT = pathlib.Path(__file__).resolve().parents[2]
+_L2_OPT_DIR = str(_ROOT / "l2-optimistic")
+_L2_ZK_DIR = str(_ROOT / "l2-zk")
+while _L2_ZK_DIR in sys.path:
+    sys.path.remove(_L2_ZK_DIR)
 if _L2_OPT_DIR not in sys.path:
     sys.path.insert(0, _L2_OPT_DIR)
 
-# Remove any previously cached 'sequencer' module (e.g. the ZK sequencer
-# loaded from l2/) so the optimistic version from l2-optimistic/ is imported.
+# Remove any previously cached 'sequencer' module so the optimistic
+# version from l2-optimistic/ is imported fresh.
 sys.modules.pop("sequencer", None)
+sys.modules.pop("zk_sequencer", None)
 
 from sequencer import OptimisticSequencer, app  # noqa: E402 — must follow sys.modules setup
 import sequencer as _seq_module  # noqa: E402 — used to access module-level Prometheus mocks

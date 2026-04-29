@@ -34,8 +34,15 @@ sys.modules["flask_cors"] = MagicMock()
 # ---------------------------------------------------------------------------
 sys.modules.pop("sequencer", None)  # Remove any cached sequencer module
 sys.modules.pop("opt_sequencer", None)  # Remove optimistic version if loaded
+sys.modules.pop("zk_sequencer", None)
 
-_L2_DIR = str(pathlib.Path(__file__).resolve().parents[2] / "l2-zk")
+# Evict the competing directory from sys.path so Python always picks
+# l2-zk/sequencer.py regardless of collection order across test files.
+_ROOT = pathlib.Path(__file__).resolve().parents[2]
+_L2_DIR = str(_ROOT / "l2-zk")
+_L2_OPT_DIR = str(_ROOT / "l2-optimistic")
+while _L2_OPT_DIR in sys.path:
+    sys.path.remove(_L2_OPT_DIR)
 if _L2_DIR not in sys.path:
     sys.path.insert(0, _L2_DIR)
 

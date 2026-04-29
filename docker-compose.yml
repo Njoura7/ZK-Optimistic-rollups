@@ -63,7 +63,7 @@ services:
       - prometheus
   # Test runner service - does not start automatically
   test-runner:
-    build: .
+    image: zk-optimistic-rollups-zk-rollup   # reuse the image built by the zk-rollup service
     container_name: zk-test-runner
     command: ["pytest", "tests/", "-v", "--tb=short"]
     environment:

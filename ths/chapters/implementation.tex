@@ -251,31 +251,50 @@ Figure~\ref{fig:test-results} shows the full test run output from the GitHub Act
 
 \subsection{Running the Tests}
 
-Tests run through the Docker Compose test profile and are separate from the main service stack:
+Because every test mocks its external dependencies at import time, the suite needs no running Docker stack, no Hardhat node, and no Ethereum connection. The fastest way to run it is directly from the project root with only four lightweight packages:
 
 \begin{verbatim}
-docker compose --profile test run --rm test-runner \
-    pytest tests/ -v --tb=short
+pip install -r requirements-test.txt
+pytest tests/ -v --tb=short
 \end{verbatim}
 
-Individual tiers can be targeted by path (e.g., \texttt{tests/adversarial/}). The expected result is 21 tests passing in under two minutes. Tests are also executed automatically on every commit that modifies sequencer code, contracts, or test files through the GitHub Actions workflow in \texttt{.github/workflows/ci.yml}.
+\texttt{requirements-test.txt} lists only \texttt{flask}, \texttt{flask-cors}, \texttt{pytest}, and \texttt{pytest-mock}---the packages that the sequencer sources import directly. \texttt{web3} and \texttt{prometheus-client} are replaced by \texttt{MagicMock} at import time and do not need to be installed. The full \texttt{requirements.txt} is only needed to run the live application stack.
+
+The same suite can also be executed inside Docker to verify the container build. Two separate commands are required: the first rebuilds the image so that any recent code change is included; the second runs the suite:
+
+\begin{verbatim}
+docker compose build
+docker compose --profile test run --rm test-runner
+\end{verbatim}
+
+Running \texttt{docker compose build} before each test session is necessary because Docker caches layers from the previous build. The \texttt{test-runner} service shares the image produced by \texttt{docker compose build}, so a single build step covers both. Skipping it means the container runs an older copy of the source files. The \texttt{test-runner} service already contains the full pytest invocation in its \texttt{command} field; no additional arguments are needed after the second command.
+
+Individual tiers can be targeted by path:
+
+\begin{verbatim}
+pytest tests/unit/          # 10 tests  (5 ZK, 5 Optimistic)
+pytest tests/integration/   # 7 tests   (dual-sequencer scenarios)
+pytest tests/adversarial/   # 4 tests   (crash, delay, invalid state)
+\end{verbatim}
+
+The expected result is 21 tests passing in under two minutes on any machine with Python~3.9 or later. The same suite runs automatically on every commit via GitHub Actions (\texttt{.github/workflows/ci.yml}).
 
 \section{Extending the Framework}
 \label{sec:extending}
 
-A third sequencer type can be added to the framework without touching any existing code. The required steps are:
+Adding a third sequencer type requires four concrete changes. No existing sequencer code or contract needs to be modified.
 
-\begin{enumerate}
-    \item \textbf{Write a new sequencer class} in Python. It needs three methods: \texttt{submit\_transaction(tx)} to accept transactions over HTTP, \texttt{\_batch()} to assemble and submit a commitment to Layer~1, and a metrics endpoint to expose counters on a new port. The existing ZK and Optimistic sequencers can be used as templates.
+\textbf{1. Write a new sequencer class.} Copy \texttt{l2-zk/sequencer.py} or \texttt{l2-optimistic/sequencer.py} as a starting point. Three things must be implemented: an HTTP endpoint at \texttt{/submit} that appends incoming transactions to a pending list; a \texttt{\_batch()} method that assembles a commitment and calls the new L1 contract; and a Prometheus metrics export on a new port (9102, 9103, \ldots). The batch loop, Flask setup, and metric registration are boilerplate that can be copied verbatim.
 
-    \item \textbf{Deploy a new Solidity contract} that enforces whatever finality rule the new sequencer uses. The contract must implement \texttt{submit()} and \texttt{isFinalized(uint256 id)} so the test suite can treat it the same way it treats \texttt{ZKVerifier} and \texttt{OptimisticVerifier}.
+\textbf{2. Deploy a new Solidity contract.} The contract must expose two functions: \texttt{submit(bytes32 stateRoot, \ldots)} for the sequencer to post a commitment, and \texttt{isFinalized(uint256 id)} for the test suite to query finality. The finality rule inside those functions is where the new architecture lives---proof check, time lock, validity window, or any combination. Deploy it alongside \texttt{ZKVerifier} and \texttt{OptimisticVerifier} by adding it to the Hardhat deployment script in \texttt{l1/scripts/deploy.js}.
 
-    \item \textbf{Add a service block to \texttt{docker-compose.yml}} pointing to the new sequencer and mapping its port. Set the Layer~1 RPC endpoint to the shared Hardhat service so the new sequencer joins the same controlled environment.
+\textbf{3. Add a service block to \texttt{docker-compose.yml}.} Point it at the new sequencer directory, expose its ports, and set \texttt{L1\_RPC=http://zk-rollup:8545} so it joins the shared Hardhat instance. The Grafana and Prometheus services pick up the new sequencer automatically once the metrics port is registered.
 
-    \item \textbf{Register the new metrics port in \texttt{prometheus.yml}}. Prometheus will then scrape it alongside the existing two sequencers, and the Grafana dashboard will pick it up automatically.
-\end{enumerate}
+\textbf{4. Register the metrics port in \texttt{config/prometheus.yml}.} Add one \texttt{- targets: ['zk-rollup:9102']} entry under a new scrape job. All existing Grafana panels are PromQL queries---duplicate a panel, change the metric prefix, and the new sequencer appears in the dashboard without touching Grafana configuration directly.
 
-This is how the framework supports reproducibility beyond simply re-running the existing experiments: another researcher can implement a hybrid rollup, a different proof system, or a Validium variant, and run it against the same contracts, the same Layer~1 node, and the same adversarial scenarios. The only interface it needs to satisfy is the one already used by the two sequencers here.
+The Grafana dashboard is driven entirely by PromQL queries against Prometheus. As long as the new sequencer exports metrics with consistent naming (e.g.\ \texttt{hybrid\_l2\_batches\_total}), all existing visualization panels can be duplicated by editing the query string, requiring no JSON schema changes.
+
+One honest note on scope: extending the test suite requires writing new unit and integration tests that mock the new contract. The existing tests are tightly coupled to the ZK and Optimistic class interfaces; they will not automatically cover a third type. The mock pattern in \texttt{tests/unit/test\_zk\_sequencer.py} can be used as a template, but new test cases are the largest part of the work when adding a new architecture.
 
 \section{From Code to Measurement}
 
