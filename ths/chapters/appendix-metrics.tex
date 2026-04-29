@@ -113,23 +113,6 @@ opt_l2_batch_gas_used                       170937.0   # EVM gas units
 \label{lst:prometheus-opt}
 \end{listing}
 
-\subsection*{Derived statistics}
-
-From the snapshots above:
-
-\begin{itemize}
-    \item ZK average L1 submission latency: $0.288\,\text{s} \div 11 = 26.2\,\text{ms}$ per batch
-    \item ZK average simulated proof time: $0.00126\,\text{s} \div 11 = 0.114\,\text{ms}$ per batch
-    \item Optimistic average L1 submission latency: $0.145\,\text{s} \div 7 = 20.7\,\text{ms}$ per batch
-    \item Optimistic average batch assembly time: $0.00109\,\text{s} \div 7 = 0.155\,\text{ms}$ per batch
-    \item ZK average transactions per batch: $900 \div 11 \approx 82$ (threshold 100, some time-triggered)
-    \item Optimistic average transactions per batch: $900 \div 7 \approx 129$ (threshold 200, time-triggered)
-    \item Gas per batch: ZK 165,293 \textbf{vs.} Optimistic 170,937 — nearly identical in the mock proof scenario; Optimistic is slightly higher because its \texttt{Commitment} struct has more storage fields
-\end{itemize}
-
-\textbf{Note on the Grafana ``Finality Time (P95) = 47.5\,ms'' readout.}
-Both the ZK and Optimistic panels display 47.5\,ms. This is a mathematical artifact: when all histogram observations fall below the first bucket boundary (\texttt{le=0.05}, i.e.\ 50\,ms), Prometheus linearly interpolates the P95 as $0.95 \times 0.05\,\text{s} = 47.5\,\text{ms}$. The value is not hardcoded and does not imply the two architectures are identical — it means both submitted batches complete in under 50\,ms on the local Hardhat node. The architectural finality difference (cryptographic proof verification for ZK vs.\ 10-block challenge window for Optimistic) is enforced by the smart contracts and is described in Chapter~\ref{ch:background}, not in these submission-latency metrics.
-
 \section{PromQL Queries Used in the Dashboard}
 
 \begin{listing}[H]
