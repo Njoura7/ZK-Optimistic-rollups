@@ -1,0 +1,232 @@
+:root {
+  --bg-primary: #0b0f1a;
+  --bg-card: #131a2b;
+  --bg-card-inner: #0d1320;
+  --bg-hover: #1a2340;
+  --zk-color: #38bdf8;
+  --zk-glow: rgba(56, 189, 248, 0.15);
+  --zk-border: rgba(56, 189, 248, 0.25);
+  --opt-color: #34d399;
+  --opt-glow: rgba(52, 211, 153, 0.15);
+  --opt-border: rgba(52, 211, 153, 0.25);
+  --warn-color: #fbbf24;
+  --danger-color: #f87171;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border-subtle: rgba(148, 163, 184, 0.08);
+  --radius: 12px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.header {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 20px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.header-left h1 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+.header-left p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.wallet-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.wallet-address {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: "Consolas", monospace;
+}
+
+.network-warning {
+  background: rgba(248, 113, 113, 0.12);
+  border-bottom: 1px solid rgba(248, 113, 113, 0.3);
+  color: var(--danger-color);
+  padding: 10px 32px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.network-warning.hidden {
+  display: none;
+}
+
+.main {
+  padding: 32px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 640px) {
+  .panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  border: 1px solid var(--border-subtle);
+}
+.panel.zk {
+  border-color: var(--zk-border);
+}
+.panel.opt {
+  border-color: var(--opt-border);
+}
+
+.panel-header h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.panel.zk .panel-header h2 {
+  color: var(--zk-color);
+}
+.panel.opt .panel-header h2 {
+  color: var(--opt-color);
+}
+.tag {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
+.panel-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 8px 0 16px;
+}
+
+.field {
+  margin-bottom: 12px;
+}
+.field label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.field input {
+  width: 100%;
+  background: var(--bg-card-inner);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.btn {
+  background: var(--bg-hover);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--text-secondary);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-small {
+  width: auto;
+  white-space: nowrap;
+}
+.btn-claim {
+  margin-top: 4px;
+}
+
+.status-line {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  min-height: 14px;
+  word-break: break-word;
+}
+.status-line.error {
+  color: var(--danger-color);
+}
+.status-line.success {
+  color: var(--opt-color);
+}
+
+.divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 16px 0;
+}
+
+.finality-badge {
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+.finality-badge.pending {
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--text-secondary);
+}
+.finality-badge.waiting {
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--warn-color);
+}
+.finality-badge.ready {
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--opt-color);
+}
+.finality-badge.blocked {
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--danger-color);
+}
+
+.footnote {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 24px;
+  text-align: center;
+}
+.footnote code {
+  font-family: "Consolas", monospace;
+  color: var(--text-secondary);
+}

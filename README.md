@@ -19,7 +19,7 @@ Everything runs in a single Docker container. One command starts all services.
 
 ## Quick start
 
-**Prerequisites:** Docker Desktop, ports 3000 3001 5000 5001 8545 9090 9100 9101 free, 8 GB RAM.
+**Prerequisites:** Docker Desktop, ports 3000 3001 3002 5000 5001 8545 9090 9100 9101 free, 8 GB RAM.
 
 ```bash
 git clone <repo-url>
@@ -34,6 +34,7 @@ Wait about 90 seconds. You will see `Starting dual rollup dashboard on port 3000
 | What | URL | Use it for |
 |------|-----|------------|
 | **Flask dashboard** | http://localhost:3000 | Trigger test scenarios, watch real-time counters |
+| **Web3 withdrawal demo** | http://localhost:3002 | Connect a real MetaMask wallet, deposit ETH, watch the claim button unlock at different speeds per architecture — see `web3-demo/README.md` |
 | **Grafana** | http://localhost:3001 (admin / admin) | Historical graphs, finality and throughput comparison |
 | **Prometheus** | http://localhost:9090 | Raw metric queries, check scrape targets |
 
@@ -65,6 +66,16 @@ docker compose --profile test run --rm test-runner pytest tests/adversarial/ -v
 ```
 
 Expected: **21 passed** in under two minutes. The CI workflow at `.github/workflows/ci.yml` runs each tier automatically on every push that modifies sequencer code, contracts, or test files — without starting the full stack.
+
+There is a separate, small Hardhat/JS tier (7 tests) for `WithdrawalEscrow.sol` — unlike the Python tests above, these run real Solidity against Hardhat's built-in in-process network rather than mocks:
+
+```bash
+# Against the same test-runner image used above
+docker compose --profile test run --rm --workdir /app/l1 test-runner npx hardhat test
+
+# Or locally, if you have Node installed
+cd l1 && npm test
+```
 
 ### What each tier validates
 
@@ -167,11 +178,16 @@ The most important finding is the finality gap: identical L1 inclusion times, bu
 ├── l1/
 │   ├── contracts/
 │   │   ├── ZKVerifier.sol           # ZK proof verification (mock)
-│   │   └── OptimisticVerifier.sol   # Challenge window enforcement
-│   └── scripts/deploy.js            # Deploys both contracts to Hardhat
+│   │   ├── OptimisticVerifier.sol   # Challenge window enforcement
+│   │   └── WithdrawalEscrow.sol     # Deposit/claim gated by isFinalized()
+│   ├── test/WithdrawalEscrow.test.js # Hardhat contract tests (7 tests)
+│   └── scripts/deploy.js            # Deploys all four contracts to Hardhat
 ├── l2-zk/sequencer.py               # ZK sequencer (port 5000, metrics 9100)
 ├── l2-optimistic/sequencer.py       # Optimistic sequencer (port 5001, metrics 9101)
 ├── dashboard/app.py                 # Flask dashboard (port 3000)
+├── web3-demo/                       # Wallet-connected withdrawal demo (port 3002)
+│   ├── index.html, app.js, style.css
+│   └── README.md                    # MetaMask setup, expected behavior
 ├── config/
 │   ├── prometheus.yml               # Scrape config
 │   └── grafana/                     # Auto-provisioned dashboards

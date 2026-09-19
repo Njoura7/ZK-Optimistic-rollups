@@ -114,10 +114,31 @@ async function main() {
     }
   }
 
-  // Save both addresses
+  // ---------------------------------------------------------------------------
+  // WithdrawalEscrow — one deployed per verifier, wired to its isFinalized().
+  // Both commitments above already have id 1, so the web3-demo frontend can
+  // hardcode commitmentId=1 for each side rather than discovering it at runtime.
+  // ---------------------------------------------------------------------------
+  console.log("Deploying WithdrawalEscrow (ZK)...");
+  const WithdrawalEscrow = await ethers.getContractFactory("WithdrawalEscrow");
+  const escrowZk = await WithdrawalEscrow.deploy(zkAddress);
+  await escrowZk.waitForDeployment();
+  const escrowZkAddress = await escrowZk.getAddress();
+  console.log("✓ WithdrawalEscrow (ZK) deployed:", escrowZkAddress);
+
+  console.log("Deploying WithdrawalEscrow (Optimistic)...");
+  const escrowOptimistic = await WithdrawalEscrow.deploy(optAddress);
+  await escrowOptimistic.waitForDeployment();
+  const escrowOptimisticAddress = await escrowOptimistic.getAddress();
+  console.log("✓ WithdrawalEscrow (Optimistic) deployed:", escrowOptimisticAddress);
+
+  // Save all addresses
   const deployment = {
     zk: zkAddress,
     optimistic: optAddress,
+    escrowZk: escrowZkAddress,
+    escrowOptimistic: escrowOptimisticAddress,
+    demoCommitmentId: 1,
     deployedAt: new Date().toISOString(),
   };
 
@@ -126,7 +147,16 @@ async function main() {
   // Keep backward compatibility
   fs.writeFileSync("/app/contract.txt", zkAddress);
 
-  console.log("✓ Both contracts deployed successfully");
+  // Same file, served statically so the web3-demo page can fetch() it
+  // instead of reaching into the container's filesystem.
+  if (fs.existsSync("/app/web3-demo")) {
+    fs.writeFileSync(
+      "/app/web3-demo/contracts.json",
+      JSON.stringify(deployment, null, 2),
+    );
+  }
+
+  console.log("✓ All contracts deployed successfully");
 }
 
 main().catch((error) => {

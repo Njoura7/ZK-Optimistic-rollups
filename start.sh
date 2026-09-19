@@ -55,9 +55,14 @@ python l2-optimistic/sequencer.py > /app/data/opt-sequencer.log 2>&1 &
 OPT_PID=$!
 sleep 3
 
+# Start Web3 withdrawal demo (static page, port 3002)
+echo "Starting Web3 withdrawal demo on http://localhost:3002"
+(cd web3-demo && python -m http.server 3002 > /app/data/web3-demo.log 2>&1) &
+WEB3_PID=$!
+
 # Start dashboard
 echo "Starting dual rollup dashboard on http://localhost:3000"
 python dashboard/app.py
 
 # Cleanup on exit
-kill $L1_PID $ZK_PID $OPT_PID 2>/dev/null || true
+kill $L1_PID $ZK_PID $OPT_PID $WEB3_PID 2>/dev/null || true

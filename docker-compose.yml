@@ -5,6 +5,7 @@ services:
     container_name: zk-rollup-demo
     ports:
       - "3000:3000" # Flask Dashboard
+      - "3002:3002" # Web3 withdrawal demo (wallet-connected static page)
       - "8545:8545" # L1 RPC
       - "5000:5000" # ZK Rollup L2 API
       - "5001:5001" # Optimistic Rollup L2 API
@@ -16,7 +17,7 @@ services:
       - ZK_GAS_LIMIT=200000
       - OPT_BATCH_SIZE=200
       - OPT_BATCH_INTERVAL=8
-      - OPT_GAS_LIMIT=300000
+      - OPT_GAS_LIMIT=150000
       - L1_RPC=http://localhost:8545
     volumes:
       - zk-data:/app/data
@@ -63,7 +64,7 @@ services:
       - prometheus
   # Test runner service - does not start automatically
   test-runner:
-    image: zk-optimistic-rollups-zk-rollup   # reuse the image built by the zk-rollup service
+    build: .
     container_name: zk-test-runner
     command: ["pytest", "tests/", "-v", "--tb=short"]
     environment:

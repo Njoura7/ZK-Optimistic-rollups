@@ -296,6 +296,25 @@ The Grafana dashboard is driven entirely by PromQL queries against Prometheus. A
 
 One honest note on scope: extending the test suite requires writing new unit and integration tests that mock the new contract. The existing tests are tightly coupled to the ZK and Optimistic class interfaces; they will not automatically cover a third type. The mock pattern in \texttt{tests/unit/test\_zk\_sequencer.py} can be used as a template, but new test cases are the largest part of the work when adding a new architecture.
 
+\subsection{Example: A Wallet-Connected Withdrawal Client}
+\label{sec:web3-demo}
+
+The \texttt{isFinalized()} interface described above is not only consumed by the test suite. We built a small \texttt{WithdrawalEscrow} contract and a static web page (\texttt{web3-demo/}) that demonstrate the same interface from a user's perspective: a wallet deposits ETH tied to a batch commitment, and a claim function releases it once \texttt{isFinalized()} returns true for that commitment. We deploy the contract twice, once against each verifier, and use ethers.js \cite{ethersjs2024} to connect a browser wallet directly to the Hardhat node with no backend in between.
+
+A scripted run against a freshly deployed stack (\texttt{l1/scripts/demo\_withdrawal\_flow.js}) makes the mechanism concrete. We deposit 0.05 ETH into the ZK escrow and check \texttt{isFinalized()} immediately afterward---it already returns true, because the demo commitment, submitted several transactions earlier during deployment, had already cleared its five-block window by the time our deposit landed. The same deposit into the Optimistic escrow returns \texttt{SOFT\_FINAL} with five blocks remaining; a claim attempted at that point reverts with \texttt{Not finalized yet}, and succeeds only after five more blocks are mined, closing out the ten-block challenge window measured from that commitment's own submission point. Both deposits are returned in full; across both round trips the only balance change on the depositor's account is gas, confirming this is a round trip rather than a one-way transfer.
+
+\begin{figure}[htbp]
+    \centering
+    % PLACEHOLDER: screenshot of the two web3-demo panels side by side, one
+    % claim button enabled (ZK) and one still counting down (Optimistic).
+    % Capture after running the demo live, then replace this comment with
+    % \includegraphics and write a caption describing what is visible.
+    \caption{PLACEHOLDER --- withdrawal demo, ZK claim unlocked next to the Optimistic countdown. To be added.}
+    \label{fig:web3-demo}
+\end{figure}
+
+This is a demonstration of the finality gap already measured in Chapter~\ref{ch:evaluation}, not a new measurement; it adds no data of its own, only a concrete illustration, gated by real transactions rather than a table, of what those numbers mean for someone waiting on a withdrawal.
+
 \section{From Code to Measurement}
 
 This chapter described how the design objectives from Chapter~\ref{ch:framework} became concrete code. The Layer~1 contracts enforce the correct finality rules for each architecture without running the full cryptographic operations that would make experimental iteration impractical. The Layer~2 sequencers implement the batching and submission logic that distinguishes ZK from Optimistic, with parameters exposed as environment variables so that any configuration can be tested by restarting the stack. The metrics layer exports histograms and counters that answer the research questions directly: finality latency distributions for RQ1, crash behavior for RQ2, and proof overhead for RQ3. The automated test suite validates each component in isolation before anything runs against the live Hardhat node.

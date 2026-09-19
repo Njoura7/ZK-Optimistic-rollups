@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Withdrawal Finality Demo — ZK vs Optimistic</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>Withdrawal finality demo</h1>
+    <p>Same escrow contract, two verifiers — watch the claim button unlock at different speeds</p>
+  </div>
+  <div class="wallet-group">
+    <span id="wallet-address" class="wallet-address">Not connected</span>
+    <button id="connect-btn" class="btn">Connect wallet</button>
+  </div>
+</div>
+
+<div id="network-warning" class="network-warning hidden">
+  Wrong network. This demo needs the Hardhat local chain (id 31337).
+  <button id="switch-network-btn" class="btn btn-small">Switch network</button>
+</div>
+
+<div class="main">
+  <div class="panels">
+
+    <div class="panel zk">
+      <div class="panel-header">
+        <h2>ZK rollup <span class="tag">validity proof</span></h2>
+      </div>
+      <p class="panel-note">Claim unlocks once the batch's proof has a 5-block L1 confirmation — no waiting on anyone else.</p>
+      <div class="field">
+        <label>Deposit amount (ETH)</label>
+        <input id="zk-amount" type="text" value="0.01" />
+      </div>
+      <button id="zk-deposit-btn" class="btn" disabled>Deposit</button>
+      <div id="zk-deposit-status" class="status-line"></div>
+      <div class="divider"></div>
+      <div id="zk-finality-status" class="finality-badge pending">connect wallet to check status</div>
+      <button id="zk-claim-btn" class="btn btn-claim" disabled>Claim withdrawal</button>
+      <div id="zk-claim-status" class="status-line"></div>
+    </div>
+
+    <div class="panel opt">
+      <div class="panel-header">
+        <h2>Optimistic rollup <span class="tag">challenge window</span></h2>
+      </div>
+      <p class="panel-note">Claim stays locked until the 10-block challenge window closes with no dispute filed.</p>
+      <div class="field">
+        <label>Deposit amount (ETH)</label>
+        <input id="opt-amount" type="text" value="0.01" />
+      </div>
+      <button id="opt-deposit-btn" class="btn" disabled>Deposit</button>
+      <div id="opt-deposit-status" class="status-line"></div>
+      <div class="divider"></div>
+      <div id="opt-finality-status" class="finality-badge pending">connect wallet to check status</div>
+      <button id="opt-claim-btn" class="btn btn-claim" disabled>Claim withdrawal</button>
+      <div id="opt-claim-status" class="status-line"></div>
+    </div>
+
+  </div>
+
+  <p class="footnote">
+    Each escrow supports one deposit-to-claim cycle per container lifecycle. Restart the stack
+    (<code>docker compose restart</code>) to reset both commitments for another run. See
+    <code>web3-demo/README.md</code> for MetaMask setup.
+  </p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
