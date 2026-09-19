@@ -306,11 +306,11 @@ A scripted run against a freshly deployed stack (\texttt{l1/scripts/demo\_withdr
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{web3-demo/withdrawal-finality-demo.png}
-    \caption{The withdrawal demo after a live run through MetaMask. Left: the ZK panel reads \textquotedblleft Finalized --- claim available\textquotedblright\ with \textquotedblleft Already claimed\textquotedblright\ beneath it --- the full deposit-to-claim cycle already completed. Right: the Optimistic panel reads \textquotedblleft Challenge window open --- 5 block(s) remaining,\textquotedblright\ its claim button still disabled. The wallet panel on the right shows MetaMask's own Activity tab confirming both as real, signed contract interactions with the escrow addresses --- not simulated.}
+    \caption{The withdrawal demo after a live MetaMask run, ZK already claimed next to Optimistic still mid-challenge-window.}
     \label{fig:web3-demo}
 \end{figure}
 
-This is a demonstration of the finality gap already measured in Chapter~\ref{ch:evaluation}, not a new measurement; it adds no data of its own, only a concrete illustration, gated by real transactions rather than a table, of what those numbers mean for someone waiting on a withdrawal.
+This is a demonstration of the finality gap already measured in Chapter~\ref{ch:evaluation}, not a new measurement; it adds no data of its own, only a concrete illustration, gated by real transactions rather than a table, of what those numbers mean for someone waiting on a withdrawal. Figure~\ref{fig:web3-demo} captures one such run: the ZK panel reads \textquotedblleft Finalized --- claim available\textquotedblright\ with \textquotedblleft Already claimed\textquotedblright\ beneath it, meaning the full deposit-to-claim cycle already completed, while the Optimistic panel still reads \textquotedblleft Challenge window open --- 5 block(s) remaining\textquotedblright\ with its claim button disabled. MetaMask's own Activity tab, visible alongside the page, confirms both as real signed transactions against the escrow addresses rather than a simulated interface.
 
 \section{From Code to Measurement}
 

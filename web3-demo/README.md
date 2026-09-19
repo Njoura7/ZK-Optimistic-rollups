@@ -76,7 +76,13 @@ need to rush the screenshot.
 - Optimistic panel: claim button stays disabled with a live "N blocks
   remaining" countdown for roughly 2 minutes before unlocking.
 
-![ZK panel showing a completed deposit-to-claim cycle ("Finalized — claim available", "Already claimed") next to the Optimistic panel still mid-challenge-window ("Challenge window open — 5 block(s) remaining"), with MetaMask's own Activity tab on the right confirming both as real signed transactions](images/withdrawal-finality-demo.png)
+![Withdrawal demo after a live run](images/withdrawal-finality-demo.png)
+
+The screenshot above is from a real MetaMask session: the ZK panel already reads "Finalized — claim
+available" and "Already claimed," meaning that side completed its full deposit-to-claim cycle, while
+the Optimistic panel still reads "Challenge window open — 5 block(s) remaining" with its claim button
+disabled. MetaMask's own Activity tab on the right confirms both as real signed transactions against
+the escrow addresses, not a mocked interface.
 
 ## Reproducible example (no browser or wallet needed)
 

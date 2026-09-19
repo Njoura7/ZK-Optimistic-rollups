@@ -108,6 +108,7 @@ These apply to every chapter edit. Do not deviate.
 - **No "Summary" or "Conclusion" section titles** at chapter ends — use descriptive titles like "What This Chapter Establishes" or "What the Security Analysis Adds"
 - **Direct openings**: start each chapter with a concrete statement, not a roadmap sentence
 - **Cite only from `thesis.bib`** — do not invent citation keys
+- **Avoid numbered/lettered micro-lists inside prose** (1/2/3, a/b/c enumerations of minor points): this reads as AI-generated structure. Prefer longer paragraphs that develop an argument in connected sentences and engage with citations inline, over itemizing everything into fragments. Numbered lists are fine for genuinely sequential procedures (e.g. deployment steps in an appendix) but should not be the default shape of an argumentative paragraph. This is a real revision task across existing chapters, not yet done as of this session --- flagged in "What still needs doing" below.
 
 ---
 
@@ -163,3 +164,8 @@ specifically asked to change that.
    practical extension of the isFinalized() interface (`implementation.tex` §"Example: A
    Wallet-Connected Withdrawal Client" already documents it in the thesis text itself); the
    analysis notebook is personal practice and probably not worth raising.
+6. **De-listify chapter prose**: supervisor feedback (2026-09-19) flagged that heavy use of
+   numbered/lettered enumerations inside argumentative paragraphs reads as AI-generated. Needs a
+   pass across the chapters to convert appropriate itemized lists into longer connected prose that
+   engages with citations inline, while leaving genuinely procedural lists (deployment steps,
+   setup instructions) as lists. Not started yet.
