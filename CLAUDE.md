@@ -76,6 +76,8 @@ All screenshots are captured — the old "4 missing images" TODO is done. There 
 - One deposit-to-claim cycle per container lifecycle per escrow — restart the stack to reset.
 - zkSync/Arbitrum/etc. stay theory-only (cited in `thesis.bib` as related work) — deliberately not deployed to; this project's adversarial tests (crash, invalid-state) need control over the sequencer that a real production L2 would never grant.
 - `l1/scripts/demo_withdrawal_flow.js` — a scripted, non-browser walkthrough of the exact same deposit/wait/claim sequence, using Hardhat account #1 as the depositor. Run it against a live stack with `cd l1 && npx hardhat run scripts/demo_withdrawal_flow.js --network localhost`. Verified end-to-end this session against a freshly deployed container: real tx hashes, real gas costs, ZK claim needed 0 additional blocks (demo commitment had already aged past its 5-block window by deposit time), Optimistic needed exactly 5 more blocks to close its window, both deposits returned in full with only gas lost. Full sample output is in `web3-demo/README.md`.
+- `web3-demo/README.md` embeds two real screenshots (`images/demo-screenshot.png` — a MetaMask deposit confirmation; `images/withdrawal-finality-demo.png` — the completed-vs-waiting contrast) as illustrations. These are separate from the thesis's own copy of the second image at `ths/images/web3-demo/`.
+- `web3-demo/analysis/` — a personal pandas/Jupyter practice notebook (`withdrawal_analysis.ipynb`) built on real data from `l1/scripts/generate_sample_data.js` (configurable via `l1/.env`, `SAMPLE_RUNS`). Explicitly an addition, not referenced anywhere in `ths/` and not intended to be — see `web3-demo/analysis/README.md`.
 
 ---
 
@@ -125,10 +127,39 @@ Unused but present in `thesis.bib` (harmless): `poon2017plasma`, `scalability-tr
 
 ---
 
+## Recently completed (web3 withdrawal demo milestone)
+
+Full loop closed this session: `WithdrawalEscrow.sol` (new contract, gates `claim()` on the
+existing `isFinalized()` both verifiers already exposed) + `web3-demo/` frontend (plain HTML +
+ethers.js v6, no build step) + 7 Hardhat contract tests + docker/CI wiring + a scripted
+end-to-end verification (`l1/scripts/demo_withdrawal_flow.js`, real tx hashes) + a live
+browser/MetaMask run (real wallet, real signed transactions, ZK completed its full cycle while
+Optimistic was still mid-challenge-window) + the thesis figure (`fig:web3-demo` in
+`implementation.tex`, placeholder replaced with a real screenshot and caption) + two more
+screenshots wired into `web3-demo/README.md`. Everything in this paragraph is verified working,
+not just written.
+
+Also added, explicitly NOT part of the thesis: `web3-demo/analysis/`, a personal pandas/Jupyter
+practice notebook on real generated data. Keep it that way unless a future session is
+specifically asked to change that.
+
+---
+
 ## What still needs doing
 
-1. **Fix the duplicate-figure/caption bug** above (deferred by user for now — do later).
-2. **Decide security.tex's fate**: reuse/merge remaining content into evaluation.tex, or delete the orphaned file.
-3. **Appendix expansion**: `appendix-deployment.tex` (68 lines) and `appendix-metrics.tex` (152 lines) are lean — may want to expand.
-4. **Final LaTeX build check**: no toolchain available locally or in CI; static cross-reference check (labels/refs/citations/image paths) passed clean as of this session.
-5. **Web3 withdrawal demo — verified end-to-end via script, not yet via a real browser wallet click-through**: `WithdrawalEscrow.sol` + `web3-demo/` frontend + Hardhat tests + docker/CI wiring are in place and a live run against a freshly deployed container succeeded (`l1/scripts/demo_withdrawal_flow.js`, real tx hashes, see `web3-demo/README.md`). What remains: actually opening `http://localhost:3002` in a browser with MetaMask connected and clicking through Connect/Deposit/Claim by hand, and capturing the screenshot for `fig:web3-demo` in `implementation.tex` (currently a placeholder, `\label{sec:web3-demo}`). The subsection "Example: A Wallet-Connected Withdrawal Client" is already written in `implementation.tex`, right after "Extending the Framework".
+1. **Fix the duplicate-figure/caption bug**: `fig:finality-comparison` in `evaluation.tex`
+   reuses the same image as `fig:grafana-comparison` with a caption that falsely claims it's a
+   crop (deferred by user — do later, before submission).
+2. **Decide security.tex's fate**: reuse/merge remaining content into evaluation.tex, or delete
+   the orphaned file. See "Known issues" above for exactly what content would be lost.
+3. **Appendix expansion**: `appendix-deployment.tex` (68 lines) and `appendix-metrics.tex`
+   (152 lines) are lean — may want to expand before final submission.
+4. **Final LaTeX build check**: no toolchain available locally or in CI; static cross-reference
+   check (labels/refs/citations/image paths — 9 for 9 as of this session) passed clean, but an
+   actual `pdflatex`/Overleaf compile has not been run this session. Worth doing once before
+   the supervisor check, ideally in whatever tool (e.g. Overleaf) is used to produce the final PDF.
+5. **Decide what to say to the supervisor about the web3-demo/analysis additions** — neither is
+   referenced in the thesis chapters. The withdrawal demo could be worth showing live as a
+   practical extension of the isFinalized() interface (`implementation.tex` §"Example: A
+   Wallet-Connected Withdrawal Client" already documents it in the thesis text itself); the
+   analysis notebook is personal practice and probably not worth raising.

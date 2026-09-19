@@ -34,6 +34,7 @@ l1/cache/
 contracts.json
 contract.txt
 *.log
+.env
 
 # OS
 .DS_Store

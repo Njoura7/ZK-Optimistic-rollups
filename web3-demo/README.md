@@ -8,6 +8,8 @@ This is the only part of the repo that talks to a real browser wallet.
 Everything else in the project (Flask dashboard, sequencers) runs server-side
 with no wallet involved.
 
+![MetaMask's transaction-request prompt when confirming a deposit into the ZK escrow](images/demo-screenshot.png)
+
 ## What it demonstrates
 
 Both `ZKVerifier` and `OptimisticVerifier` expose an `isFinalized(id)` check.
@@ -41,11 +43,40 @@ bridge — the point is the gating mechanism, not moving real value.
    deterministic test keys — never reuse them anywhere with real funds.
 5. Click **Connect wallet**, then **Deposit** on either panel.
 
+## Troubleshooting and tips
+
+**"Amount shows MON instead of ETH"** — cosmetic labeling issue, not a functional bug. Somewhere
+the "Hardhat local" network entry in MetaMask got its currency symbol set to `MON` (Monad's
+testnet symbol) instead of `ETH`, likely a leftover from editing a different network. Fix it via
+MetaMask -> Settings -> Networks -> Hardhat local -> edit -> set **Currency symbol** to `ETH`.
+
+**Renaming the imported test account** — to avoid confusing it with your real MetaMask account
+in the account list: click the account name/avatar -> three-dot menu -> account details -> the
+pencil icon next to the name -> rename (e.g. `Hardhat Test #1`) -> save.
+
+**Where to actually see a transaction land** — there is no public block explorer for this chain;
+it only exists inside your own Docker container and disappears when the container stops. Two ways
+to confirm something happened:
+1. The page itself, live — the status line under each Deposit button and the finality badges
+   above each Claim button poll the contracts every 3 seconds and update automatically.
+2. MetaMask's own **Activity** tab for the connected account — shows every transaction you send,
+   with its hash and confirmed/pending status, same as on any real network.
+
+**Getting the "one unlocked, one still waiting" screenshot** — deposit on both panels shortly
+after a fresh `docker compose up --build`. The ZK window (5 blocks) is usually already satisfied
+by the time you connect, since the deploy sequence itself burns through most of it — so ZK will
+likely read "Finalized — claim available" almost immediately after its deposit confirms.
+Optimistic's window (10 blocks) won't be satisfied yet. Since Hardhat only mines on transactions
+(no wall-clock timer), that contrast holds steady with nothing else happening on the chain — no
+need to rush the screenshot.
+
 ## Expected behavior
 
 - ZK panel: claim button enables within a few seconds of depositing.
 - Optimistic panel: claim button stays disabled with a live "N blocks
   remaining" countdown for roughly 2 minutes before unlocking.
+
+![ZK panel showing a completed deposit-to-claim cycle ("Finalized — claim available", "Already claimed") next to the Optimistic panel still mid-challenge-window ("Challenge window open — 5 block(s) remaining"), with MetaMask's own Activity tab on the right confirming both as real signed transactions](images/withdrawal-finality-demo.png)
 
 ## Reproducible example (no browser or wallet needed)
 
@@ -91,6 +122,13 @@ Hardhat's network only advances blocks when a transaction (or an explicit
 is the meaningful unit of "how long until finality" here, not the script's
 millisecond timings, which just reflect how fast the script fired off
 back-to-back transactions.
+
+## Data-science practice addition (analysis/)
+
+`analysis/` holds a personal pandas/Jupyter practice notebook built on real data generated from
+these contracts (a bigger, scripted sibling of the reproducible example above). It is an addition,
+not part of the thesis — not referenced in `ths/` and not intended to be. See
+`analysis/README.md` for setup and how to regenerate the data with more samples.
 
 ## Resetting
 
