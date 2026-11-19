@@ -1,0 +1,95 @@
+{
+  "campaign_id": "path-a-canonical-commitment-baseline",
+  "captured_at_utc": "2026-11-19T08:13:40.865085+00:00",
+  "git_commit": "unknown",
+  "branch": "path-a-canonical-commitment",
+  "python": "3.9.25",
+  "iterations_per_measurement": 5000,
+  "environment": "local Python inside project Docker image; no public chain",
+  "golden_vector": {
+    "batch": [
+      {
+        "from": "user0",
+        "to": "user1",
+        "value": 0
+      },
+      {
+        "from": "user1",
+        "to": "user2",
+        "value": 1
+      },
+      {
+        "from": "user2",
+        "to": "user0",
+        "value": 2
+      }
+    ],
+    "root_hex": "ac38ffffbb708dd768f64584b1951a954e5fc7a4844fc744bb1a92fcd2f2c080"
+  },
+  "timing": {
+    "100": {
+      "root": {
+        "min_us": 2671.206,
+        "p50_us": 2911.779,
+        "p95_us": 3639.382,
+        "p99_us": 4360.421,
+        "max_us": 11212.847,
+        "mean_us": 3041.431
+      },
+      "mock_proof": {
+        "min_us": 5.32,
+        "p50_us": 5.59,
+        "p95_us": 8.375,
+        "p99_us": 18.144,
+        "max_us": 116.132,
+        "mean_us": 6.389
+      },
+      "root_plus_proof": {
+        "min_us": 2678.149,
+        "p50_us": 2918.703,
+        "p95_us": 3644.822,
+        "p99_us": 4365.992,
+        "max_us": 11218.387,
+        "mean_us": 3047.82
+      }
+    },
+    "200": {
+      "root": {
+        "min_us": 5353.698,
+        "p50_us": 5783.935,
+        "p95_us": 6797.531,
+        "p99_us": 7607.206,
+        "max_us": 15032.326,
+        "mean_us": 5980.024
+      },
+      "mock_proof": {
+        "min_us": 5.32,
+        "p50_us": 5.571,
+        "p95_us": 7.395,
+        "p99_us": 13.585,
+        "max_us": 67.813,
+        "mean_us": 5.996
+      },
+      "root_plus_proof": {
+        "min_us": 5359.189,
+        "p50_us": 5790.03,
+        "p95_us": 6803.012,
+        "p99_us": 7613.158,
+        "max_us": 15039.059,
+        "mean_us": 5986.02
+      }
+    }
+  },
+  "crash_loss": {
+    "zk": {
+      "accepted_txs": 100,
+      "confirmed_batches": 0,
+      "accepted_but_unconfirmed": 100
+    },
+    "optimistic": {
+      "accepted_txs": 200,
+      "confirmed_batches": 0,
+      "accepted_but_unconfirmed": 200
+    }
+  }
+}

@@ -1,6 +1,10 @@
 # Minimal dependencies for running the test suite locally.
 # web3 and prometheus-client are mocked at import time and NOT required here.
+# eth-abi and eth-utils ARE required: l2_common.commitment uses them directly
+# to build the canonical batch commitment that the sequencer tests exercise.
 # Use requirements.txt only when running the full application stack.
+eth-abi>=4.0.0,<6
+eth-utils>=2.0.0,<5
 flask==3.0.0
 flask-cors==4.0.0
 pytest==7.4.0

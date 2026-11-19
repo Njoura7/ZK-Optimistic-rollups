@@ -1,99 +1,40 @@
-# ZK Rollup Demo
-## What This Demonstrates
+# Demo Guide
 
-Layer 2 ZK Rollup scaling solution showing:
+> This file lists what the running demo actually does. `README.md` is the
+> authoritative, maintained reference.
 
-- Transaction batching (100 txs/batch)
-- ZK proof generation
-- L1 state commitment
-- Real-time metrics
-
-## Architecture
-
-```
-Users → L2 Sequencer → Batch (100) → Proof → L1 Contract → Finality
-                           ↓
-                      Web Dashboard
-```
-
-## Components
-
-### L1 (Port 8545)
-
-- Hardhat Ethereum simulation
-- ZKVerifier.sol contract
-- Accepts batched proofs
-
-### L2 (Port 5000)
-
-- Python sequencer
-- Batches transactions
-- Generates proofs
-- Submits to L1
-
-### Dashboard (Port 3000)
-
-- Real-time metrics
-- Demo scenarios
-- Activity log
-
-## File Structure
-
-```
-zk-rollup-mvp/
-├── Dockerfile           Single container
-├── docker-compose.yml   One command setup
-├── l1/                  Smart contracts
-├── l2/                  Sequencer logic
-└── dashboard/           Web interface
-```
-
-## Running Demo
-
-### Start
+## Start
 
 ```bash
-docker-compose up --build
+docker compose up --build
+# open http://localhost:3000
 ```
 
-### Access
+## What the dashboard shows
 
-http://localhost:3000
+- **Two live panels** — transactions, batches, TPS for each sequencer, polled
+  every 2 seconds from `GET /metrics` on `:5000` (ZK) and `:5001` (Optimistic).
+- **Finality cells** — the configured contract rules (ZK: 5 L1 blocks;
+  Optimistic: 10-block challenge window). These are architecture parameters,
+  not live wall-clock measurements.
+- **Comparison table** — qualitative architectural properties. Its values are
+  reference/presentation-only and are explicitly marked as **not evidence**
+  in the UI. Reproducible numbers live in `docs/IMPLEMENTATION_NOTES.md`.
+- **Demo scenario buttons** — send 150 (normal), 500 (high load) or 250 (batch
+  test) transactions to one sequencer at a time, with a progress bar and log.
 
-### Demo Scenarios
+## Manual end-to-end flows
 
-1. **Normal** - 150 txs, steady state
-2. **High Load** - 500 txs, stress test
-3. **Batch Test** - 250 txs, clear batching
+- **Batch pipeline:** `README.md` → "Manual verification against the live
+  stack" posts 100 txs to ZK and 200 to Optimistic and checks `/metrics`.
+- **Withdrawal / finality:** `web3-demo/README.md` and
+  `l1/scripts/demo_withdrawal_flow.js` show the ZK unlock versus the Optimistic
+  challenge window using the `WithdrawalEscrow` contract.
 
-### Watch
+## Scope reminder
 
-- Total transactions counter
-- Batches submitted to L1
-- Transactions per second
-- Activity log
-
-## Key Metrics
-
-**TPS**: L2 throughput (scalability)
-**Batches**: L1 submissions (cost efficiency)  
-**Finality**: Time from L2→L1 (security)
-
-## Technology
-
-- **L1**: Hardhat + Solidity 0.8.20
-- **L2**: Python 3.9 + Web3
-- **UI**: Flask (simple web dashboard)
-- **Deploy**: Docker (one command)
-
-## Thesis Context
-
-**Phase 1 (MVP)**: ZK Rollup demonstration
-**Phase 2**: Add Optimistic Rollup, Plasma
-**Phase 3**: Failure scenarios, comparison
-
-## Stopping
-
-```bash
-docker-compose down
-```
+The ZK "proof" is a keccak-based mock and the commitment is a batch commitment
+(Merkle root over transaction tuples), not a full state root. Gas and latency
+come from a local Hardhat node. See `docs/IMPLEMENTATION_NOTES.md` for the
+precise real-versus-mocked boundary and `docs/PATH_B_GROTH16.md` for how a real
+Groth16 prover could be added later.

@@ -6,7 +6,6 @@ larger batch sizes (200 vs 100), longer finality (challenge period).
 All tests run in Docker (python:3.9-slim), no L1 node required.
 """
 
-import hashlib
 import inspect
 import json
 import pathlib
@@ -105,34 +104,44 @@ def test_no_proof_generation():
     Thesis metric: Key academic difference — Optimistic skips
     proof generation entirely. This eliminates computational overhead
     but introduces the challenge period security assumption.
+
+    Path A note: the batch commitment now comes from the shared
+    ``batch_merkle_root`` helper rather than hashlib.sha256. We count calls
+    to that helper instead, and assert the Optimistic module does not even
+    import ``mock_proof`` (the ZK-only proof step).
     """
     seq = _make_seq()
     seq.pending = [{"from": f"addr{i}", "to": "contract", "value": i} for i in range(200)]
 
     # Set up the full mock chain so _batch() completes through the success path.
-    seq.w3.eth.accounts = ["0xabc"]
+    # The Optimistic sequencer signs from accounts[1], so provide two accounts.
+    seq.w3.eth.accounts = ["0xabc", "0xdef"]
     seq.w3.eth.get_transaction_count.return_value = 0
     seq.contract.functions.submit.return_value.build_transaction.return_value = {
-        "from": "0xabc", "gas": 150000,
+        "from": "0xdef", "gas": 250000,
     }
     seq.w3.eth.account.sign_transaction.return_value.rawTransaction = b"signed"
     seq.w3.eth.send_raw_transaction.return_value = b"txhash"
     seq.w3.eth.wait_for_transaction_receipt.return_value = MagicMock()
 
-    sha256_call_count = []
-    original_sha256 = hashlib.sha256
+    root_call_count = []
+    original_root = _seq_module.batch_merkle_root
 
-    def counting_sha256(data):
-        sha256_call_count.append(1)
-        return original_sha256(data)
+    def counting_root(batch):
+        root_call_count.append(1)
+        return original_root(batch)
 
-    with patch("hashlib.sha256", side_effect=counting_sha256):
+    with patch.object(_seq_module, "batch_merkle_root", side_effect=counting_root):
         seq._batch()
 
-    # Exactly one sha256 call: state_root only — no second call for a proof.
-    assert len(sha256_call_count) == 1, (
-        f"Expected exactly 1 sha256 call (state_root only), got {len(sha256_call_count)}. "
-        "ZK sequencer makes 2 calls (state_root + proof); Optimistic skips proof entirely."
+    # Exactly one canonical commitment, no proof step.
+    assert len(root_call_count) == 1, (
+        f"Expected exactly 1 batch_merkle_root call, got {len(root_call_count)}. "
+        "The Optimistic sequencer commits once and generates no proof."
+    )
+    assert not hasattr(_seq_module, "mock_proof"), (
+        "Optimistic sequencer must not import or call mock_proof; proof "
+        "generation is the ZK path's exclusive overhead."
     )
 
 
@@ -145,10 +154,12 @@ def test_challenge_period_reflected_in_finality():
     seq = _make_seq()
     seq.pending = [{"from": f"addr{i}", "to": "contract", "value": i} for i in range(200)]
 
-    seq.w3.eth.accounts = ["0xabc"]
+    # accounts[1] is the Optimistic signer, so a single-element list would
+    # raise IndexError and prevent the confirmed-batch counter from advancing.
+    seq.w3.eth.accounts = ["0xabc", "0xdef"]
     seq.w3.eth.get_transaction_count.return_value = 0
     seq.contract.functions.submit.return_value.build_transaction.return_value = {
-        "from": "0xabc", "gas": 150000,
+        "from": "0xdef", "gas": 250000,
     }
     seq.w3.eth.account.sign_transaction.return_value.rawTransaction = b"signed"
     seq.w3.eth.send_raw_transaction.return_value = b"txhash"
@@ -163,7 +174,14 @@ def test_challenge_period_reflected_in_finality():
         "metrics['batches'] must be 1 after a successful L1 submission"
     )
 
-    _seq_module.finality_time_histogram.observe.assert_called_once()
+    # NOTE: prometheus_client is mocked as a single MagicMock, so every
+    # Histogram(...) in the module returns the *same* mock object. _batch()
+    # observes batch_processing_time first and finality_time_histogram last,
+    # so call_args (the most recent call) is the finality duration. We assert
+    # the pipeline recorded a positive value rather than an exact call count.
+    assert _seq_module.finality_time_histogram.observe.call_count >= 1, (
+        "finality_time_histogram.observe must be called after a submission"
+    )
     finality_duration = _seq_module.finality_time_histogram.observe.call_args[0][0]
     assert finality_duration > 0, (
         f"finality_duration must be > 0, got {finality_duration}. "

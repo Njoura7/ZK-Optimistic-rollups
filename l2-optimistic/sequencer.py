@@ -1,18 +1,35 @@
-"""Optimistic Rollup L2 Sequencer - Side-by-Side with ZK"""
-import time
-import hashlib
+"""Optimistic Rollup L2 Sequencer - Side-by-Side with ZK
+
+Path A note (see docs/IMPLEMENTATION_NOTES.md):
+    The batch commitment now uses the same keccak256 Merkle root helper as the
+    ZK sequencer. No proof step exists, by design. The HTTP API and the
+    Solidity ABI are unchanged.
+"""
 import json
 import os
+import sys
+import time
 from threading import Thread, Lock
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from web3 import Web3
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+from l2_common.commitment import batch_merkle_root  # noqa: E402
+
 # Configuration from environment (with defaults matching current values)
 OPT_BATCH_THRESHOLD = int(os.getenv('OPT_BATCH_SIZE', '200'))
 OPT_BATCH_INTERVAL = int(os.getenv('OPT_BATCH_INTERVAL', '8'))
-OPT_GAS_LIMIT = int(os.getenv('OPT_GAS_LIMIT', '300000'))
+# The OptimisticVerifier.submit(bytes32) call measures ~171k gas on Hardhat
+# (it stores a 10-field commitment struct). The previous default of 150000
+# silently ran out of gas on every real submission — a bug that was masked
+# because the batch counter used to increment *before* the L1 call. Align the
+# code, compose and docs on 250000 (safe headroom over the measured cost).
+OPT_GAS_LIMIT = int(os.getenv('OPT_GAS_LIMIT', '250000'))
 L1_RPC = os.getenv('L1_RPC', 'http://localhost:8545')
 
 app = Flask(__name__)
@@ -27,6 +44,31 @@ pending_txs_gauge = Gauge('opt_l2_pending_transactions', 'Optimistic pending tra
 batch_processing_time = Histogram('opt_l2_batch_processing_seconds', 'Optimistic batch processing time', buckets=(0.001,0.005,0.01,0.05,0.1,0.5))
 batch_gas_gauge = Gauge('opt_l2_batch_gas_used', 'Gas units consumed by last Optimistic batch submission')
 
+SUBMIT_ABI = [
+    {
+        "inputs": [{"type": "bytes32"}],
+        "name": "submit",
+        "outputs": [{"type": "uint256"}],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [{"type": "uint256"}],
+        "name": "isFinalized",
+        "outputs": [{"type": "bool"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{"type": "uint256"}],
+        "name": "blocksUntilFinality",
+        "outputs": [{"type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    }
+]
+
+
 class OptimisticSequencer:
     def __init__(self):
         self.w3 = Web3(Web3.HTTPProvider(L1_RPC))
@@ -38,51 +80,35 @@ class OptimisticSequencer:
         self.last_time = time.time()
         self.contract = None
         self._init_contract()
-        
-    def _init_contract(self):
-        """Initialize contract connection"""
+
+    def _load_contract_address(self):
+        """Return the Optimistic verifier address, or None if not ready."""
         try:
             with open('/app/contracts.json', 'r') as f:
-                deployment = json.load(f)
-                contract_addr = deployment['optimistic']
-            
-            self.contract = self.w3.eth.contract(
-                address=contract_addr,
-                abi=[
-                    {
-                        "inputs": [{"type": "bytes32"}],
-                        "name": "submit",
-                        "outputs": [{"type": "uint256"}],
-                        "stateMutability": "nonpayable",
-                        "type": "function"
-                    },
-                    {
-                        "inputs": [{"type": "uint256"}],
-                        "name": "isFinalized",
-                        "outputs": [{"type": "bool"}],
-                        "stateMutability": "view",
-                        "type": "function"
-                    },
-                    {
-                        "inputs": [{"type": "uint256"}],
-                        "name": "blocksUntilFinality",
-                        "outputs": [{"type": "uint256"}],
-                        "stateMutability": "view",
-                        "type": "function"
-                    }
-                ]
-            )
-            print(f"✓ Optimistic contract loaded: {contract_addr}")
-        except Exception as e:
-            print(f"Contract init delayed: {e}")
-    
+                return json.load(f)['optimistic']
+        except (OSError, ValueError, KeyError) as exc:
+            print(f"OPT: contracts.json not usable ({type(exc).__name__}: {exc})")
+        return None
+
+    def _init_contract(self):
+        """Build the cached contract handle. Returns True on success."""
+        address = self._load_contract_address()
+        if not address:
+            return False
+        try:
+            self.contract = self.w3.eth.contract(address=address, abi=SUBMIT_ABI)
+            print(f"✓ Optimistic contract loaded: {address}")
+            return True
+        except Exception as exc:
+            print(f"OPT: contract handle failed ({type(exc).__name__}: {exc})")
+            return False
+
     def add_tx(self, tx):
         with self.lock:
             self.pending.append(tx)
             self.metrics['txs'] += 1
-
+            pending_txs_gauge.set(len(self.pending))
         tx_counter.inc()
-        pending_txs_gauge.set(len(self.pending))
 
         # Optimistic: larger batches (configurable)
         if len(self.pending) >= OPT_BATCH_THRESHOLD:
@@ -92,57 +118,58 @@ class OptimisticSequencer:
         with self.lock:
             if not self.pending:
                 return
-
             batch = self.pending[:OPT_BATCH_THRESHOLD]
             self.pending = self.pending[OPT_BATCH_THRESHOLD:]
-        
-        pending_txs_gauge.set(len(self.pending))
-        
-        # Generate state root (no proof needed!)
+            pending_txs_gauge.set(len(self.pending))
+
+        # Generate the batch commitment (no proof needed). Same helper as ZK,
+        # so the two sides differ only in proof and finality logic.
         batch_start = time.time()
-        state_root = hashlib.sha256(str(batch).encode()).digest()
+        state_root = batch_merkle_root(batch)
         batch_duration = time.time() - batch_start
         batch_processing_time.observe(batch_duration)
 
-        # Count the batch immediately — it has been assembled and hashed
-        with self.lock:
-            self.metrics['batches'] += 1
-        batch_counter.inc()
+        if self.contract is None and not self._init_contract():
+            print("OPT: batch assembled but L1 contract unavailable; no submission attempted")
+            return
 
-        # Submit to L1 optimistically
         l1_start = time.time()
         try:
-            if not self.contract:
-                self._init_contract()
-            
             account = self.w3.eth.accounts[1]
             tx = self.contract.functions.submit(state_root).build_transaction({
                 'from': account,
                 'nonce': self.w3.eth.get_transaction_count(account),
                 'gas': OPT_GAS_LIMIT
             })
-            
+
             # Hardhat default account[1] private key
             private_key = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d'
             signed = self.w3.eth.account.sign_transaction(tx, private_key=private_key)
             tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
             receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
-            
+
             finality_duration = time.time() - l1_start
             finality_time_histogram.observe(finality_duration)
             batch_gas_gauge.set(receipt['gasUsed'])
 
+            # Count only confirmed submissions, matching the ZK sequencer.
+            # Previously this increment happened before submit(), which made
+            # the two batch counters incomparable on L1 failure.
+            with self.lock:
+                self.metrics['batches'] += 1
+            batch_counter.inc()
+
             print(f"✓ Optimistic batch: {len(batch)} txs, Gas: {receipt['gasUsed']}, Finality: {finality_duration:.2f}s, Total: {self.metrics['batches']}")
-        except Exception as e:
-            print(f"Optimistic L1 submit skipped: {e}")
-    
+        except Exception as exc:
+            print(f"OPT L1 submit failed ({type(exc).__name__}: {exc})")
+
     def periodic_batch(self):
         """Batch periodically (configurable interval)"""
         while self.running:
             time.sleep(OPT_BATCH_INTERVAL)
             if len(self.pending) > 0:
                 self._batch()
-    
+
     def calculate_tps(self):
         while self.running:
             time.sleep(2)
@@ -150,15 +177,16 @@ class OptimisticSequencer:
             with self.lock:
                 current_count = self.metrics['txs']
                 elapsed = current_time - self.last_time
-                
+
                 if elapsed > 0:
                     tx_diff = current_count - self.last_tx_count
                     tps = round(tx_diff / elapsed, 2)
                     self.metrics['tps'] = tps
                     tps_gauge.set(tps)
-                
+
                 self.last_tx_count = current_count
                 self.last_time = current_time
+
 
 seq = OptimisticSequencer()
 
@@ -178,7 +206,7 @@ def health():
 
 if __name__ == '__main__':
     print("Starting Prometheus metrics on port 9101...")
-    start_http_server(9101)  # Different port from ZK (9100)
+    start_http_server(9101)
     Thread(target=seq.periodic_batch, daemon=True).start()
     Thread(target=seq.calculate_tps, daemon=True).start()
     print("Optimistic Rollup Sequencer starting on port 5001...")

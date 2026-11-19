@@ -17,7 +17,7 @@ services:
       - ZK_GAS_LIMIT=200000
       - OPT_BATCH_SIZE=200
       - OPT_BATCH_INTERVAL=8
-      - OPT_GAS_LIMIT=150000
+      - OPT_GAS_LIMIT=250000
       - L1_RPC=http://localhost:8545
     volumes:
       - zk-data:/app/data

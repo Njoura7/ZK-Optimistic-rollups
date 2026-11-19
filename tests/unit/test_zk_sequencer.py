@@ -4,7 +4,6 @@ Thesis: Comparative Analysis of L2 Scaling Solutions
 These tests validate core sequencer logic in isolation (no L1 required)
 """
 
-import hashlib
 import json
 import pathlib
 import sys
@@ -106,19 +105,20 @@ def test_proof_generation_produces_bytes():
     """
     Thesis metric: ZK proof output format / correctness (Section 3.1).
 
-    The sequencer derives both the state root and the mock ZK proof via
-    SHA-256.  submit(bytes32, bytes) on ZKVerifier.sol requires:
+    Path A: the sequencer derives the commitment from the shared
+    ``batch_merkle_root`` helper and the (still mock) proof from
+    ``mock_proof``.  submit(bytes32, bytes) on ZKVerifier.sol requires:
       • state_root  — exactly 32 bytes  (Solidity bytes32)
       • proof       — non-empty bytes   (Solidity bytes calldata)
 
-    This test calls the same hashing logic used inside _batch() directly,
-    asserting the types and lengths match those required by the L1 contract
-    interface so that integration failures are caught early.
+    This test calls the exact helpers used inside _batch(), asserting the
+    types and lengths match the L1 contract interface so integration
+    failures are caught early.
     """
     batch = [{"from": f"addr{i}", "to": "contract", "value": i} for i in range(100)]
 
-    state_root = hashlib.sha256(str(batch).encode()).digest()
-    proof = hashlib.sha256(state_root).digest()
+    state_root = _seq_module.batch_merkle_root(batch)
+    proof = _seq_module.mock_proof(state_root)
 
     assert isinstance(state_root, bytes), "state_root must be bytes"
     assert len(state_root) == 32, "state_root must be exactly 32 bytes (Solidity bytes32)"

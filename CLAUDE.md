@@ -75,24 +75,31 @@ All screenshots are captured — the old "4 missing images" TODO is done. There 
 - Demo commitment id is always `1` for both escrows (hardcoded in `app.js`), since `deploy.js` already submits one demo commitment per verifier.
 - One deposit-to-claim cycle per container lifecycle per escrow — restart the stack to reset.
 - zkSync/Arbitrum/etc. stay theory-only (cited in `thesis.bib` as related work) — deliberately not deployed to; this project's adversarial tests (crash, invalid-state) need control over the sequencer that a real production L2 would never grant.
-- `l1/scripts/demo_withdrawal_flow.js` — a scripted, non-browser walkthrough of the exact same deposit/wait/claim sequence, using Hardhat account #1 as the depositor. Run it against a live stack with `cd l1 && npx hardhat run scripts/demo_withdrawal_flow.js --network localhost`. Verified end-to-end this session against a freshly deployed container: real tx hashes, real gas costs, ZK claim needed 0 additional blocks (demo commitment had already aged past its 5-block window by deposit time), Optimistic needed exactly 5 more blocks to close its window, both deposits returned in full with only gas lost. Full sample output is in `web3-demo/README.md`.
+- `l1/scripts/demo_withdrawal_flow.js` — a scripted, non-browser walkthrough of the exact same deposit/wait/claim sequence, using Hardhat account #1 as the depositor. Run it **inside the stack container** (Hardhat listens there): `docker exec zk-rollup-demo sh -c 'cd /app/l1 && npx hardhat run scripts/demo_withdrawal_flow.js --network localhost'`. It cannot reach the node from the `test-runner` container (`localhost` is a different network namespace). Verified end-to-end on Path A against a freshly deployed container: real tx hashes and gas costs, ZK claim needed 0 extra blocks (the deploy-time demo commitment had already aged past its 5-block window), Optimistic needed a few more blocks to close its 10-block window (the exact count depends on how many blocks elapsed since deployment — observed 3–5), early claim reverted with `Not finalized yet`, and both deposits returned in full with only gas lost. Full sample output is in `web3-demo/README.md`.
 - `web3-demo/README.md` embeds two real screenshots (`images/demo-screenshot.png` — a MetaMask deposit confirmation; `images/withdrawal-finality-demo.png` — the completed-vs-waiting contrast) as illustrations. These are separate from the thesis's own copy of the second image at `ths/images/web3-demo/`.
 - `web3-demo/analysis/` — a personal pandas/Jupyter practice notebook (`withdrawal_analysis.ipynb`) built on real data from `l1/scripts/generate_sample_data.js` (configurable via `l1/.env`, `SAMPLE_RUNS`). Explicitly an addition, not referenced anywhere in `ths/` and not intended to be — see `web3-demo/analysis/README.md`.
 
 ---
 
-## Key measured results
+## Key results (Path A baseline)
+
+Authoritative source: `measurement/raw/baseline-path-a.json` (harness
+`measurement/capture.py`). All timing is local, inside the Docker image; no
+public chain. See `docs/IMPLEMENTATION_NOTES.md`.
 
 | Metric | ZK | Optimistic |
 |--------|-----|------------|
-| Finality (demo, 10-block window) | ~15s | ~2 min |
-| Finality (production, 7-day window) | ~15s | ~7 days (~672× slower) |
-| L1 gas per tx (Hardhat only) | ~3× higher | baseline |
-| Proof generation P95 | ~95ms | n/a |
-| Peak throughput | 39–43% higher | baseline |
-| Pending tx lost per crash | ~73 | ~142 |
+| Batch commitment P95 (100 / 200 tx) | 3.64 ms / 6.80 ms | same helper |
+| Mock proof P95 | 0.008 ms | n/a (no proof step) |
+| Commitment + proof P95 (100 tx) | 3.64 ms | 3.64 ms (commit only) |
+| Accepted-but-unconfirmed on submit failure | 100 tx | 200 tx |
+| Finality (production, assumed) | ~15 s | ~7 days (~40,320×) |
 
-Gas figures are Hardhat estimates only. Do not extrapolate to mainnet dollar costs.
+Retired claims (no raw artefact / not stable): 95 ms proof P95, 73/142 pending
+losses, 39–43% throughput advantage, 672× (arithmetic error: minutes/seconds).
+The 7-day vs 15 s ratio is a protocol assumption, not a measurement; Hardhat
+mines only on transactions, so demo wall-clock finality is not reported.
+Gas figures are Hardhat-only and must not be extrapolated to mainnet costs.
 
 ---
 

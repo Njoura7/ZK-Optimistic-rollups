@@ -26,8 +26,10 @@ WORKDIR /app/l1
 RUN npm install
 WORKDIR /app
 
-# Expose ports
-EXPOSE 3000 5000 8545
+# Expose ports used by the stack (documentation only; docker-compose publishes them)
+# 3000 dashboard, 3001 Grafana (host), 3002 web3 demo, 5000/5001 sequencer APIs,
+# 8545 Hardhat RPC, 9090 Prometheus (host), 9100/9101 sequencer metrics.
+EXPOSE 3000 3001 3002 5000 5001 8545 9090 9100 9101
 
 # Start script
 CMD ["bash", "start.sh"]

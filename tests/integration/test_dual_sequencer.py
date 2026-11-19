@@ -20,7 +20,6 @@ the differences quantitatively.
 All tests run in Docker (python:3.9-slim), no L1 node required.
 """
 
-import hashlib
 import json
 import pathlib
 import sys
@@ -104,11 +103,15 @@ def _wire_zk_l1_mocks(seq: Sequencer):
 
 def _wire_opt_l1_mocks(seq: OptimisticSequencer):
     """Set up mock chain so Optimistic _batch() completes through the L1 success path."""
-    seq.w3.eth.accounts = ["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"]
+    # The Optimistic signer is accounts[1]; provide two accounts (ZK uses [0]).
+    seq.w3.eth.accounts = [
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    ]
     seq.w3.eth.get_transaction_count.return_value = 0
     seq.contract.functions.submit.return_value.build_transaction.return_value = {
-        "from": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "gas": 150000,
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "gas": 250000,
     }
     seq.w3.eth.account.sign_transaction.return_value.rawTransaction = b"signed"
     seq.w3.eth.send_raw_transaction.return_value = b"txhash"
@@ -204,55 +207,67 @@ def test_zk_proof_overhead_vs_optimistic():
     """
     THESIS I3: Proof generation overhead — ZK vs Optimistic (Section 3.1).
 
-    ZK sequencer calls sha256 twice per batch (state_root + proof).
-    Optimistic sequencer calls sha256 once per batch (state_root only).
-    This test confirms the overhead difference by counting sha256 invocations
-    on identical batch payloads.
+    Path A replaced the old sha256(str(batch)) representation with a shared
+    canonical Merkle commitment (``batch_merkle_root``). Both sequencers call
+    that helper exactly once. The ZK path additionally calls ``mock_proof``;
+    the Optimistic path has no proof step at all. We count calls to the shared
+    helpers to confirm the structural overhead difference.
     """
-    original_sha256 = hashlib.sha256
-
-    # --- ZK: count sha256 calls ---
-    zk = _make_zk_seq()
-    _wire_zk_l1_mocks(zk)
-    zk.pending = [{"value": i} for i in range(100)]
-
-    zk_sha256_calls = []
-
-    def zk_counting_sha256(data):
-        zk_sha256_calls.append(1)
-        return original_sha256(data)
-
     contracts_json = json.dumps({
         "zk": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
     })
 
-    with patch("builtins.open", mock_open(read_data=contracts_json)):
-        with patch("hashlib.sha256", side_effect=zk_counting_sha256):
-            zk._batch()
+    # --- ZK: count commitment + proof helper calls ---
+    zk = _make_zk_seq()
+    _wire_zk_l1_mocks(zk)
+    zk.pending = [{"value": i} for i in range(100)]
 
-    # --- Optimistic: count sha256 calls ---
+    zk_root_calls = []
+    zk_proof_calls = []
+    original_zk_root = _zk_seq_module.batch_merkle_root
+    original_zk_proof = _zk_seq_module.mock_proof
+
+    def counting_zk_root(batch):
+        zk_root_calls.append(1)
+        return original_zk_root(batch)
+
+    def counting_zk_proof(root):
+        zk_proof_calls.append(1)
+        return original_zk_proof(root)
+
+    with patch("builtins.open", mock_open(read_data=contracts_json)):
+        with patch.object(_zk_seq_module, "batch_merkle_root", side_effect=counting_zk_root):
+            with patch.object(_zk_seq_module, "mock_proof", side_effect=counting_zk_proof):
+                zk._batch()
+
+    # --- Optimistic: count commitment helper calls only ---
     opt = _make_opt_seq()
     _wire_opt_l1_mocks(opt)
     opt.pending = [{"value": i} for i in range(200)]
 
-    opt_sha256_calls = []
+    opt_root_calls = []
+    original_opt_root = _opt_seq_module.batch_merkle_root
 
-    def opt_counting_sha256(data):
-        opt_sha256_calls.append(1)
-        return original_sha256(data)
+    def counting_opt_root(batch):
+        opt_root_calls.append(1)
+        return original_opt_root(batch)
 
-    with patch("hashlib.sha256", side_effect=opt_counting_sha256):
+    with patch.object(_opt_seq_module, "batch_merkle_root", side_effect=counting_opt_root):
         opt._batch()
 
-    # ZK: 2 sha256 calls (state_root + proof); Optimistic: 1 (state_root only).
-    assert len(zk_sha256_calls) == 2, (
-        f"ZK must call sha256 twice (state_root + proof), got {len(zk_sha256_calls)}"
+    # Both compute exactly one canonical batch commitment.
+    assert len(zk_root_calls) == 1, (
+        f"ZK must call batch_merkle_root once, got {len(zk_root_calls)}"
     )
-    assert len(opt_sha256_calls) == 1, (
-        f"Optimistic must call sha256 once (state_root only), got {len(opt_sha256_calls)}"
+    assert len(opt_root_calls) == 1, (
+        f"Optimistic must call batch_merkle_root once, got {len(opt_root_calls)}"
     )
-    assert len(zk_sha256_calls) > len(opt_sha256_calls), (
-        "ZK proof generation must have strictly more hash operations than Optimistic"
+    # Only the ZK path generates a proof.
+    assert len(zk_proof_calls) == 1, (
+        f"ZK must call mock_proof once, got {len(zk_proof_calls)}"
+    )
+    assert not hasattr(_opt_seq_module, "mock_proof"), (
+        "Optimistic sequencer must have no proof-generation step"
     )
 
 

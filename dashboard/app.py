@@ -50,9 +50,9 @@ HTML = """<!DOCTYPE html>
                     <div class="label">TPS</div>
                 </div>
                 <div class="metric-cell">
-                    <div class="value">~15s</div>
+                    <div class="value">5 blk</div>
                     <div class="label">Finality</div>
-                    <div class="sub">cryptographic</div>
+                    <div class="sub">L1 confirmation window*</div>
                 </div>
             </div>
         </div>
@@ -78,7 +78,7 @@ HTML = """<!DOCTYPE html>
                 <div class="metric-cell">
                     <div class="value">10 blk</div>
                     <div class="label">Finality</div>
-                    <div class="sub">challenge window</div>
+                    <div class="sub">challenge window*</div>
                 </div>
             </div>
         </div>
@@ -98,9 +98,9 @@ HTML = """<!DOCTYPE html>
             </thead>
             <tbody>
                 <tr>
-                    <td class="property">Finality Time</td>
-                    <td class="zk-val">~15 seconds</td>
-                    <td class="opt-val">10 blocks (~2 min demo)</td>
+                    <td class="property">Finality rule*</td>
+                    <td class="zk-val">5 L1 blocks after proof</td>
+                    <td class="opt-val">10 L1 blocks challenge window</td>
                     <td><span class="winner zk-win">ZK</span></td>
                 </tr>
                 <tr>
@@ -111,7 +111,7 @@ HTML = """<!DOCTYPE html>
                 </tr>
                 <tr>
                     <td class="property">Proof Type</td>
-                    <td class="zk-val">Groth16 (SHA-256 stub)</td>
+                    <td class="zk-val">Mock keccak proof (Path A)</td>
                     <td class="opt-val">None (post-hoc fraud)</td>
                     <td><span class="winner draw">Trade-off</span></td>
                 </tr>
@@ -123,12 +123,20 @@ HTML = """<!DOCTYPE html>
                 </tr>
                 <tr>
                     <td class="property">L1 Gas per Batch</td>
-                    <td class="zk-val">~165K (mock; higher in prod)</td>
-                    <td class="opt-val">~171K (10-field struct)</td>
+                    <td class="zk-val">Local Hardhat sample*</td>
+                    <td class="opt-val">Local Hardhat sample*</td>
                     <td><span class="winner draw">Trade-off</span></td>
                 </tr>
             </tbody>
         </table>
+        <p class="table-note" style="margin:10px 2px 0;font-size:12px;line-height:1.5;color:#9aa5b1;">
+            * <strong>Reference values, not live measurements.</strong> This table records
+            architectural properties and illustrative figures for presentation only. It is
+            <em>not</em> evidence: do not cite these cells as measured results. Live values
+            (transactions, batches, TPS) are shown in the panels above and are polled from
+            each sequencer's <code>/metrics</code> endpoint. Reproducible measurements and
+            their raw artefacts are documented in <code>docs/IMPLEMENTATION_NOTES.md</code>.
+        </p>
     </div>
 
     <!-- Bottom: demo controls + log -->
@@ -270,14 +278,19 @@ def index():
 
 @app.route('/api/metrics')
 def metrics():
+    # Narrow exception handling: a sequencer may not be up yet, or may return
+    # a non-JSON error page. Both are expected during startup; anything else
+    # (e.g. a programming error) should surface instead of being swallowed.
+    zk = {'txs': 0, 'batches': 0, 'tps': 0}
+    opt = {'txs': 0, 'batches': 0, 'tps': 0}
     try:
         zk = requests.get('http://localhost:5000/metrics', timeout=1).json()
-    except:
-        zk = {'txs': 0, 'batches': 0, 'tps': 0}
+    except (requests.RequestException, ValueError) as exc:
+        app.logger.debug('ZK metrics unavailable: %s', exc)
     try:
         opt = requests.get('http://localhost:5001/metrics', timeout=1).json()
-    except:
-        opt = {'txs': 0, 'batches': 0, 'tps': 0}
+    except (requests.RequestException, ValueError) as exc:
+        app.logger.debug('Optimistic metrics unavailable: %s', exc)
     return {'zk': zk, 'optimistic': opt}
 
 if __name__ == '__main__':

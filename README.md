@@ -49,13 +49,13 @@ Internal endpoints (not for browser use):
 
 ## Running tests
 
-Tests are separate from the main service stack. All 21 tests replace the web3 and Prometheus libraries with mock objects, so no Hardhat node or running Docker stack is required.
+Tests are separate from the main service stack. The Python tests replace the web3 and Prometheus libraries with mock objects, so no Hardhat node or running Docker stack is required.
 
 ```bash
 # All tests — does not need the stack running
 docker compose --profile test run --rm test-runner pytest tests/ -v --tb=short
 
-# Unit tests only (10 tests: ZK and Optimistic sequencers in isolation)
+# Unit tests only (19 tests: 9 canonical-commitment, 5 ZK, 5 Optimistic)
 docker compose --profile test run --rm test-runner pytest tests/unit/ -v
 
 # Integration tests (7 tests: both sequencers side by side)
@@ -65,7 +65,7 @@ docker compose --profile test run --rm test-runner pytest tests/integration/ -v
 docker compose --profile test run --rm test-runner pytest tests/adversarial/ -v
 ```
 
-Expected: **21 passed** in under two minutes. The CI workflow at `.github/workflows/ci.yml` runs each tier automatically on every push that modifies sequencer code, contracts, or test files — without starting the full stack.
+Expected: **30 passed** in under two minutes. The CI workflow at `.github/workflows/ci.yml` runs each tier automatically on every push that modifies sequencer code, contracts, or test files — without starting the full stack.
 
 There is a separate, small Hardhat/JS tier (7 tests) for `WithdrawalEscrow.sol` — unlike the Python tests above, these run real Solidity against Hardhat's built-in in-process network rather than mocks:
 
@@ -81,9 +81,10 @@ cd l1 && npm test
 
 | Tier | Tests | Validates |
 |------|-------|-----------|
-| Unit — ZK sequencer | 5 | Batch threshold at 100 tx, 32-byte state root, TPS gauge accuracy, RPC failure isolation, metrics endpoint schema |
-| Unit — Optimistic sequencer | 5 | Batch threshold at 200 tx, absence of proof step, finality timestamp, polling interval, metrics endpoint schema |
-| Integration — dual sequencer | 7 | Side-by-side batch ratios (2 ZK vs 1 Optimistic for 200 tx), full pipeline, proof overhead (2 vs 1 hash call), multi-batch slicing, schema parity, metric isolation |
+| Unit — canonical commitment | 9 | Golden vector, determinism, order independence, odd/empty batches, explicit ABI field order, Merkle inclusion + tamper rejection, proof domain separation |
+| Unit — ZK sequencer | 5 | Batch threshold at 100 tx, 32-byte commitment + proof format, TPS formula, RPC failure isolation, metrics endpoint schema |
+| Unit — Optimistic sequencer | 5 | Batch threshold at 200 tx, absence of proof step, finality observation, polling interval, metrics endpoint schema |
+| Integration — dual sequencer | 7 | Side-by-side batch ratios (2 ZK vs 1 Optimistic for 200 tx), full pipeline, shared commitment + ZK-only proof step, multi-batch slicing, schema parity, metric isolation |
 | Adversarial — crash and recovery | 4 | ZK crash at batch threshold, Optimistic crash at its larger threshold, 1.5-second L1 congestion delay, malicious state root rejection |
 
 If a previous pytest run left cache files behind:
@@ -148,26 +149,53 @@ Full parameter list:
 | `ZK_GAS_LIMIT` | 200000 | Gas limit for Hardhat (local only) |
 | `OPT_BATCH_SIZE` | 200 | Transactions per Optimistic batch |
 | `OPT_BATCH_INTERVAL` | 8 | Seconds between Optimistic batch checks |
-| `OPT_GAS_LIMIT` | 150000 | Gas limit for Hardhat (local only) |
+| `OPT_GAS_LIMIT` | 250000 | Gas limit for Hardhat (local only). `OptimisticVerifier.submit` measures ~171k gas, so the previous 150k value ran out of gas. |
 | `L1_RPC` | http://localhost:8545 | Layer 1 RPC endpoint |
 
 ---
 
 ## Key results
 
-From a 400-transaction run (see Chapter 6 for full analysis):
+All figures below are **local, reproducible measurements** or explicitly
+labelled protocol assumptions. The raw artefact is
+`measurement/raw/baseline-path-a.json`, produced by `measurement/capture.py`
+(5,000 iterations per timing, Python 3.9 inside the project image, no public
+chain). See `docs/IMPLEMENTATION_NOTES.md` for the exact real-versus-mock
+boundary.
 
-| Metric | ZK Rollup | Optimistic Rollup |
-|--------|-----------|-------------------|
-| Batches submitted | 7 (×100 tx) | 4 (×200 tx) |
-| Peak TPS | ~50 | ~35 |
-| L1 inclusion (P95) | 4.75 s | 4.75 s |
-| True finality | ~15 s | ~2 min (demo) / 7 days (prod) |
-| Proof generation (P95) | 95 ms | — |
+| Metric | ZK Rollup | Optimistic Rollup | Source |
+|--------|-----------|-------------------|--------|
+| Batch commitment, P95 (100 / 200 tx) | 3.64 ms / 6.80 ms | same helper, same cost | measured |
+| Mock proof, P95 | 0.008 ms | — (no proof step) | measured |
+| Batch commitment + proof, P95 (100 tx) | 3.64 ms | 3.64 ms (commitment only) | measured |
+| Batch threshold | 100 tx | 200 tx | configuration default |
+| Accepted-but-unconfirmed on L1 submit failure | 100 tx | 200 tx | measured (invariant) |
 
-The most important finding is the finality gap: identical L1 inclusion times, but ZK reaches true finality ~8× faster in the demo environment. In a production Ethereum deployment the gap widens to roughly 672× (15 seconds vs. 7 days).
+**What the timing numbers mean.** Both sequencers pay the same ~3.6 ms
+commitment cost; the ZK-only mock proof adds only ~0.008 ms. That is the honest
+picture of the current proof step: it demonstrates the *architecture* (a proof
+is required before submission) but not the *cost* of a real proving system. The
+earlier "95 ms proof P95" figure had no raw artefact and was not reproducible
+from the code, so it has been replaced by the measurement above.
 
-**What the gas numbers mean:** Gas values in this framework come from a local Hardhat node with fixed pricing. They are useful for comparing the two architectures against each other (ZK uses ~2.6× more gas per 400 transactions than Optimistic), but they do not predict actual Ethereum mainnet costs.
+**Finality gap (assumption, not a measurement).** Finality here is a protocol
+rule, not a wall-clock result: ZK accepts after proof verification and 5 L1
+blocks, Optimistic after a 10-block demo challenge window. If one assumes a
+~15 s ZK finality (the figure previously used in this project) against a
+7-day challenge window, the ratio is approximately **40,320×**
+(604,800 s / 15 s), not 672× — the earlier number divided minutes by seconds.
+These are protocol-parameter assumptions; Hardhat mines only on transactions,
+so wall-clock "finality" in the demo is an artefact of the test harness and is
+not reported as a result.
+
+**Removed claims.** The earlier "peak throughput 39–43% higher" had no raw
+artefact and is not a stable metric here: measured TPS is dominated by the HTTP
+client loop that injects transactions, not by the rollup architecture. The
+"400-transaction run" table was internally inconsistent (7×100 and 4×200 both
+exceed 400) and has been replaced by the measured table above. Gas values come
+from a local Hardhat node with fixed pricing; they are useful for relative
+comparison between the two architectures but do not predict mainnet costs, so
+no absolute gas figures are published here.
 
 ---
 
@@ -182,18 +210,28 @@ The most important finding is the finality gap: identical L1 inclusion times, bu
 │   │   └── WithdrawalEscrow.sol     # Deposit/claim gated by isFinalized()
 │   ├── test/WithdrawalEscrow.test.js # Hardhat contract tests (7 tests)
 │   └── scripts/deploy.js            # Deploys all four contracts to Hardhat
+├── l2_common/
+│   └── commitment.py                # Shared canonical batch commitment (Path A)
 ├── l2-zk/sequencer.py               # ZK sequencer (port 5000, metrics 9100)
 ├── l2-optimistic/sequencer.py       # Optimistic sequencer (port 5001, metrics 9101)
 ├── dashboard/app.py                 # Flask dashboard (port 3000)
 ├── web3-demo/                       # Wallet-connected withdrawal demo (port 3002)
 │   ├── index.html, app.js, style.css
+│   ├── analysis/                    # Personal practice notebook — NOT thesis data
 │   └── README.md                    # MetaMask setup, expected behavior
 ├── config/
 │   ├── prometheus.yml               # Scrape config
 │   └── grafana/                     # Auto-provisioned dashboards
+├── docs/
+│   ├── IMPLEMENTATION_NOTES.md      # Real vs mocked boundary; measurement campaigns
+│   ├── PATH_B_GROTH16.md            # Concrete plan for a real Groth16 prover
+│   └── SEQUENCER_INTERFACE.md       # HTTP / metric / contract interface
+├── measurement/                     # Reproducible capture harness + raw artefacts
+│   ├── capture.py
+│   └── raw/baseline-path-a.json
 ├── tests/
-│   ├── unit/                        # ZK and Optimistic sequencer unit tests
-│   ├── integration/                 # Dual-sequencer finality/throughput tests
+│   ├── unit/                        # Commitment, ZK and Optimistic unit tests
+│   ├── integration/                 # Dual-sequencer comparison tests
 │   └── adversarial/                 # Crash and recovery tests
 ├── ths/                             # LaTeX thesis source
 │   ├── chapters/                    # Chapter .tex files
@@ -207,10 +245,22 @@ The most important finding is the finality gap: identical L1 inclusion times, bu
 
 ## What this framework does not test
 
-- Real ZK proofs: we use SHA-256 double-hashing as a stand-in. Production proof generation takes seconds to minutes; ours takes milliseconds. The architecture (proof required at submission) is preserved, but the computational cost is not.
-- Mainnet gas prices: Hardhat uses a fixed price. Relative gas comparisons between ZK and Optimistic are valid; absolute dollar amounts are not.
-- Network latency: all services run on localhost in Docker. Real deployments have network propagation delays.
-- 7-day challenge windows: compressed to 10 blocks (~2 minutes) for testability.
+- **Real ZK proofs.** The proof is a keccak-based mock (8 µs P95), not a SNARK.
+  A real Groth16 prover would take seconds and require an on-chain pairing
+  check; the architecture (a proof is required before submission) is preserved
+  but the cost is not. `docs/PATH_B_GROTH16.md` explains how to add it.
+- **Full state root.** The commitment is a Merkle root over transaction tuples,
+  not a post-execution account trie. It is a real, deterministic *batch*
+  commitment, but it does not attest to state transitions.
+- **Mainnet gas prices.** Hardhat uses a fixed price. Relative gas comparisons
+  between the two architectures are meaningful; absolute dollar amounts are not.
+- **Network latency.** All services run on localhost in Docker.
+- **Wall-clock finality.** Hardhat mines only on transactions; the displayed
+  finality values are protocol parameters, not measured latencies.
+- **7-day challenge windows.** Compressed to 10 blocks for testability.
+
+`web3-demo/analysis/` is personal data-analysis practice and is explicitly not
+thesis material or measurement data.
 
 ---
 
