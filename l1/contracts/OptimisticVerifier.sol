@@ -23,7 +23,7 @@ contract OptimisticVerifier {
     ///      uses `confirmPeriodBlocks` (currently 45 818 blocks ≈ 6.4 days).
     ///      The 10-block demo value keeps the local Hardhat environment responsive
     ///      while preserving the same two-phase finality semantics.
-    uint256 public constant CHALLENGE_PERIOD = 10; // 10 blocks (~2 min in demo)
+    uint256 public constant CHALLENGE_PERIOD = 10; // 10 L1 blocks in demo (~7 days in production); Hardhat mines on transactions only
 
     /// @dev ACADEMIC: In production (Optimism) challengers post an ETH bond ~0.08 ETH.
     ///      Bond is slashed if the challenge is invalid, rewarded if fraud is proven.
@@ -49,7 +49,7 @@ contract OptimisticVerifier {
     // -------------------------------------------------------------------------
 
     struct Commitment {
-        bytes32 stateRoot;          // Merkle root of the post-batch L2 state
+        bytes32 stateRoot;          // keccak256 binary Merkle batch commitment over (from,to,value) tuples, NOT an L2 state root
         uint256 blockNumber;        // L1 block at which this commitment was included
         uint256 challengeDeadline;  // Block number when challenge period ends
         bool    challenged;         // True if any fraud proof was filed
@@ -96,7 +96,7 @@ contract OptimisticVerifier {
 
     /// @notice Emitted when a new optimistic state commitment is accepted on L1.
     /// @param id                Monotonically increasing commitment identifier.
-    /// @param stateRoot         Merkle root of the L2 state after this batch.
+    /// @param stateRoot         Canonical keccak256 batch commitment (NOT an L2 state root).
     /// @param challengeDeadline L1 block number at which the challenge window closes.
     /// @param batchSize         Number of L2 transactions bundled in this commitment.
     event Committed(
@@ -131,9 +131,10 @@ contract OptimisticVerifier {
     // -------------------------------------------------------------------------
 
     /// @notice Submit an optimistic state commitment to L1 (no proof required).
-    /// @dev    Unlike ZKVerifier.submit() which requires a valid Groth16 proof at
-    ///         submission time, the optimistic model accepts any state root and relies
-    ///         on economic incentives during the challenge period to ensure correctness.
+    /// @dev    Unlike ZKVerifier.submit() which requires a proof before submission,
+    ///         the optimistic model accepts any batch commitment and relies on
+    ///         economic incentives during the challenge period. In this testbed the
+    ///         ZK proof is itself a mock (non-zero check), not a Groth16 proof.
     ///
     ///         Security assumption: at least one honest verifier is monitoring L1 and
     ///         will file a fraud proof within CHALLENGE_PERIOD blocks if the state root
@@ -147,7 +148,7 @@ contract OptimisticVerifier {
     ///         delayed by the full challenge window (7 days in production, 10 blocks
     ///         in this demo).
     ///
-    /// @param  stateRoot Merkle root of the post-batch L2 state.
+    /// @param  stateRoot Canonical keccak256 batch commitment (NOT an L2 state root).
     /// @return id        Identifier of the newly stored commitment.
     function submit(bytes32 stateRoot) external returns (uint256) {
         commitmentCount++;
@@ -248,8 +249,10 @@ contract OptimisticVerifier {
     ///         HARD_FINAL (challenge window closed, no valid fraud proof).
     ///
     ///         This two-phase finality is the core difference from ZK rollups:
-    ///           • ZK: finality ≈ proof verification time + L1 confirmation (~minutes)
-    ///           • Optimistic: finality = challenge period + L1 confirmation (~7 days)
+    ///           • ZK: finality rule = proof accepted + 5 L1 blocks (mock proof
+    ///             costs ~0.008 ms here; no wall-clock measurement)
+    ///           • Optimistic: finality rule = 10 L1 blocks in the demo
+    ///             (~7 days assumed in production)
     ///
     ///         Optimism's OptimismPortal2.sol enforces a similar pattern: withdrawals
     ///         are first "proven" (SOFT_FINAL), then after the dispute window they can
@@ -279,10 +282,11 @@ contract OptimisticVerifier {
     ///         `finalizeWithdrawalTransaction()` or implicit finality when the
     ///         dispute game resolves in favour of the defender.
     ///
-    ///         Contrast with ZKVerifier.isFinalized() which only requires the proof
-    ///         to be verified and a short L1 confirmation window (5 blocks) — no
-    ///         economic challenge game is needed because correctness is guaranteed
-    ///         cryptographically by the Groth16 proof.
+    ///         Contrast with ZKVerifier.isFinalized(), which requires a mock proof
+    ///         to be accepted plus a 5-block L1 window — no economic challenge game
+    ///         is needed because the ZK path is architecturally gated on a proof.
+    ///         In this testbed that proof is a mock; no cryptographic guarantee is
+    ///         implemented (see docs/PATH_B_GROTH16.md).
     ///
     /// @param  id The commitment identifier returned by submit().
     /// @return    True once the commitment is finalized (challenge window passed).
@@ -293,8 +297,9 @@ contract OptimisticVerifier {
     }
 
     /// @notice Get the number of L1 blocks remaining in the challenge window.
-    /// @dev    Useful for off-chain monitoring: the Python sequencer and Grafana
-    ///         dashboard poll this to display real-time finality countdown.
+    /// @dev    Used by the web3-demo frontend (web3-demo/app.js) for a block
+    ///         countdown. The Python sequencers and Grafana do not poll this;
+    ///         Grafana's latency panels show L1 submission-to-receipt time.
     ///
     ///         In Optimism Bedrock the equivalent is computed off-chain from the
     ///         `createdAt` timestamp + dispute game duration.  In Arbitrum Nitro,
@@ -324,8 +329,9 @@ contract OptimisticVerifier {
     ///                      In production, interactive dispute resolution follows.
     ///
     ///         ZK rollups skip the SOFT_FINAL → HARD_FINAL transition entirely:
-    ///         once the Groth16 proof is verified on-chain, the commitment achieves
-    ///         cryptographic finality immediately (modulo L1 block confirmations).
+    ///         in this testbed the mock proof is only checked for a non-zero prefix
+    ///         and VK binding; finality is the 5-block rule, not a cryptographic
+    ///         guarantee (see docs/PATH_B_GROTH16.md for real Groth16).
     ///
     /// @param  id The commitment identifier.
     /// @return    One of "PENDING", "SOFT_FINAL", "HARD_FINAL", or "CHALLENGED".

@@ -17,8 +17,8 @@ Both `ZKVerifier` and `OptimisticVerifier` expose an `isFinalized(id)` check.
 the *only* difference between the ZK and Optimistic panels on this page is
 how fast `isFinalized()` turns true:
 
-- **ZK escrow**: unlocks once the batch has a 5-block L1 confirmation (a few seconds on Hardhat).
-- **Optimistic escrow**: stays locked for the full 10-block challenge window (~2 minutes on Hardhat), and stays locked indefinitely if the commitment gets challenged.
+- **ZK escrow**: unlocks once the batch has a 5-block L1 confirmation.
+- **Optimistic escrow**: stays locked for the full 10-block challenge window (~7 days in production), and stays locked indefinitely if the commitment gets challenged. Hardhat mines only on transactions, so the wait is measured in blocks, not wall-clock minutes.
 
 It is a toy round-trip (you get back exactly what you deposited), not a real
 bridge — the point is the gating mechanism, not moving real value.
@@ -45,10 +45,11 @@ bridge — the point is the gating mechanism, not moving real value.
 
 ## Troubleshooting and tips
 
-**"Amount shows MON instead of ETH"** — cosmetic labeling issue, not a functional bug. Somewhere
-the "Hardhat local" network entry in MetaMask got its currency symbol set to `MON` (Monad's
-testnet symbol) instead of `ETH`, likely a leftover from editing a different network. Fix it via
-MetaMask -> Settings -> Networks -> Hardhat local -> edit -> set **Currency symbol** to `ETH`.
+**"Amount shows MON instead of ETH"** — stale wallet state only. The current
+`app.js` adds the network with symbol `ETH` and the setup instructions above use `ETH`; if an
+older "Hardhat local" entry in MetaMask still shows `MON` (Monad's symbol), edit that wallet
+entry via MetaMask -> Settings -> Networks -> Hardhat local -> edit -> **Currency symbol** `ETH`.
+This is not a defect of this repository's code, and the native token in this testbed is ETH.
 
 **Renaming the imported test account** — to avoid confusing it with your real MetaMask account
 in the account list: click the account name/avatar -> three-dot menu -> account details -> the
@@ -74,7 +75,8 @@ need to rush the screenshot.
 
 - ZK panel: claim button enables within a few seconds of depositing.
 - Optimistic panel: claim button stays disabled with a live "N blocks
-  remaining" countdown for roughly 2 minutes before unlocking.
+  remaining" countdown until 10 L1 blocks have been mined. Block count is the
+  meaningful unit here; Hardhat has no wall-clock block timer.
 
 ![Withdrawal demo after a live run](images/withdrawal-finality-demo.png)
 
@@ -150,6 +152,8 @@ a fresh Hardhat chain and fresh contracts for another run.
 Hardhat's local chain is sufficient to demonstrate the mechanism — a real
 signed transaction, a real contract call, a real gated claim. If you want to
 see it survive outside a local sandbox, redeploy the same contracts to
-Sepolia (free testnet ETH from a faucet) via `npx hardhat run
-scripts/deploy.js --network sepolia` after adding a `sepolia` network entry
-to `l1/hardhat.config.js`. There is no need to spend real money on this demo.
+Sepolia (free testnet ETH from a faucet) after adding a `sepolia` network entry
+to `l1/hardhat.config.js`. Note that `deploy.js` writes to the absolute container
+path `/app/contracts.json`, so a host-side run would not refresh the addresses
+this page reads; adapt that write path as part of such an extension. There is no
+need to spend real money on this demo.

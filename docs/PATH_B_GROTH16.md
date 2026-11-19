@@ -6,6 +6,48 @@
 > `path-b-groth16-verifier`, so the stable Path A baseline stays available for
 > comparison. No thesis text has been edited for Path B.
 
+## Decision: thesis scope vs. repository follow-up
+
+This section records the decision explicitly so it is not left ambiguous during
+thesis writing.
+
+**Decision:** do **not** implement Path B inside the thesis scope. The delivered
+system stays on Path A (canonical keccak batch commitment + mock proof), and real
+Groth16 is a documented follow-up. Path A is already a complete, internally
+consistent story: the commitment is canonical and shared by both sequencers, the
+mock/real boundary is explicit in `IMPLEMENTATION_NOTES.md`, and every published
+number comes from one raw artefact (`measurement/raw/baseline-path-a.json`).
+Adding Groth16 would force proof time and gas to be re-measured and would blur the
+clean baseline the thesis needs.
+
+**Where the follow-up lives:** on a separate branch of this GitHub repository,
+e.g. `path-b-groth16-verifier` — never on `path-a-canonical-commitment` or `main`.
+The repository therefore keeps two clearly separated artefacts:
+
+| Artefact | Branch | Status | Role |
+|---|---|---|---|
+| Path A — canonical commitment + mock proof | `path-a-canonical-commitment` | delivered, measured | the system and numbers the thesis describes |
+| Path B — real Groth16 prover/verifier | `path-b-groth16-verifier` | plan only (`docs/PATH_B_GROTH16.md`) | optional extension / future work |
+
+**How to phrase it in the thesis** (safe in either case):
+
+- The implementation and evaluation chapters describe Path A only, with the
+  proof explicitly called a **mock** and the commitment explicitly called a
+  **batch commitment**, not a state root.
+- Future work says: "a real Groth16 prover and on-chain verifier are a concrete
+  next step; the plan, including the field-modulus and trusted-setup caveats, is
+  documented in `docs/PATH_B_GROTH16.md` in the project repository." This is
+  accurate whether or not Path B is ever implemented.
+- If Path B is implemented later in the repository *before submission*, the
+  thesis may add the before/after paragraph quoted under "Thesis framing" below
+  and the new measurements — but only after re-running `measurement/capture.py`
+  and committing a fresh raw artefact. Path B numbers must never be mixed into
+  Path A tables.
+
+**Rule of thumb:** the thesis claims only what the Path A branch can reproduce;
+the GitHub repository may carry the optional Path B branch as future work without
+changing any thesis claim.
+
 ## Why Path A comes first
 
 A Groth16 proof binds to *public signals*. You need a deterministic, canonical

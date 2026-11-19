@@ -32,7 +32,7 @@ HTML = """<!DOCTYPE html>
     <div class="panels">
         <div class="panel zk">
             <div class="panel-header">
-                <h2>ZK Rollup <span class="tag">Validity Proof</span></h2>
+                <h2>ZK Rollup <span class="tag">Validity Proof (mock in testbed)</span></h2>
                 <span class="port">:5000</span>
             </div>
             <div class="metric-grid">
@@ -117,7 +117,7 @@ HTML = """<!DOCTYPE html>
                 </tr>
                 <tr>
                     <td class="property">Security Model</td>
-                    <td class="zk-val">Cryptographic</td>
+                    <td class="zk-val">Cryptographic (architectural model; mock verifier)</td>
                     <td class="opt-val">Economic (1-of-N honest)</td>
                     <td><span class="winner zk-win">ZK</span></td>
                 </tr>

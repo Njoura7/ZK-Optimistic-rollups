@@ -55,6 +55,8 @@ The essential architectural difference between the two approaches manifests in t
     \label{tab:contract-diffs}
 \end{table}
 
+A terminology note applies throughout this thesis: the field named \texttt{stateRoot} in both contracts actually holds the canonical keccak256 binary Merkle \emph{batch commitment} over ABI-encoded \texttt{(from,to,value)} tuples, not a post-execution state trie root. We use ``batch commitment'' for this value and reserve ``state root'' for the general concept in related work.
+
 \subsection{ZKVerifier Contract}
 
 The \texttt{ZKVerifier} contract is the on-chain anchor for the ZK~Rollup path. It accepts proofs submitted by the sequencer and enforces a finality delay before commitments are irreversible. The contract implements two core functions:
@@ -89,7 +91,7 @@ The \texttt{OptimisticVerifier} contract implements the fraud-proof challenge mo
     \item \texttt{isFinalized(uint256 id)} — Returns true if the commitment is explicitly finalized OR if the challenge period has expired without a dispute. This dual path ensures that finality is recognized whether or not anyone calls the explicit \texttt{finalize()} function.
 \end{enumerate}
 
-\textbf{Challenge period duration}: We set the challenge period to 10 blocks (~2 minutes on a local Hardhat node). Production systems use 7 days~\cite{arbitrum-original}; the compressed window is necessary for experimental tractability while preserving the architectural semantics. Any test scenario can be executed and analyzed in seconds rather than days.
+\textbf{Challenge period duration}: We set the challenge period to 10 L1 blocks. Production systems use 7 days~\cite{arbitrum-original}; the compressed window is necessary for experimental tractability while preserving the architectural semantics. Hardhat mines only on transactions, so the window has no fixed wall-clock duration; any test scenario can be executed and analysed in seconds rather than days.
 
 \textbf{Dispute resolution}: In production Arbitrum and Optimism, a valid fraud proof requires an interactive bisection game followed by on-chain re-execution of a single VM step. Here, we record a dispute but do not re-execute; the challenge simply invalidates the root. This simplification removes the largest source of complexity while preserving the core property: incorrect state roots can be challenged and prevented from reaching finality.
 
@@ -112,7 +114,7 @@ The sequencers are implemented as independent Python processes using Flask~\cite
         \hline
         & \textbf{ZK Sequencer} & \textbf{Optimistic Sequencer} \\
         \hline
-        Commitment step & Two SHA-256 hashes & One SHA-256 hash \\
+        Commitment step & keccak256 Merkle commitment + mock proof & same commitment, no proof \\
         \hline
         Batch threshold & 100 transactions & 200 transactions \\
         \hline
@@ -160,7 +162,7 @@ The Flask HTTP API exposes three endpoints:
 
 Both sequencers export Prometheus metrics on dedicated ports (9100 for ZK, 9101 for Optimistic), enabling the monitoring stack to observe finality latency, proof generation time, and other real-time data.
 
-\textbf{Implementation simplification}: In production systems, the sequencer also performs state execution (applying transactions to a state tree, updating storage, etc.). This framework omits that step and uses synthetic state roots (SHA-256 hashes of batch data). This simplification allows the framework to run on modest hardware while preserving the key architectural difference: ZK requires proof generation at every submission, while Optimistic does not. The comparative analysis in Chapter~\ref{ch:evaluation} remains valid because it measures the differences that matter—finality latency, throughput, and proof generation time—regardless of whether state execution is simplified.
+\textbf{Implementation simplification}: In production systems, the sequencer also performs state execution (applying transactions to a state tree, updating storage, etc.). This framework omits that step and uses deterministic keccak256 Merkle batch commitments over ABI-encoded \texttt{(from,to,value)} tuples (not post-execution state trie roots). This simplification allows the framework to run on modest hardware while preserving the key architectural difference: ZK requires a mock proof at every submission, while Optimistic does not. The comparative analysis in Chapter~\ref{ch:evaluation} remains valid because it measures the differences that matter—finality latency, throughput, and proof generation time—regardless of whether state execution is simplified.
 
 Both sequencer implementations are available in the framework repository: \texttt{l2-zk/sequencer.py} and \texttt{l2-optimistic/sequencer.py}.
 
@@ -213,9 +215,9 @@ The framework includes 21 automated tests distributed across three tiers. Each t
 
 \subsection{Test Structure}
 
-\textbf{Unit tests} cover ten cases: five for each sequencer. Each test instantiates a fresh sequencer object so that metric state accumulated in one test does not carry into the next. The ZK unit tests check that the batch threshold fires at exactly 100 transactions, that the commitment step produces a 32-byte state root and a non-empty proof, that the throughput gauge computes correctly from a known transaction count and elapsed time, and that an RPC failure during Layer~1 submission leaves the batch counter at zero. The Optimistic unit tests apply the same categories of check at the 200-transaction threshold—confirming the absence of a second hash call (no proof step), that the finality timestamp is recorded, and that the HTTP metrics endpoint returns the required fields.
+\textbf{Unit tests} cover nineteen cases: nine canonical-commitment tests plus five for each sequencer. Each sequencer test instantiates a fresh object so that metric state accumulated in one test does not carry into the next. The commitment tests verify the golden vector, determinism, order independence, odd/empty batches, explicit ABI field order, Merkle inclusion with tamper rejection, and proof domain separation. The ZK unit tests check that the batch threshold fires at exactly 100 transactions, that the commitment step produces a 32-byte batch commitment and a non-empty mock proof, that the throughput gauge computes correctly from a known transaction count and elapsed time, and that an RPC failure during Layer~1 submission leaves the batch counter at zero. The Optimistic unit tests apply the same categories of check at the 200-transaction threshold—confirming the absence of a proof step, that the finality timestamp is recorded, and that the HTTP metrics endpoint returns the required fields.
 
-\textbf{Integration tests} cover seven scenarios and load both sequencer classes in the same test process using distinct module aliases to prevent name conflicts. The tests verify that 200 transactions submitted to each sequencer produce two ZK batches and one Optimistic batch, that the full pipeline from submission to mock Layer~1 receipt increments the correct counters, that the ZK path performs exactly two SHA-256 operations per batch while the Optimistic path performs one, that 500 transactions produce five ZK batches and two Optimistic batches (with 100 below threshold and left pending), and that both metrics endpoints expose the same core fields.
+\textbf{Integration tests} cover seven scenarios and load both sequencer classes in the same test process using distinct module aliases to prevent name conflicts. The tests verify that 200 transactions submitted to each sequencer produce two ZK batches and one Optimistic batch, that the full pipeline from submission to mock Layer~1 receipt increments the correct counters, that both paths compute the same keccak256 Merkle commitment while only the ZK path adds the domain-separated mock proof step, that 500 transactions produce five ZK batches and two Optimistic batches (with 100 below threshold and left pending), and that both metrics endpoints expose the same core fields.
 
 \textbf{Adversarial tests} cover four failure scenarios. One injects a \texttt{RuntimeError} at the moment the batch threshold fires and verifies that a replacement sequencer starts with clean state. A second applies the same crash scenario to the Optimistic sequencer at its larger threshold. A third introduces a 1.5-second delay inside \texttt{\_batch()} to model Layer~1 inclusion latency and confirms that all transaction counts remain accurate despite the blocking call. A fourth configures the ZK contract mock to reject finalization for a malicious state root and confirms that the Optimistic challenge window shows blocks remaining before finality.
 
@@ -240,12 +242,12 @@ Table~\ref{tab:test-coverage} maps each tier to the research questions it exerci
     \label{tab:test-coverage}
 \end{table}
 
-Figure~\ref{fig:test-results} shows the full test run output from the GitHub Actions CI log, confirming all 21 tests pass on a clean checkout.
+Figure~\ref{fig:test-results} shows the full test run output from the GitHub Actions CI log, confirming all 30 tests pass on a clean checkout.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{tests.png}
-    \caption{All 21 tests passing in the GitHub Actions CI run: 5 ZK unit, 5 Optimistic unit, 7 integration, and 4 adversarial. No Docker stack is required; all network and contract calls are replaced with mocks at import time.}
+    \caption{All 30 Python tests passing in the GitHub Actions CI run: 9 canonical commitment, 5 ZK unit, 5 Optimistic unit, 7 integration, and 4 adversarial. No Docker stack is required; all network and contract calls are replaced with mocks at import time. A separate Hardhat tier of 7 contract tests exercises the real Solidity escrow.}
     \label{fig:test-results}
 \end{figure}
 
@@ -272,12 +274,12 @@ Running \texttt{docker compose build} before each test session is necessary beca
 Individual tiers can be targeted by path:
 
 \begin{verbatim}
-pytest tests/unit/          # 10 tests  (5 ZK, 5 Optimistic)
+pytest tests/unit/          # 19 tests  (9 commitment, 5 ZK, 5 Optimistic)
 pytest tests/integration/   # 7 tests   (dual-sequencer scenarios)
 pytest tests/adversarial/   # 4 tests   (crash, delay, invalid state)
 \end{verbatim}
 
-The expected result is 21 tests passing in under two minutes on any machine with Python~3.9 or later. The same suite runs automatically on every commit via GitHub Actions (\texttt{.github/workflows/ci.yml}).
+The expected result is 30 tests passing in under two minutes on any machine with Python~3.9 or later. The same suite runs automatically on every commit via GitHub Actions (\texttt{.github/workflows/ci.yml}).
 
 \section{Extending the Framework}
 \label{sec:extending}

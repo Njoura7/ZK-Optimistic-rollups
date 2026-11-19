@@ -28,7 +28,7 @@ for i in {1..30}; do
     sleep 2
 done
 
-# Deploy BOTH contracts
+# Deploy both verifiers and two WithdrawalEscrow instances
 echo "Deploying contracts..."
 npx hardhat run scripts/deploy.js --network localhost
 sleep 2

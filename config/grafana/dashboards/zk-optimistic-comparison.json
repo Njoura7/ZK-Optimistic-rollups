@@ -211,9 +211,9 @@
           "refId": "A"
         }
       ],
-      "title": "ZK - Finality Time (P95)",
+      "title": "ZK - L1 Submission Latency (P95)",
       "type": "stat",
-      "description": "Time for ZK batch to achieve L1 finality"
+      "description": "L1 submission-to-receipt latency for ZK batches (NOT protocol finality)"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -289,9 +289,9 @@
           "refId": "A"
         }
       ],
-      "title": "Optimistic - Finality Time (P95)",
+      "title": "Optimistic - L1 Submission Latency (P95)",
       "type": "stat",
-      "description": "Time for Optimistic batch to achieve L1 finality"
+      "description": "L1 submission-to-receipt latency for Optimistic batches (NOT protocol finality)"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -355,7 +355,7 @@
       ],
       "title": "TPS Comparison",
       "type": "timeseries",
-      "description": "Side-by-side TPS comparison between rollup types"
+      "description": "Instantaneous sequencer TPS in the local Hardhat testbed; illustrative only, not a throughput benchmark or thesis evidence."
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -365,7 +365,7 @@
           "custom": {
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "Finality Time (seconds)",
+            "axisLabel": "L1 submission latency (s)",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
@@ -409,17 +409,17 @@
         {
           "expr": "histogram_quantile(0.95, rate(l2_finality_time_seconds_bucket[1m]))",
           "refId": "A",
-          "legendFormat": "ZK P95 Finality"
+          "legendFormat": "ZK P95 L1 submission latency"
         },
         {
           "expr": "histogram_quantile(0.95, rate(opt_l2_finality_time_seconds_bucket[1m]))",
           "refId": "B",
-          "legendFormat": "Optimistic P95 Finality"
+          "legendFormat": "Optimistic P95 L1 submission latency"
         }
       ],
-      "title": "Finality Time Comparison",
+      "title": "L1 Submission Latency Comparison",
       "type": "timeseries",
-      "description": "L2→L1 finality time comparison - key resilience metric"
+      "description": "L1 submission-to-receipt latency comparison - NOT protocol finality. Protocol finality (15 s / 7 days) is an assumption, not measured here."
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -539,9 +539,9 @@
           "legendFormat": "ZK Proof Gen (P95)"
         }
       ],
-      "title": "ZK Proof Generation Time",
+      "title": "ZK Mock Proof Generation Time",
       "type": "timeseries",
-      "description": "ZK proof generation latency - impacts L2 throughput"
+      "description": "Time to compute the MOCK proof (a domain-separated keccak hash, ~8 us). NOT a real SNARK. Real Groth16 is deferred; see docs/PATH_B_GROTH16.md."
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -596,7 +596,7 @@
       ],
       "title": "Optimistic Batch Processing Time",
       "type": "timeseries",
-      "description": "Optimistic batch state-root computation time (no proof) - contrast with ZK proof generation"
+      "description": "Optimistic batch commitment computation time (no proof) - contrast with ZK mock proof generation. Both use the same canonical keccak256 batch commitment."
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -703,7 +703,7 @@
       ],
       "title": "Gas per Batch Comparison",
       "type": "timeseries",
-      "description": "L1 gas units consumed per batch submission. In the mock-proof environment both are ~165–171K (Optimistic stores a larger struct). In production, real Groth16 pairing adds 200–500K gas per ZK submission."
+      "description": "L1 gas units per batch submission. Measured in this mock-proof testbed: ZK ~165K, Optimistic ~171K (Optimistic stores a larger struct). A future real Groth16 verifier would add substantial gas - estimate only, not measured; see docs/PATH_B_GROTH16.md."
     }
   ],
   "refresh": "5s",

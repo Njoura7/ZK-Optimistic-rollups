@@ -58,13 +58,12 @@ All screenshots are captured — the old "4 missing images" TODO is done. There 
 | Run Hardhat contract tests | `docker compose --profile test run --rm --workdir /app/l1 test-runner npx hardhat test` (or `cd l1 && npm test` locally) |
 
 **Key implementation details:**
-- ZK sequencer reads `contracts.json` on every `_batch()` call (lazy load)
-- Optimistic sequencer loads the contract handle once at `__init__`
+- Both sequencers load and cache the contract handle once, with a retry on the next batch if deployment was still pending (Path A audit fix)
 - ZK batch threshold: 100 tx, polling: 5s
 - Optimistic batch threshold: 200 tx, polling: 8s
-- Proof is mocked as two chained SHA-256 hashes (not real SNARKs)
-- Challenge window: 10 blocks in framework (7 days in production)
-- 21 automated Python tests: 5 ZK unit + 5 Optimistic unit + 7 integration + 4 adversarial
+- Proof is a 32-byte domain-separated keccak mock (`MOCK_GROTH16_PROOF_V1`), not a SNARK; see `l2_common/commitment.py` and `docs/IMPLEMENTATION_NOTES.md`
+- Challenge window: 10 L1 blocks in framework (~7 days in production); no fixed wall-clock duration in Hardhat
+- 30 automated Python tests: 9 canonical commitment + 5 ZK unit + 5 Optimistic unit + 7 integration + 4 adversarial
 - All Python tests are fully mocked — they run without the Docker stack
 - 7 Hardhat/JS contract tests for `WithdrawalEscrow.sol` (`l1/test/WithdrawalEscrow.test.js`) — these DO run real Solidity against Hardhat's in-process network (mines blocks directly), unlike the mocked Python tier
 
@@ -129,7 +128,7 @@ Unused but present in `thesis.bib` (harmless): `poon2017plasma`, `scalability-tr
 
 ## Known issues (found during a static build check, no LaTeX toolchain in this repo/CI)
 
-1. **Duplicate figure with a wrong caption**: `fig:finality-comparison` at `evaluation.tex` (~line 195-200) reuses the exact same `dashboards/grafana-top-panels.png` file already shown as `fig:grafana-comparison` (~line 60-65), but its caption claims it's a cropped "(right half of dashboard)" view. It is not a crop — it is the identical full screenshot shown twice. Needs either: (a) drop the duplicate figure and just re-reference `fig:grafana-comparison` in prose, or (b) actually crop the "Finality Time Comparison" panel into its own image.
+1. **Duplicate figure with a wrong caption and unsupported number**: `fig:finality-comparison` at `evaluation.tex` (~line 195-200) reuses the exact same `dashboards/grafana-top-panels.png` file already shown as `fig:grafana-comparison` (~line 60-65), but its caption claims it's a cropped "(right half of dashboard)" view. It is not a crop — it is the identical full screenshot shown twice. Its prose also quotes "P95 = 47.5 ms", for which there is no raw artefact (see `measurement/raw/baseline-path-a.json`). Needs either: (a) drop the duplicate figure, re-reference `fig:grafana-comparison`, and remove the 47.5 ms claim, or (b) caption a real crop of the renamed "L1 Submission Latency Comparison" panel as an illustration only, with no latency number cited from it.
 2. **security.tex is orphaned**: not included in `main.tex` (evaluation.tex absorbed the empirically-testable parts). Content that did NOT carry over and currently exists nowhere else in the thesis: ZK security property breakdown (soundness/zero-knowledge/non-interactivity, prover-availability risk, proof-system-compromise risk), Optimistic withdrawal-latency discussion, the deep-reorg (>7 blocks) scenario, the full data-availability discussion (Validium/Volition alternatives), and the "Practical Implications" operational-guidelines section. Decision pending on whether to fold any of this back in before deleting the file, or drop it for good.
 3. **`fig:batch-flow` is never cross-referenced** from prose (image exists and renders, just no "as shown in Figure X" pointer to it).
 
@@ -155,9 +154,11 @@ specifically asked to change that.
 
 ## What still needs doing
 
-1. **Fix the duplicate-figure/caption bug**: `fig:finality-comparison` in `evaluation.tex`
-   reuses the same image as `fig:grafana-comparison` with a caption that falsely claims it's a
-   crop (deferred by user — do later, before submission).
+1. **Fix the duplicate-figure/caption bug and remove the unsupported 47.5 ms number**:
+   `fig:finality-comparison` in `evaluation.tex` reuses the same image as `fig:grafana-comparison`
+   with a caption that falsely claims it's a crop, and its prose cites a P95 latency with no raw
+   artefact. The Grafana panel was renamed "L1 Submission Latency Comparison" on the Path A
+   branch; treat any screenshot as illustration only, never as measurement evidence.
 2. **Decide security.tex's fate**: reuse/merge remaining content into evaluation.tex, or delete
    the orphaned file. See "Known issues" above for exactly what content would be lost.
 3. **Appendix expansion**: `appendix-deployment.tex` (68 lines) and `appendix-metrics.tex`

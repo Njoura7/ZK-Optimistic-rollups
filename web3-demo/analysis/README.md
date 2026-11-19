@@ -46,6 +46,8 @@ npx hardhat run scripts/generate_sample_data.js --network localhost
 Writes `data/withdrawal_samples.csv`, overwriting it. Each row is one full deposit-wait-claim
 cycle against a freshly submitted commitment (not the single demo commitment `deploy.js` creates),
 with a random deposit amount. The current file has 100 rows per architecture (200 total).
+These are block counts from a scripted mini-exercise on generated data — **not** thesis
+finality measurements and not wall-clock times. Do not cite them as evaluation evidence.
 
 Note on what you'll see: `blocks_to_unlock` will likely come out perfectly constant across every
 run (4 for ZK, 9 for Optimistic) no matter how many samples you generate. That's not a bug — the

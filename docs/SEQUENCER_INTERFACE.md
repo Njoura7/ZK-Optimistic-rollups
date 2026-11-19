@@ -178,7 +178,7 @@ To implement a custom ZK sequencer:
 1. Create a Flask app
 2. Store pending transactions in a list
 3. Every `ZK_BATCH_INTERVAL` seconds, check if pending pool has >= `ZK_BATCH_SIZE` transactions
-4. When threshold is reached, compute state root, generate proof, call contract's submit()
+4. When threshold is reached, compute the canonical keccak256 batch commitment, generate the mock proof, call the contract's `submit()`
 5. Track metrics via the `/metrics` endpoint
 6. Export Prometheus metrics on port 9100 (or configured port)
 
@@ -191,7 +191,7 @@ See `l2-zk/sequencer.py` for the reference implementation.
 Same as ZK but:
 
 1. No proof generation step
-2. Call contract's submit() with only state root
+2. Call the contract's `submit()` with only the batch commitment
 3. Gas limit of 250k (the Optimistic `submit()` still costs ~171k gas, slightly
    more than the ZK path's ~165k, because of its larger commitment struct)
 4. Larger batch size (200 vs 100) and longer interval (8s vs 5s) reflect lower overhead

@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "tests/**"
+      - "l2_common/**"
       - "l2-zk/**"
       - "l2-optimistic/**"
       - "l1/contracts/**"
@@ -23,7 +24,7 @@ concurrency:
 
 jobs:
   test:
-    name: "21 Python tests + 7 Hardhat contract tests"
+    name: "30 Python tests + 7 Hardhat contract tests"
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -38,9 +39,17 @@ jobs:
         # simply overrides the CMD.
         run: docker compose build test-runner
 
+      - name: Unit tests — canonical commitment (9 tests)
+        # Validates: golden vector, determinism, order independence, odd/empty
+        # batches, ABI field order, Merkle inclusion + tamper rejection,
+        # proof domain separation.
+        run: |
+          docker compose --profile test run --rm test-runner \
+            pytest tests/unit/test_commitment.py -v --tb=short
+
       - name: Unit tests — ZK sequencer (5 tests)
-        # Validates: batch threshold at 100 tx, 32-byte state root + non-empty
-        # proof, TPS gauge accuracy, RPC failure isolation, metrics endpoint schema.
+        # Validates: batch threshold at 100 tx, 32-byte batch commitment +
+        # mock proof, TPS gauge accuracy, RPC failure isolation, metrics schema.
         run: |
           docker compose --profile test run --rm test-runner \
             pytest tests/unit/test_zk_sequencer.py -v --tb=short
@@ -54,8 +63,8 @@ jobs:
 
       - name: Integration tests — dual sequencer (7 tests)
         # Validates: side-by-side batch count ratio (2 ZK vs 1 Optimistic for
-        # 200 tx), full pipeline, proof overhead difference (2 vs 1 SHA-256 call),
-        # multi-batch slicing, finality model divergence, schema parity,
+        # 200 tx), full pipeline, shared keccak commitment plus ZK-only mock
+        # proof step, multi-batch slicing, finality model divergence, schema parity,
         # and metric isolation between sequencer instances.
         run: |
           docker compose --profile test run --rm test-runner \
@@ -64,7 +73,8 @@ jobs:
       - name: Adversarial tests — crash and recovery (4 tests)
         # Validates: RuntimeError propagation at ZK batch threshold,
         # clean state on sequencer restart, L1 congestion simulation (1.5s delay),
-        # and malicious state root rejection vs challenge window behaviour.
+        # and malicious-root handling (mocked verifier returns not-finalized;
+        # no on-chain rejection is tested).
         run: |
           docker compose --profile test run --rm test-runner \
             pytest tests/adversarial/ -v --tb=short

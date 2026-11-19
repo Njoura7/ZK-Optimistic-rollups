@@ -148,7 +148,7 @@ def test_no_proof_generation():
 def test_challenge_period_reflected_in_finality():
     """
     Thesis metric: Optimistic finality includes challenge period.
-    In production this is 7 days. In demo it is 10 blocks (~2 min).
+    In production this is 7 days. In demo it is 10 L1 blocks (no fixed wall-clock duration).
     This test validates the finality measurement pipeline is working.
     """
     seq = _make_seq()

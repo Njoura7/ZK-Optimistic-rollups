@@ -8,7 +8,7 @@ The two questions that shaped this thesis both have clear answers. ZK and Optimi
 
 \section{What We Found}
 
-The finality gap is the headline result. ZK achieves true finality around eight times faster than Optimistic in the demo environment; scaled to production parameters---seconds versus a seven-day challenge window---the ratio grows to roughly 672 to one. That is not a framework artefact. It follows directly from the design: one architecture requires a proof before accepting a state transition, the other waits to see if anyone objects.
+The finality gap is the headline result, and it is architectural rather than measured. The ZK rule accepts a proof plus five L1 blocks; the Optimistic rule waits a ten-block challenge window in the demo (about seven days in production). Assuming roughly 15~seconds for ZK gives an assumed production ratio of about 40,320 to one. Both the 15-second and seven-day values are protocol-parameter assumptions, not framework measurements. The difference follows directly from the design: one architecture requires a proof before accepting a batch, the other waits to see if anyone objects.
 
 Throughput and gas tell a more balanced story. ZK processes more transactions per second because its smaller batch threshold keeps the pipeline moving. Optimistic submits fewer batches and spends less total L1 gas for the same workload. Recovery from crashes was symmetric in kind but not in scale: both architectures preserved Layer~1 state integrity and both lost pending transactions, with Optimistic consistently losing more because its larger batch window lets more accumulate before being drained.
 
@@ -22,7 +22,7 @@ That last point shapes what comes next.
 
 \section{Limitations Worth Naming}
 
-Two limitations are structural and worth stating plainly. The ZK proof in the framework is a double SHA-256 hash. It plays the structural role of a proof---submission is gated on it, finality follows immediately---but it contributes nothing meaningful to the overhead figures. Real Groth16 proof generation runs from several hundred milliseconds to minutes on production hardware. The Hardhat environment adds a second layer of simplification: deterministic blocks, zero network latency, no mempool congestion. These were the right trade-offs for a controlled comparison, but they mean the absolute numbers are not portable to a deployed system without adjustment.
+Two limitations are structural and worth stating plainly. The ZK proof in the framework is a domain-separated keccak hash stand-in (about 0.008\,ms at P95), not a SNARK. It plays the structural role of a proof---submission is gated on it---but it contributes nothing meaningful to the overhead figures. Real Groth16 proving runs from seconds to minutes on production hardware; adding it is documented future work in \texttt{docs/PATH\_B\_GROTH16.md} and is not part of this thesis. The Hardhat environment adds a second layer of simplification: deterministic blocks, zero network latency, no mempool congestion. These were the right trade-offs for a controlled comparison, but the absolute numbers are not portable to a deployed system without adjustment.
 
 \section{Where This Framework Could Go}
 

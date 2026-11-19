@@ -29,9 +29,9 @@
 
     <div class="panel zk">
       <div class="panel-header">
-        <h2>ZK rollup <span class="tag">validity proof</span></h2>
+        <h2>ZK rollup <span class="tag">validity-proof model (mock proof)</span></h2>
       </div>
-      <p class="panel-note">Claim unlocks once the batch's proof has a 5-block L1 confirmation — no waiting on anyone else.</p>
+      <p class="panel-note">Claim unlocks after the commitment's 5-block L1 window; the proof is a mock stand-in in this testbed.</p>
       <div class="field">
         <label>Deposit amount (ETH)</label>
         <input id="zk-amount" type="text" value="0.01" />
@@ -64,8 +64,8 @@
   </div>
 
   <p class="footnote">
-    Each escrow supports one deposit-to-claim cycle per container lifecycle. Restart the stack
-    (<code>docker compose restart</code>) to reset both commitments for another run. See
+    Each escrow supports one deposit-to-claim cycle per container lifecycle. Recreate the stack
+    (<code>docker compose down &amp;&amp; docker compose up --build</code>) to reset both commitments for another run. See
     <code>web3-demo/README.md</code> for MetaMask setup.
   </p>
 </div>

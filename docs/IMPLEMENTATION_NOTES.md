@@ -12,6 +12,15 @@ All Path A work lives on branch `path-a-canonical-commitment`. Path B (a real
 Groth16 prover) is deliberately deferred to a separate branch; the plan is in
 `docs/PATH_B_GROTH16.md`.
 
+**Decision (thesis vs. repository):** real Groth16 is **not** implemented in the
+delivered thesis scope. The thesis describes Path A only (canonical keccak batch
+commitment + mock proof), citing the raw artefact
+`measurement/raw/baseline-path-a.json` for all numbers. Path B remains a concrete
+follow-up on a separate repository branch (`path-b-groth16-verifier`), to be
+undertaken after submission or only before submission if there is time to
+re-measure everything. See the "Decision: thesis scope vs. repository follow-up"
+section in `docs/PATH_B_GROTH16.md` for the exact thesis phrasing and rationale.
+
 ## Component status
 
 | Component | Status | What it really is |
@@ -22,7 +31,7 @@ Groth16 prover) is deliberately deferred to a separate branch; the plan is in
 | `ZKVerifier.sol` proof check | **Mock** | `verifyProof` checks the proof prefix is non-zero and a VK-hash binding is non-zero. No BN254 curve or pairing operations. |
 | Verifying key | **Mock** | `MOCK_VK_HASH` constant; no trusted setup, no `zkey`. |
 | Optimistic challenge window | **Real logic, compressed** | 10 L1 blocks in the demo instead of ~7 days in production; fraud-proof *submission* is not implemented, only the window/status. |
-| Finality time labels | **Assumption** | `~15 s` / `~2 min` / `7 days` are protocol parameters, not measured wall-clock values. Hardhat mines on transactions only. |
+| Finality time labels | **Assumption** | `~15 s` / `~2 min` / `7 days` are protocol-parameter assumptions (not this stack); the demo window is 5 / 10 L1 blocks and has no fixed wall-clock duration. Hardhat mines on transactions only. |
 | Gas figures | **Local only** | Hardhat fixed pricing. Useful for relative comparison, not mainnet cost. |
 | Dashboard comparison table | **Presentation only** | Hardcoded qualitative cells; explicitly marked "not evidence" in the UI. Never cite it as a result. |
 | `web3-demo/analysis/` | **Personal practice** | Notebook on generated sample data; explicitly not thesis material. |
@@ -101,8 +110,8 @@ re-submission path in the current implementation.
 
 ### Claims deliberately not reproduced
 
-- `95 ms` proof P95 — no artefact; inconsistent with two SHA-256 hashes.
-  Replaced by the measurement above.
+- `95 ms` proof P95 — no artefact; inconsistent with the current domain-separated
+  keccak mock (~0.008 ms P95). Replaced by the measurement above.
 - `73` / `142` pending losses — no artefact. Replaced by the measured
   deterministic invariant (100 / 200).
 - `39–43%` throughput advantage — no artefact and not a stable metric (TPS is

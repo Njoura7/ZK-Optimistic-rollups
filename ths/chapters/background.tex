@@ -51,14 +51,14 @@ Safety follows from proof soundness: a dishonest sequencer cannot produce a vali
 Proof generation is computationally expensive and adds measurable latency per batch~\cite{zksync-paper}. On-chain verification costs between 200K and 500K gas due to pairing operations~\cite{groth2016size}. Newer schemes such as PLONK~\cite{gabizon2019plonk} and STARKs~\cite{bensasson2018stark} reduce some of these overheads, but Groth16 remains the most widely deployed in production as of this writing.
 
 \textbf{Framework instantiation.}
-\texttt{ZKVerifier.sol} accepts a state root and a mock proof, binding it to a verifying-key hash. Proof generation is simulated in \texttt{l2-zk/sequencer.py} using two chained SHA-256 hashes---one for the state root, one for the proof. This preserves the structural property (proof required at submission; no challenge window) without the hardware cost of real elliptic-curve computation. Batch size and polling interval default to 100~transactions and 5~seconds, reflecting the higher per-batch submission cost relative to the Optimistic path.
+Both sequencers compute the same canonical batch commitment with \texttt{l2\_common.commitment.batch\_merkle\_root}: a keccak256 binary Merkle root over ABI-encoded \texttt{(from,to,value)} tuples. This is a batch commitment, not a post-execution state trie root. \texttt{ZKVerifier.sol} accepts it together with a 32-byte mock proof (a domain-separated keccak hash from \texttt{mock\_proof()}) and binds them to a placeholder verifying-key hash; there is no circuit or pairing check. This preserves the structural property (proof required at submission; no challenge window) without the hardware cost of real elliptic-curve computation. Batch size and polling interval default to 100~transactions and 5~seconds.
 
 % -----------------------------------------
 \section{Optimistic Rollups}
 \label{sec:optimistic}
 % -----------------------------------------
 
-An Optimistic~Rollup posts a state root without a proof and opens a challenge window---a period during which any observer can dispute the commitment by submitting a fraud proof~\cite{arbitrum-original}. In production deployments such as Optimism and Arbitrum, this window is seven days. In this framework it is compressed to ten Layer~1 blocks (approximately two minutes on a local Hardhat node) for experimental tractability.
+An Optimistic~Rollup posts a state root without a proof and opens a challenge window---a period during which any observer can dispute the commitment by submitting a fraud proof~\cite{arbitrum-original}. In production deployments such as Optimism and Arbitrum, this window is seven days. In this framework it is compressed to ten Layer~1 blocks for experimental tractability. Hardhat mines only on transactions, so the window has no fixed wall-clock duration.
 
 Fraud proving in production systems uses a bisection protocol that narrows disagreement to a single instruction, which Layer~1 re-executes~\cite{arbitrum-original,cannon2023}.
 
@@ -71,7 +71,7 @@ Safety depends on what Kalodner et al.~\cite{arbitrum-original} term the at-leas
 The challenge window is the primary usability cost: withdrawals to Layer~1 are delayed by the full window unless a liquidity provider offers early exit for a fee. Full transaction data must be published on-chain so watchers can reconstruct state independently; EIP-4844 blob transactions~\cite{eip4844} reduce this data cost in recent deployments.
 
 \textbf{Framework instantiation.}
-\texttt{l2-optimistic/sequencer.py} submits state roots without proof generation---a single SHA-256 hash of the batch data serves as the state root. Batch size and polling interval default to 200~transactions and 8~seconds. The contract loading strategy differs from the ZK sequencer in one important detail: the Optimistic sequencer loads the verifier contract handle once at startup, while the ZK sequencer reads \texttt{contracts.json} on every batch call. Recovery scenarios are triggered programmatically and observed through Prometheus metrics on port~9101.
+\texttt{l2-optimistic/sequencer.py} submits the same canonical keccak256 Merkle batch commitment without proof generation; both sequencers call \texttt{l2\_common.commitment.batch\_merkle\_root} on ABI-encoded \texttt{(from,to,value)} tuples. Batch size and polling interval default to 200~transactions and 8~seconds. Both sequencers now load and cache the verifier contract handle once, with a retry on the next batch if deployment was still pending. Recovery scenarios are triggered programmatically and observed through Prometheus metrics on port~9101.
 
 Both rollup families move execution off-chain and anchor security on-chain, but differ in the mechanism that links the two: immediate cryptographic verification in the ZK case versus deferred economic enforcement in the Optimistic case. That single design choice drives every difference measured in Chapter~\ref{ch:evaluation}: finality time, per-transaction gas cost, recovery behaviour after a crash, and what happens when an invalid state root is submitted. Table~\ref{tab:bg-summary} puts the two side by side.
 

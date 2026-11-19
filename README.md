@@ -35,7 +35,7 @@ Wait about 90 seconds. You will see `Starting dual rollup dashboard on port 3000
 |------|-----|------------|
 | **Flask dashboard** | http://localhost:3000 | Trigger test scenarios, watch real-time counters |
 | **Web3 withdrawal demo** | http://localhost:3002 | Connect a real MetaMask wallet, deposit ETH, watch the claim button unlock at different speeds per architecture — see `web3-demo/README.md` |
-| **Grafana** | http://localhost:3001 (admin / admin) | Historical graphs, finality and throughput comparison |
+| **Grafana** | http://localhost:3001 (admin / admin) | Historical graphs of TPS and L1 submission-to-receipt latency (not protocol finality) |
 | **Prometheus** | http://localhost:9090 | Raw metric queries, check scrape targets |
 
 Internal endpoints (not for browser use):
@@ -85,7 +85,7 @@ cd l1 && npm test
 | Unit — ZK sequencer | 5 | Batch threshold at 100 tx, 32-byte commitment + proof format, TPS formula, RPC failure isolation, metrics endpoint schema |
 | Unit — Optimistic sequencer | 5 | Batch threshold at 200 tx, absence of proof step, finality observation, polling interval, metrics endpoint schema |
 | Integration — dual sequencer | 7 | Side-by-side batch ratios (2 ZK vs 1 Optimistic for 200 tx), full pipeline, shared commitment + ZK-only proof step, multi-batch slicing, schema parity, metric isolation |
-| Adversarial — crash and recovery | 4 | ZK crash at batch threshold, Optimistic crash at its larger threshold, 1.5-second L1 congestion delay, malicious state root rejection |
+| Adversarial — crash and recovery | 4 | ZK crash at batch threshold, Optimistic crash at its larger threshold, 1.5-second L1 congestion delay, malicious-root handling (mocked verifier returns not-finalized; no on-chain rejection tested) |
 
 If a previous pytest run left cache files behind:
 ```bash
@@ -209,7 +209,7 @@ no absolute gas figures are published here.
 │   │   ├── OptimisticVerifier.sol   # Challenge window enforcement
 │   │   └── WithdrawalEscrow.sol     # Deposit/claim gated by isFinalized()
 │   ├── test/WithdrawalEscrow.test.js # Hardhat contract tests (7 tests)
-│   └── scripts/deploy.js            # Deploys all four contracts to Hardhat
+│   └── scripts/deploy.js            # Deploys ZKVerifier, OptimisticVerifier and two WithdrawalEscrow instances
 ├── l2_common/
 │   └── commitment.py                # Shared canonical batch commitment (Path A)
 ├── l2-zk/sequencer.py               # ZK sequencer (port 5000, metrics 9100)
@@ -249,6 +249,11 @@ no absolute gas figures are published here.
   A real Groth16 prover would take seconds and require an on-chain pairing
   check; the architecture (a proof is required before submission) is preserved
   but the cost is not. `docs/PATH_B_GROTH16.md` explains how to add it.
+  **Decision:** real Groth16 is *not* part of the delivered thesis scope; it is a
+  documented follow-up planned for a separate repository branch
+  (`path-b-groth16-verifier`), so the Path A baseline and its measurements remain
+  the single source of truth. See the "Decision: thesis scope vs. repository
+  follow-up" section in `docs/PATH_B_GROTH16.md` for the thesis phrasing.
 - **Full state root.** The commitment is a Merkle root over transaction tuples,
   not a post-execution account trie. It is a real, deterministic *batch*
   commitment, but it does not attest to state transitions.

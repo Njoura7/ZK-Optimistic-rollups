@@ -40,27 +40,27 @@ In addition to these performance scenarios, two adversarial scenarios were execu
     \item \textbf{Scenario~E (Invalid State Proposal)}: the sequencer submits a deliberately malformed state root, testing the detection mechanism of each verifier contract.
 \end{enumerate}
 
-Each performance scenario was run for a continuous 5-minute window, with both sequencers operating in parallel against the same L1 node. All reported values are means over three independent runs unless otherwise noted; individual run results were consistent to within $\pm$5\% of the mean.
+The reproducible measurements reported in this chapter are limited to the raw artefact \texttt{measurement/raw/baseline-path-a.json}: batch-commitment and mock-proof timings, per-submission gas, and the deterministic crash-loss invariant. Screenshots of the live dashboard and Grafana are included as illustrations of the running system; they are not measurement evidence. TPS values displayed by the demo are dominated by the rate at which the harness injects HTTP requests and are not treated as an architectural throughput result.
 
 \subsection{Data Validation Before Analysis}
 
-Before interpreting results, each screenshot and data export is checked against three criteria. First, the transaction counters in the Flask dashboard must match the number of transactions submitted by the test scenario; a mismatch indicates a dropped request or a metrics lag. Second, both Grafana panels must show non-zero values for throughput and finality time; zero values after a completed scenario indicate a Prometheus scrape gap and require the scenario to be re-run with a longer post-completion wait. Third, the finality time distributions from the two sequencers must be visually separated: the ZK histogram should plateau around 15 seconds and the Optimistic histogram around 120 seconds in the demo environment. If the two distributions overlap significantly, the challenge period parameter or the Hardhat block production timing should be verified before conclusions are drawn.
+Before interpreting screenshots, two checks are applied. First, the transaction counters in the Flask dashboard must match the number of transactions submitted, so that a dropped request or a metrics lag is visible. Second, Prometheus must show both sequencer scrape targets as up; zero values after a completed scenario indicate a scrape gap and require a longer post-completion wait. The \texttt{*\_finality\_time\_seconds} histograms record L1 submission-to-receipt latency (sub-second in Hardhat), not protocol finality; no claim about finality is derived from them.
 
-These checks apply when screenshots are captured for Figures~\ref{fig:flask-dashboard}, \ref{fig:grafana-comparison}, \ref{fig:throughput-comparison}, and~\ref{fig:finality-comparison}. Any screenshot that fails a check is not used for analysis; instead the scenario is re-run and a new capture is taken.
+These checks apply to the live-system screenshots in Figures~\ref{fig:flask-dashboard}, \ref{fig:grafana-comparison}, \ref{fig:throughput-comparison}, and~\ref{fig:finality-comparison}. The latter two are Grafana panel screenshots illustrating the dashboard, not measured throughput or finality results; no numeric claim is based on them.
 
 Figure~\ref{fig:flask-dashboard} shows the Flask real-time dashboard with both sequencers running. Figure~\ref{fig:grafana-comparison} shows the Grafana metrics dashboard with all comparison panels visible.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{dashboards/flask-dashboard-overview.png}
-    \caption{Flask real-time dashboard during an evaluation run. Left panel: ZK~Rollup showing 900~transactions across 11~batches (100~tx/batch). Right panel: Optimistic~Rollup showing 900~transactions across 7~batches (200~tx/batch). The Architectural Comparison table reflects design-level properties; gas values are updated from live measurements.}
+    \caption{Flask real-time dashboard during a live run. Both panels poll their sequencer's \texttt{/metrics} endpoint; the counters and batch totals depend on which scenarios were run in that container and are illustrative, not a reproducible measurement. The Architectural Comparison table records design-level properties only and is marked ``not evidence'' in the UI.}
     \label{fig:flask-dashboard}
 \end{figure}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{dashboards/grafana-top-panels.png}
-    \caption{Grafana dashboard top row: transaction counters, batch counts, current TPS, and L1 submission latency P95 for both architectures. The 47.5\,ms P95 value shown for both is a histogram interpolation artefact (all observations below the 50\,ms bucket boundary); see Appendix~\ref{app:metrics} for explanation.}
+    \caption{Grafana dashboard top row: transaction counters, batch counts, current TPS and L1 submission-to-receipt latency (P95) for both architectures. The latency panel measures submission latency only; protocol finality (5-block and 10-block rules in the demo) is enforced by the contracts and is not visible here. No numeric latency value is quoted from this screenshot.}
     \label{fig:grafana-comparison}
 \end{figure}
 
@@ -68,43 +68,37 @@ Figure~\ref{fig:flask-dashboard} shows the Flask real-time dashboard with both s
 
 \subsection{Transactions Per Second}
 
-Table~\ref{tab:tps-results} presents the measured peak TPS for each scenario.
+Table~\ref{tab:tps-results} records the TPS gauges displayed by the two sequencers for the three demo scenarios. These readings are shown only to illustrate the live dashboard: they are dominated by the rate at which the harness injects HTTP requests and are not an architectural throughput measurement. No percentage advantage is claimed from them.
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|c|c|c}
+    \begin{tabular}{l|c|c}
         \hline
-        \textbf{Scenario} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Difference} \\
+        \textbf{Scenario} & \textbf{ZK gauge} & \textbf{Optimistic gauge} \\
         \hline
-        Normal (150~tx) & $\sim$25~TPS & $\sim$18~TPS & +39\% ZK \\
+        Normal (150~tx) & illustrative & illustrative \\
         \hline
-        High Load (500~tx) & $\sim$50~TPS & $\sim$35~TPS & +43\% ZK \\
+        High Load (500~tx) & illustrative & illustrative \\
         \hline
-        Batch (250~tx) & $\sim$40~TPS & $\sim$28~TPS & +43\% ZK \\
+        Batch (250~tx) & illustrative & illustrative \\
         \hline
     \end{tabular}
-    \caption{Peak throughput comparison (transactions per second)}
+    \caption{Illustrative TPS gauge readings from the live demo; not a throughput benchmark and not measurement evidence.}
     \label{tab:tps-results}
 \end{table}
 
-Across all three scenarios, the ZK~Rollup achieves 39--43\% higher peak throughput than the Optimistic~Rollup. This advantage arises from the ZK~sequencer's configuration:
-\begin{itemize}
-    \item a smaller batch size (100~transactions versus 200) triggers submissions more frequently;
-    \item a shorter batching interval (5~seconds versus 8~seconds) reduces idle time between batches.
-\end{itemize}
-
-As a result, the ZK~sequencer processes transactions into L1-committed batches at a faster rate. However, this comes at the cost of a higher number of L1 submissions, which we analyze in the next subsection.
+The two sequencers differ in configuration --- a 100-transaction batch every 5 seconds for the ZK path and a 200-transaction batch every 8 seconds for the Optimistic path --- which changes how frequently batches are submitted. Any rate difference observed in the demo follows from these settings and the injection harness, not from the proof mechanism.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{dashboards/grafana-bottom-panels.png}
-    \caption{Grafana dashboard lower panels showing the transaction rate comparison (ZK and Optimistic TX rates overlaid), ZK proof generation time, Optimistic batch processing time, pending transaction queues, and gas per batch comparison. Peak ZK transaction rate: 15.3\,ops/s; peak Optimistic rate: 16.6\,ops/s. Gas per batch: ZK~165\,K, Optimistic~171\,K (mock-proof environment).}
+    \caption{Grafana dashboard lower panels showing the transaction rate comparison, ZK mock proof generation time, Optimistic batch commitment computation time, pending transaction queues, and gas per batch. These panels illustrate live metrics; the reproducible gas figures are reported in Section~\ref{sec:gas}.}
     \label{fig:throughput-comparison}
 \end{figure}
 
 \subsection{Batch Efficiency}
 
-While the ZK~Rollup achieves higher throughput, the Optimistic~Rollup makes more efficient use of each L1 submission. Table~\ref{tab:batch-efficiency} summarizes the batch efficiency metrics measured during a 400-transaction test.
+The Optimistic path makes more efficient use of each L1 submission because its configured batch size is twice as large. Table~\ref{tab:batch-efficiency} records this configuration-derived relationship, not a measured run.
 
 \begin{table}[h]
     \centering
@@ -112,16 +106,14 @@ While the ZK~Rollup achieves higher throughput, the Optimistic~Rollup makes more
         \hline
         \textbf{Metric} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Trade-off} \\
         \hline
-        Batch size & 100~txs & 200~txs & 2$\times$ difference \\
+        Batch threshold & 100~txs & 200~txs & 2$\times$ difference \\
         \hline
-        Batches created (400~tx) & 7 & 4 & 43\% fewer for Optimistic \\
+        Batches per 200~tx & 2 & 1 & 50\% fewer for Optimistic \\
         \hline
-        L1 submissions & 7 & 4 & Higher L1 cost for ZK \\
-        \hline
-        L1 gas per transaction & Higher & Lower & Optimistic cheaper \\
+        L1 submission frequency & higher & lower & L1 cost versus latency \\
         \hline
     \end{tabular}
-    \caption{Batch efficiency comparison}
+    \caption{Batch efficiency derived from the configured thresholds (not a measured workload).}
     \label{tab:batch-efficiency}
 \end{table}
 
@@ -130,15 +122,13 @@ We define batch efficiency as the ratio of transactions processed to L1 submissi
 \text{Batch Efficiency} = \frac{\text{Transactions Batched}}{\text{L1 Submissions}}
 \end{equation}
 
-Under this metric, the ZK~Rollup achieves an efficiency of $400 / 7 \approx 57$~transactions per L1 submission, while the Optimistic~Rollup achieves $400 / 4 = 100$~transactions per L1 submission. This means that the Optimistic~Rollup reduces L1 interaction by approximately 43\% compared to the ZK~Rollup, which translates directly into lower per-transaction gas costs on L1.
-
-This result illustrates a fundamental trade-off: the ZK~Rollup prioritizes low-latency finality (via frequent, smaller batches), while the Optimistic~Rollup prioritizes cost efficiency (via fewer, larger batches).
+For $n$ transactions the ZK path submits $\lceil n/100 \rceil$ batches and the Optimistic path $\lceil n/200 \rceil$, so the latter makes approximately half as many L1 submissions for the same workload. This follows directly from the configuration, not from a measured performance difference. It illustrates the trade-off: the ZK path favours earlier submission (smaller batches), while the Optimistic path favours fewer on-chain transactions (larger batches).
 
 \section{Finality Analysis}
 
 \subsection{L1 Submission Latency}
 
-Table~\ref{tab:l1-latency} shows the measured time from \texttt{send\_raw\_transaction} to receipt, derived from the Prometheus histogram snapshots in Appendix~\ref{app:metrics}. Hardhat's automining mode mines each transaction immediately, so these times reflect Python RPC overhead rather than block production wait time.
+The sequencers export a histogram of the time from \texttt{send\_raw\_transaction} to receipt. Hardhat's automining mode mines each transaction immediately, so these observations reflect Python RPC overhead rather than block production wait time. No raw artefact for this histogram is committed; the table therefore records its scope rather than a P95 value.
 
 \begin{table}[h]
     \centering
@@ -146,87 +136,73 @@ Table~\ref{tab:l1-latency} shows the measured time from \texttt{send\_raw\_trans
         \hline
         \textbf{Metric} & \textbf{ZK Rollup} & \textbf{Optimistic} \\
         \hline
-        Batches submitted & 11 & 7 \\
+        What is measured & submission-to-receipt & submission-to-receipt \\
         \hline
-        Total submission time & 288\,ms & 145\,ms \\
+        Typical magnitude in Hardhat & sub-second & sub-second \\
         \hline
-        Average per batch & 26.2\,ms & 20.7\,ms \\
+        Protocol finality included? & No & No \\
         \hline
-        All observations within & $<50$\,ms & $<50$\,ms \\
+        Committed raw artefact? & No & No \\
         \hline
     \end{tabular}
-    \caption{L1 submission latency from Prometheus histograms (Hardhat automining)}
+    \caption{Scope of the \texttt{*\_finality\_time\_seconds} histograms; no latency figure is quoted from them.}
     \label{tab:l1-latency}
 \end{table}
 
-Both sequencers complete L1 submission in under 50\,ms in every observed batch. The Grafana panels display ``P95 = 47.5\,ms'' for both architectures; this is a histogram interpolation artefact that occurs when all observations fall below the first bucket boundary (50\,ms)---see Appendix~\ref{app:metrics} for the mathematical explanation. L1 submission latency is effectively identical for both architectures. The finality difference is enforced by contract logic, not the submission step.
+Both sequencers complete L1 submission in well under a second in Hardhat's automining mode. The Grafana panels formerly labelled ``Finality Time'' now use the name \emph{L1 Submission Latency} to make this distinction explicit. This chapter does not quote a P95 value from a screenshot. The finality difference is enforced by contract rules, not by the submission step.
 
-\subsection{True Finality (Architecture-Specific)}
+\subsection{Finality Rules (Not Measured Latencies)}
 
-L1 inclusion is a necessary but not sufficient condition for finality. Each rollup architecture imposes additional requirements before a transaction can be considered truly final. Table~\ref{tab:true-finality} breaks down the complete finality path for each architecture.
-
-\begin{table}[h]
-    \centering
-    \begin{tabular}{l|c|c|c}
-        \hline
-        \textbf{Finality Stage} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Difference} \\
-        \hline
-        L1 inclusion & 4.75s & 4.75s & Identical \\
-        \hline
-        Proof verification & $\sim$15s & --- & ZK-specific \\
-        \hline
-        Challenge period & --- & 10~blocks ($\sim$2~min) & Optimistic-specific \\
-        \hline
-        \textbf{True finality} & \textbf{$\sim$15s} & \textbf{$\sim$2~min} & \textbf{$\sim$8$\times$ faster for ZK} \\
-        \hline
-    \end{tabular}
-    \caption{True finality comparison in the demo environment}
-    \label{tab:true-finality}
-\end{table}
-
-This distinction is critical. In our demo environment, the ZK~Rollup achieves true finality approximately 8 times faster than the Optimistic~Rollup. In a production Ethereum deployment, the gap widens dramatically:
-\begin{itemize}
-    \item \textbf{ZK~Rollup}: L1 inclusion ($\sim$12s) + proof verification ($\sim$2s) + confirmations ($\sim$1s) $\approx$ \textbf{15~seconds}.
-    \item \textbf{Optimistic~Rollup}: L1 inclusion ($\sim$12s) + 7-day challenge period $\approx$ \textbf{604,800~seconds}.
-\end{itemize}
-
-This represents a difference of roughly 672$\times$ in finality time, which has direct implications for applications that depend on fast settlement (such as decentralized exchanges and cross-chain bridges).
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.95\textwidth]{dashboards/grafana-top-panels.png}
-    \caption{Grafana finality time comparison panel (right half of dashboard). Both architectures show P95 = 47.5\,ms for L1 \emph{submission} latency in Hardhat automining mode. Architectural finality---5-block confirmation window for ZK ($\approx$15\,s) and 10-block challenge window for Optimistic ($\approx$2\,min in demo)---is enforced by the smart contracts, not captured in this submission-latency metric.}
-    \label{fig:finality-comparison}
-\end{figure}
-
-\section{Computational Overhead: Proof Generation}
-
-The ZK~Rollup incurs a computational cost that the Optimistic~Rollup avoids: generating a zero-knowledge proof for each batch. Table~\ref{tab:proof-latency} reports the measured proof generation latency.
+L1 inclusion is a necessary but not sufficient condition for finality. Each architecture imposes an additional rule before a transaction is considered final. Table~\ref{tab:true-finality} describes those rules; the wall-clock figures sometimes quoted in prose (about 15 seconds for ZK and seven days for Optimistic) are protocol assumptions, not measurements of this stack.
 
 \begin{table}[h]
     \centering
     \begin{tabular}{l|c|c}
         \hline
-        \textbf{Metric} & \textbf{ZK (proof)} & \textbf{Optimistic (batch hash)} \\
+        \textbf{Finality} & \textbf{ZK Rollup} & \textbf{Optimistic} \\
         \hline
-        Total time (11 / 7 batches) & 1.256\,ms & 1.087\,ms \\
+        Rule in this testbed & proof accepted + 5 L1 blocks & 10 L1 blocks (challenge window) \\
         \hline
-        Average per batch & 0.114\,ms & 0.155\,ms \\
+        Production assumption & $\sim$15~s & $\sim$7~days \\
         \hline
-        All observations within & $<1$\,ms & $<1$\,ms \\
+        Hardhat wall-clock duration & none (mines on transactions only) & none (mines on transactions only) \\
         \hline
     \end{tabular}
-    \caption{Batch computation overhead: ZK proof (SHA-256 mock) vs.\ Optimistic batch hash (SHA-256)}
+    \caption{Finality rules and assumptions; these are not measured latencies.}
+    \label{tab:true-finality}
+\end{table}
+
+The ZK rule is architecturally faster than the Optimistic rule because it does not wait for a challenge window. In production this is commonly summarised as roughly 15 seconds versus a seven-day window, a ratio of about 40,320$\times$ (604,800\,s / 15\,s). That figure is an assumption about protocol parameters, not an experimental result; the earlier 672$\times$ figure was an arithmetic error. Hardhat mines only on transactions, so the demo has no meaningful wall-clock finality, and the previously quoted 8$\times$ demo ratio was a harness artefact. The practical implication for latency-sensitive applications follows from the rule, not from a measured timing.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth]{dashboards/grafana-top-panels.png}
+    \caption{The same Grafana top-row screenshot as Figure~\ref{fig:grafana-comparison}, repeated here next to the finality discussion. Its panels show L1 submission-to-receipt latency, not protocol finality; the 5-block and 10-block rules are enforced by the contracts and are not visible in this metric. No latency value should be cited from the image.}
+    \label{fig:finality-comparison}
+\end{figure}
+
+\section{Computational Overhead: Proof Generation}
+
+Both sequencers first compute the same canonical keccak256 binary Merkle commitment over ABI-encoded \texttt{(from,to,value)} tuples via \texttt{l2\_common.commitment.batch\_merkle\_root}. The ZK path additionally computes a mock proof. Table~\ref{tab:proof-latency} reports the reproducible Path A measurements from \texttt{measurement/raw/baseline-path-a.json}.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|c|c}
+        \hline
+        \textbf{Metric} & \textbf{ZK path} & \textbf{Optimistic path} \\
+        \hline
+        Batch commitment P95 (100~tx) & 3.64\,ms & 3.64\,ms \\
+        \hline
+        Batch commitment P95 (200~tx) & 6.80\,ms & 6.80\,ms \\
+        \hline
+        Mock proof P95 (any batch size) & 0.008\,ms & --- (no proof step) \\
+        \hline
+    \end{tabular}
+    \caption{Reproducible Path A timings (P95); source: \texttt{measurement/raw/baseline-path-a.json}.}
     \label{tab:proof-latency}
 \end{table}
 
-Both sequencers perform a single SHA-256 hash per batch as their computation step (ZK chains two hashes to simulate a proof commitment; Optimistic hashes the batch data for the state root). The measured average is 0.114\,ms for ZK and 0.155\,ms for Optimistic. Both are sub-millisecond and effectively zero relative to the batching intervals (5\,s and 8\,s respectively):
-
-\begin{equation}
-\text{Batch Overhead}_\text{ZK} = \frac{0.114\,\text{ms}}{5000\,\text{ms}} \approx 0.002\%
-\end{equation}
-
-This figure is a lower bound specific to the mock proof. In production, real Groth16 proof generation over the BN254 curve takes 500\,ms to several minutes depending on circuit complexity and hardware. The simulation confirms the structural pipeline is correct; the overhead figure cannot be extrapolated to real prover hardware.
+The mock proof is a single domain-separated keccak hash of the commitment --- not a SNARK --- taking roughly 0.008\,ms at P95. Both paths therefore pay the same commitment cost, and the ZK-only proof step is about three orders of magnitude smaller. This is a lower bound specific to the mock: a real Groth16 prover would take seconds, so the figure cannot be extrapolated to real prover hardware. The plan for such a prover is documented in \texttt{docs/PATH\_B\_GROTH16.md} and is future work, not part of this evaluation.
 
 \section{Security Analysis}
 \label{sec:security}
@@ -268,11 +244,11 @@ Table~\ref{tab:security-models} contrasts the key security properties of each ar
         Censorship risk & Low (anyone can generate a proof) & Medium (requires active challengers) \\
         \hline
     \end{tabular}
-    \caption{Security model comparison}
+    \caption{Security model comparison. These are properties of the architectures in principle; in this testbed the ZK proof is a mock and the on-chain verifier performs only a non-zero check, so none of the guarantees listed here is implemented.}
     \label{tab:security-models}
 \end{table}
 
-The ZK~Rollup's security rests on the soundness of its proof system: a valid proof mathematically guarantees the state transition is correct, so no invalid state can reach L1 storage. The Optimistic~Rollup's security rests on economic incentives: honest challengers are rewarded for detecting fraud, and dishonest sequencers lose posted collateral. The ZK model gives you a cryptographic guarantee by default; the Optimistic model gives you one only if at least one observer is watching and willing to act.
+Architecturally, the ZK model rests on the soundness of a proof system: a real validity proof would guarantee the state transition, while the Optimistic model rests on economic incentives and at least one honest challenger. In this testbed the ZK proof is a domain-separated keccak mock and \texttt{ZKVerifier.verifyProof} checks only non-zero words; the \emph{interface} is preserved but the cryptographic guarantee is not implemented. The distinction is documented in \texttt{docs/IMPLEMENTATION\_NOTES.md}.
 
 \subsection{Challenger Absence: Quantifying the Risk}
 \label{sec:challenger-absence}
@@ -289,21 +265,19 @@ With $p = 0.1$ and $n = 10$ observers, $P(\text{no challenge}) = (0.9)^{10} \app
 n \geq \frac{\ln \varepsilon}{\ln (1 - p)}
 \end{equation}
 
-For $p = 0.1$ and $\varepsilon = 0.01$, this gives $n \geq 44$~independent watchtower nodes. This is a concrete operational requirement, not a theoretical concern: production deployments need active monitoring infrastructure of at least this scale to achieve 99\% confidence that fraud will be caught. The ZK model has no corresponding requirement---invalid proofs are rejected automatically.
+For $p = 0.1$ and $\varepsilon = 0.01$, this gives $n \geq 44$~independent watchtower nodes. This is an illustration of the monitoring burden implied by the optimistic assumption, not a measurement of this testbed. A production ZK rollup has no corresponding watchtower requirement because a real validity proof rejects invalid state; the mock verifier here does not implement that guarantee.
 
 \subsection{Behavior Under Invalid State Proposals}
 \label{sec:invalid-state}
 
-Scenario~E submitted a deliberately incorrect state root to each verifier contract.
+Scenario~E exercised malicious-root handling in the mocked adversarial harness. The Python tests configure a verifier \texttt{MagicMock} to return \texttt{False} and assert that the sequencer treats the commitment as not finalised. This tests the sequencer's control flow only: no on-chain rejection is exercised. The deployed \texttt{ZKVerifier} accepts any non-zero 32-byte proof word and has no binding between proof and root, so an on-chain mock verifier would \emph{not} reject a mismatched proof.
 
-In the \textbf{ZK~Rollup}, the invalid submission was paired with a proof that did not match the claimed state root. The \texttt{ZKVerifier} contract rejected the transaction immediately---the call reverted on-chain, consuming only the gas for the failed call. The invalid state never entered L1 storage. Detection was instantaneous: the ZK model provides \emph{prevent-by-default} security.
-
-In the \textbf{Optimistic~Rollup}, the invalid root was accepted provisionally (as designed). A simulated challenger submitted a \texttt{challenge()} call within the 10-block window. The commitment was marked \texttt{CHALLENGED}, preventing finalization. Total time from submission to challenge: approximately 15~seconds. The Optimistic model provides \emph{detect-and-revert} security---invalid states enter the system but can be removed through the dispute mechanism before finality.
+Architecturally, a real ZK rollup would reject an invalid state at proof verification (\emph{prevent-by-default}), while an optimistic rollup accepts it provisionally and relies on a challenge within the window (\emph{detect-and-revert}). In this testbed only the optimistic status transition (marking a commitment \texttt{CHALLENGED}) is modelled; no real fraud-proof submission is implemented, and no wall-clock timing for a challenge is measured.
 
 \section{Gas Cost Analysis}
 \label{sec:gas}
 
-\emph{Important scope note:} The gas figures in this section come from a local Hardhat node. Hardhat uses a fixed gas price and deterministic block production; it does not replicate Ethereum mainnet's market-driven fee auction, EIP-1559 base fee, or real-world congestion. The numbers here are useful for comparing the two architectures \emph{relative to each other}—the ZK path consistently uses more gas than the Optimistic path because of the proof payload and extra contract storage—but they should not be treated as absolute production cost estimates. Actual mainnet costs depend on gas price, which can vary by an order of magnitude day to day.
+\emph{Important scope note:} The gas figures in this section come from a local Hardhat node with a fixed gas price and deterministic block production; they are useful only for a \emph{relative} comparison, not as production cost estimates. In this testbed the Optimistic submission costs slightly \emph{more} gas per transaction (170,937 versus 165,293) because its commitment struct writes more storage fields; the mock proof adds no meaningful calldata cost. A real Groth16 verifier would change this picture substantially, but that is future work (see \texttt{docs/PATH\_B\_GROTH16.md}), not a measured result.
 
 \subsection{Per-Submission Gas (Hardhat measurements)}
 
@@ -317,31 +291,27 @@ Table~\ref{tab:gas-costs} reports the gas consumed per L1 submission measured di
         \hline
         Gas per submission (measured) & 165,293 & 170,937 \\
         \hline
-        Submissions for 900~tx & 11 & 7 \\
+        Batch threshold & 100 tx & 200 tx \\
         \hline
-        Total gas (900~tx) & 1,818,223 & 1,196,559 \\
-        \hline
-        Avg gas per transaction & $\approx$2,020 & $\approx$1,330 \\
+        Source & Hardhat receipt & Hardhat receipt \\
         \hline
     \end{tabular}
-    \caption{L1 gas cost comparison --- measured from Hardhat transaction receipts}
+    \caption{L1 gas per submission measured from Hardhat receipts; no multi-batch total is reported because no raw artefact supports one.}
     \label{tab:gas-costs}
 \end{table}
 
-The per-submission gas costs are nearly identical in the mock-proof environment (165,293 for ZK vs.\ 170,937 for Optimistic). The Optimistic contract costs slightly more per submission because its \texttt{Commitment} struct writes ten storage fields on first insertion, whereas the ZK verifier writes fewer. The difference is $\approx$3.4\% and within noise.
-
-The total gas advantage for Optimistic ($1.52\times$ lower) comes entirely from \textbf{batch count}: ZK submits 11 batches compared to Optimistic's 7 for the same 900 transactions. This is a direct consequence of the batch size configuration (100 vs.\ 200 transactions). In a production deployment with real Groth16 pairing verification, the ZK per-submission cost would increase by 200K--500K gas for the BN254 \texttt{ecPairing} precompile, making ZK substantially more expensive per submission as well.
+The per-submission gas costs are close (165,293 for ZK versus 170,937 for Optimistic). The Optimistic contract is slightly more expensive because its \texttt{Commitment} struct writes more storage fields. These are single-submission local measurements supporting only a relative comparison; the earlier 1.52$\times$ total-cost and 11-versus-7-batch figures had no reproducible artefact and were removed. Any estimate of real-Groth16 verifier gas is future-work speculation, not a measurement (see \texttt{docs/PATH\_B\_GROTH16.md}).
 
 \subsection{Per-Transaction Cost}
 
-Amortizing the per-submission cost across the actual average batch fill gives the effective gas cost per transaction:
+Amortising the per-submission cost over a full batch gives an indicative figure:
 
 \begin{equation}
-\text{Cost}_{\text{ZK}} = \frac{165{,}293}{82} \approx 2{,}016 \text{ gas/tx}, \quad
-\text{Cost}_{\text{Opt}} = \frac{170{,}937}{129} \approx 1{,}325 \text{ gas/tx}
+\text{Cost}_{\text{ZK}} \approx \frac{165{,}293}{100} \approx 1{,}653 \text{ gas/tx}, \quad
+\text{Cost}_{\text{Opt}} \approx \frac{170{,}937}{200} \approx 855 \text{ gas/tx}
 \end{equation}
 
-The Optimistic path uses $\approx$$1.52\times$ less gas per transaction, driven by its larger batch size. Translating either figure into a dollar cost requires a real mainnet gas price, which the local Hardhat environment does not provide.
+These figures assume full batches and follow from the configured thresholds, not from a measured workload. The Optimistic path is cheaper per transaction because it submits half as often; translating either figure into a dollar cost requires a real mainnet gas price, which Hardhat does not provide.
 
 \section{Adversarial Scenario Results}
 \label{sec:scenarios}
@@ -357,24 +327,24 @@ To evaluate resilience, each sequencer was forcibly terminated (\texttt{SIGKILL}
         \hline
         \textbf{Metric} & \textbf{ZK Rollup} & \textbf{Optimistic} \\
         \hline
-        Transactions in pool at crash & 73 & 142 \\
+        Accepted but unconfirmed at crash & 100 & 200 \\
         \hline
-        Transactions lost & 73 & 142 \\
+        Deterministic loss (batch threshold) & 100 & 200 \\
         \hline
-        Recovery time (process restart) & $<$2s & $<$2s \\
+        Pool persistence across restart & none & none \\
         \hline
-        Time to first new batch post-recovery & $\sim$8s & $\sim$12s \\
+        First batch after restart & after next threshold & after next threshold \\
         \hline
         L1 state consistency preserved & Yes & Yes \\
         \hline
     \end{tabular}
-    \caption{Crash recovery behavior}
+    \caption{Crash-loss invariant measured with the real sequencer classes under mocked RPC: the accepted-but-unconfirmed set equals the batch threshold.}
     \label{tab:crash-recovery}
 \end{table}
 
-Both sequencers lost all in-memory pending transactions upon crash, as neither implementation persists the transaction pool to disk. This is a deliberate design choice for the evaluation framework---production systems typically maintain a write-ahead log or persistent mempool. Crucially, L1 state integrity was preserved in both cases: no partial or inconsistent batches were committed.
+Both sequencers hold their transaction pool in memory only, so a crash loses the accepted-but-unconfirmed set. The reproducible invariant, recorded in \texttt{measurement/raw/baseline-path-a.json}, is deterministic: 100 transactions for ZK and 200 for Optimistic, matching the respective batch thresholds. The earlier 73/142 figures had no raw artefact and were removed. L1 state integrity was preserved in both cases: no partial or inconsistent batches were committed.
 
-The Optimistic sequencer had more transactions in its pool at the time of the crash (142 versus 73) because its larger batch threshold causes transactions to accumulate longer before being drained. This highlights a practical trade-off: larger batch sizes improve gas efficiency but increase the potential data loss window during sequencer failures.
+The larger loss window on the Optimistic path follows directly from its larger batch threshold. This is a design trade-off: larger batches reduce on-chain submission frequency but increase the number of transactions exposed to a sequencer failure.
 
 \section{Discussion}
 
@@ -382,46 +352,46 @@ The Optimistic sequencer had more transactions in its pool at the time of the cr
 
 We now revisit the research questions posed in Chapter~\ref{ch:intro} and evaluate the extent to which our experimental results provide answers.
 
-\textbf{RQ1 (Finality).} Time-to-finality differs by approximately 8$\times$ in the demo environment and by an estimated 672$\times$ in a production Ethereum deployment. The ZK~Rollup achieves true finality in $\sim$15~seconds; the Optimistic~Rollup requires the full challenge period. This confirms that the ZK~Rollup is categorically faster to finalize, though both architectures share identical L1 inclusion latency.
+\textbf{RQ1 (Finality).} Finality is a protocol rule, not a measured wall-clock value. The ZK rule accepts a proof after 5 L1 blocks; the Optimistic rule waits 10 L1 blocks in the demo (about seven days in production). Assuming roughly 15 seconds for ZK versus seven days for Optimistic gives an assumed gap of about 40,320$\times$. Both architectures share the same L1 submission step. This is an architectural comparison, not a measured latency result.
 
-\textbf{RQ2 (L1 Congestion and Reorgs).} Both architectures are equally affected by L1 block production delays, as confirmed by the near-identical L1 inclusion latencies in Table~\ref{tab:l1-latency}. For a 1-block reorganization, the ZK~Rollup recovers in approximately $T_{\text{detect}} + T_{\text{reproof}} + T_{\text{re-include}} \approx 12\text{s} + 0.1\text{ms} + 12\text{s} \approx 24$~seconds, whereas the Optimistic~Rollup must wait for the challenge window to elapse on the new canonical chain---potentially 7~days in production. This asymmetry is architectural: ZK recovery is gated on re-submitting one proof; Optimistic recovery is gated on re-running the full dispute window.
+\textbf{RQ2 (L1 Congestion and Reorgs).} Both architectures are equally affected by L1 block production delays at the submission step. A reorganisation analysis can only be architectural here: Hardhat's deterministic block production does not simulate reorgs. For a real ZK rollup the recovery path would be detect, re-prove and re-include; in this testbed the mock proof takes about 0.008\,ms (P95), so the re-proving term is negligible by construction. An Optimistic rollup must re-run the dispute window on the new canonical chain --- potentially seven days in production. No wall-clock reorg recovery time was measured.
 
-\textbf{RQ3 (Censorship Resistance).} Our crash recovery results (Table~\ref{tab:crash-recovery}) demonstrate that both architectures preserve L1 state integrity through sequencer failures. However, the Optimistic sequencer's larger batch accumulation window means more user transactions are at risk during an outage, weakening its practical censorship resistance unless supplemented by a transaction persistence layer.
+\textbf{RQ3 (Censorship Resistance).} The crash-loss invariant (Table~\ref{tab:crash-recovery}) shows that both sequencers preserve L1 state integrity but lose their in-memory pool: 100 transactions for ZK and 200 for Optimistic, matching their batch thresholds. The larger exposure on the Optimistic path follows from its larger batch size; neither path implements a persistent mempool.
 
-\textbf{RQ4 (Fault-Escape Mechanisms).} The invalid state proposal tests confirm that the ZK~Rollup's escape mechanism is automatic and zero-cost to users (the invalid transaction simply reverts), while the Optimistic~Rollup requires an active challenger who must pay gas to submit the dispute. The economic asymmetry favors the ZK model for user safety.
+\textbf{RQ4 (Fault-Escape Mechanisms).} Architecturally the ZK model rejects invalid state via proof verification while the Optimistic model relies on an active challenger. In this testbed the ZK verifier is a mock that accepts any non-zero proof word, and the adversarial test exercises a mocked verifier returning \texttt{False}; no on-chain rejection is demonstrated. The economic asymmetry is a property of the architecture, not a measured result here.
 
-\textbf{RQ5 (Data Availability).} Both sequencers in our framework post full batch data to L1 calldata, ensuring complete data availability. This design choice means that any observer can independently reconstruct the L2 state from L1 data alone. The cost implications are captured in the gas analysis (Section~\ref{sec:gas}): the ZK path pays more per transaction for this guarantee.
+\textbf{RQ5 (Data Availability).} Both sequencers submit the batch commitment to L1; the full transaction data backing that commitment is not posted in this prototype, so the framework does not demonstrate data availability. Architecturally, posting batch data on-chain would let observers reconstruct state; the gas implications are discussed in Section~\ref{sec:gas}.
 
 \subsection{Summary of Trade-offs}
 
-Table~\ref{tab:tradeoff-summary} consolidates the quantitative findings across all evaluation dimensions into a single comparison.
+Table~\ref{tab:tradeoff-summary} consolidates the findings across all evaluation dimensions. Measured entries come from \texttt{measurement/raw/baseline-path-a.json}; architectural entries are consequences of the design rather than measured results.
 
 \begin{table}[h]
     \centering
     \begin{tabular}{l|c|c|l}
         \hline
-        \textbf{Dimension} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Advantage} \\
+        \textbf{Dimension} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Basis} \\
         \hline
-        Peak TPS & 50 & 35 & ZK (+43\%) \\
+        Batch commitment P95 & 3.64\,ms (100~tx) & 3.64\,ms (100~tx) & measured \\
         \hline
-        Batch efficiency & 57~tx/sub & 100~tx/sub & Optimistic (+75\%) \\
+        Mock proof P95 & 0.008\,ms & none & measured \\
         \hline
-        True finality & $\sim$15s & $\sim$2~min & ZK ($\sim$8$\times$) \\
+        Batch threshold & 100~tx & 200~tx & configuration \\
         \hline
-        Gas per transaction & $\sim$2,020 & $\sim$1,330 & Optimistic ($1.5\times$) \\
+        Gas per submission & 165,293 & 170,937 & measured \\
         \hline
-        Proof overhead & $<$0.01\% (mock) & 0\% & Optimistic \\
+        Finality rule & proof + 5 L1 blocks & 10 L1 blocks & protocol rule \\
         \hline
-        Invalid state detection & Instant & Challenge period & ZK \\
+        Crash loss (accepted, unconfirmed) & 100 & 200 & measured \\
         \hline
-        Crash data loss risk & Lower (smaller pool) & Higher (larger pool) & ZK \\
+        Validity guarantee & mock verifier & challenge model & not implemented \\
         \hline
     \end{tabular}
-    \caption{Consolidated trade-off summary}
+    \caption{Consolidated trade-off summary. Measured values cite the Path A raw artefact; no unsupported performance claims are included.}
     \label{tab:tradeoff-summary}
 \end{table}
 
-The results reveal that neither architecture dominates across all dimensions. The ZK~Rollup excels in finality speed, security guarantees, and throughput, while the Optimistic~Rollup excels in gas efficiency and simplicity. The choice between them is fundamentally application-dependent: latency-sensitive applications benefit from the ZK model, while cost-sensitive applications benefit from the Optimistic model.
+Neither architecture dominates across all dimensions. The ZK path finalises after a shorter rule and has a smaller crash-loss window; the Optimistic path submits less often and is cheaper per transaction in this local testbed. The proof guarantee itself is a mock, so the security comparison is architectural. The choice between them remains application-dependent.
 
 \section{Threats to Validity}
 
@@ -429,14 +399,14 @@ Several factors may limit the generalizability of our experimental results.
 
 \textbf{Internal validity.} The Hardhat local node does not replicate the full complexity of Ethereum mainnet. Block production is deterministic rather than stochastic, gas pricing is fixed rather than market-driven, and there is no network latency between the sequencer and the L1 node. These simplifications mean that absolute latency and gas values should be interpreted as relative comparisons between the two architectures rather than production-grade predictions.
 
-\textbf{Construct validity.} Our ZK proof generation uses a SHA-256 double-hash as a stand-in for a real SNARK prover. While this preserves the structural pattern of the ZK pipeline (compute, prove, verify), it vastly underestimates the computational cost of production proof generation. The 1.9\% overhead figure is therefore a lower bound; production systems report proof generation times in the range of seconds to minutes.
+\textbf{Construct validity.} The ZK proof is a single domain-separated keccak hash (about 0.008\,ms at P95), not a SNARK. It preserves the structural pattern of the pipeline (commit, prove, verify) but vastly underestimates real proving cost; no overhead percentage is claimed from it. A real Groth16 prover is documented as future work in \texttt{docs/PATH\_B\_GROTH16.md}.
 
 \textbf{External validity.} The framework evaluates only two rollup architectures (ZK and Optimistic) with a single configuration each. Varying the batch size, challenge period, or proof system could yield different trade-off profiles. Our results are specific to the chosen parameter settings and should not be extrapolated without re-evaluation under alternative configurations.
 
-\textbf{Statistical validity.} While we report means over three independent runs with consistent results ($\pm$5\%), the number of repetitions is modest. A larger-scale study with statistical hypothesis testing would strengthen the confidence in the observed differences.
+\textbf{Statistical validity.} The measurements reported here are P95 values from the reproducible Path A harness recorded in a single raw artefact, not means over repeated experimental runs. No confidence interval or hypothesis test is claimed; a larger-scale study would be needed to support one.
 
 \section{Summary}
 
-Three findings stand out from this chapter. First, the finality gap is not a narrow performance difference but an architectural one: ZK commits to a cryptographic proof at submission and is done in $\sim$15~seconds; Optimistic defers certainty to a challenge window that takes minutes in the demo and days in production. Second, the gas cost story is counterintuitive---per submission, the two architectures cost nearly the same on a local node. The $1.52\times$ total gas difference comes from ZK submitting 1.57$\times$ more batches, not from any difference in per-submission work. Third, both architectures handle sequencer crashes gracefully at the L1 level, but the Optimistic sequencer's larger batch window means more user transactions are in-flight when a crash occurs.
+Three findings stand out from this chapter. First, the finality gap is architectural: the ZK rule accepts a proof plus five L1 blocks, while the Optimistic rule waits a challenge window of ten L1 blocks in the demo (about seven days in production). Assuming 15 seconds for ZK gives an assumed ratio of roughly 40,320$\times$, not a measurement. Second, per-submission gas is similar (165,293 versus 170,937 on Hardhat), with the Optimistic path slightly more expensive because of its larger commitment struct; no multi-batch total is reported. Third, crash loss is deterministic at 100 ZK versus 200 Optimistic transactions, matching the batch thresholds.
 
-The security analysis (Section~\ref{sec:security}) shows that these performance characteristics map directly onto security posture: ZK prevents invalid state by construction; Optimistic requires active challengers and a monitoring infrastructure of at least 44~independent nodes to achieve 99\% detection confidence.
+The security analysis (Section~\ref{sec:security}) describes architectural posture: a real ZK rollup prevents invalid state by construction, while an optimistic rollup needs active challengers and the illustrative 44-node monitoring calculation. In this prototype the ZK verifier is a mock, so the guarantee is an interface, not an implemented cryptographic property.

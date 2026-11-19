@@ -59,4 +59,9 @@ localhost inside Docker; there is no mainnet connection.
 The proof is a mock and the commitment is a batch commitment (not a full state
 trie root). Gas values come from Hardhat's fixed local pricing. Wall-clock
 "finality" figures quoted in prose are protocol assumptions, not measurements
-of this stack. See `docs/IMPLEMENTATION_NOTES.md` and `docs/PATH_B_GROTH16.md`.
+of this stack. See `docs/IMPLEMENTATION_NOTES.md` for the exact mock/real boundary
+and `docs/PATH_B_GROTH16.md` for the real-Groth16 follow-up. The delivered system
+stays on Path A; real Groth16 is explicitly deferred to a separate repository
+branch (`path-b-groth16-verifier`) and is future work, not part of this
+architecture. Refer to the "Decision: thesis scope vs. repository follow-up"
+section in `docs/PATH_B_GROTH16.md` for the precise thesis wording.

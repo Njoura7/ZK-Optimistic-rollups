@@ -35,7 +35,7 @@ Existing evaluations measure throughput under ideal load, latency when sequencer
 
 \section{Innovation and Contributions}
 
-We built a controlled testbed where both rollup architectures run against the same local Ethereum node~\cite{hardhat2024} under identical conditions, including deliberate failures. We simulate sequencer crashes, submit invalid state roots, and record what each design does. The headline result: ZK achieves true finality around 8~times faster than Optimistic in this environment, and the gap grows to roughly 672~times compared to a production seven-day challenge window.
+We built a controlled testbed where both rollup architectures run against the same local Ethereum node~\cite{hardhat2024} under identical conditions, including deliberate failures. We simulate sequencer crashes, submit invalid commitments, and record what each design does. The headline result is architectural: the ZK path finalises after a proof plus five L1 blocks, while the Optimistic path waits a ten-block challenge window in the demo (about seven days in production). Assuming roughly 15~seconds for ZK, the production gap is about 40,320$\times$ --- a protocol-parameter assumption, not a measured latency. Hardhat mines only on transactions, so the demo has no meaningful wall-clock finality.
 
 Three things make this different from existing work. It is the first controlled head-to-head comparison of both rollup types under adversarial conditions on the same node---existing benchmarks test one architecture in isolation. Every result is reproducible: the testbed starts with one Docker command and produces the same output on any machine. And adding a third rollup type requires only a new Solidity contract and a Python class that follows the existing interface.
 

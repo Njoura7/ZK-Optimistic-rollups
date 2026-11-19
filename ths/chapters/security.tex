@@ -134,7 +134,7 @@ The expected recovery time can be estimated as:
 T_{\text{recovery}} = T_{\text{detection}} + T_{\text{reproof}} + T_{\text{re-inclusion}}
 \end{equation}
 
-For a 1-block reorg on Ethereum: detection~$\approx$~12s, reproof~$\approx$~95ms, re-inclusion~$\approx$~12s, yielding a total recovery time of approximately \textbf{24~seconds}. Importantly, no data is lost during this process.
+For a 1-block reorg on Ethereum, the architectural recovery path is detection, re-proving and re-inclusion. In this testbed the mock proof takes about 0.008~ms at P95, so the re-proving term is negligible by construction and no wall-clock reorg recovery time is measured. Hardhat does not simulate reorganisations. Importantly, the committed L1 state is not corrupted in the modelled scenario.
 
 \subsection{Scenario: Deep Reorg ($>$7~Blocks)}
 

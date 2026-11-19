@@ -1,19 +1,18 @@
 // =============================================================================
-// Deploy Script — ZKVerifier & OptimisticVerifier
+// Deploy Script — ZKVerifier, OptimisticVerifier and two WithdrawalEscrow instances
 //
-// Architecture Reference:
+// Architecture Reference (for FUTURE real Groth16 only — see docs/PATH_B_GROTH16.md):
 //   Scroll ZkEvmVerifierV1 pattern (MIT License)
 //   https://github.com/scroll-tech/scroll/blob/develop/contracts/src/L1/rollup/ZkEvmVerifierV1.sol
 //
-// ZKVerifier implements the Groth16 verification interface demonstrated in
-// Scroll's architecture:
-//   • MOCK_VK_HASH  — stand-in for the circuit's trusted-setup verifying key
-//   • verifyProof() — stub for the BN254 ecPairing precompile check
-//   • Commitment    — stores proofHash and batchSize for on-chain auditability
+// ZKVerifier exposes a Groth16-shaped interface, but the verification body is a
+// MOCK in this testbed:
+//   • MOCK_VK_HASH  — placeholder constant, no trusted setup
+//   • verifyProof() — non-zero prefix + VK-binding check; no ecPairing precompile
+//   • Commitment    — stores proofHash and a batchSize word for ABI continuity
 //
-// Proof byte layout expected by ZKVerifier.submit():
-//   bytes[0..31]   — uint256 batchSize (public signal, big-endian)
-//   bytes[32..287] — Groth16 A (G1) / B (G2) / C (G1) points from snarkjs
+// The submitted "proof" is a 32-byte mock (domain-separated keccak in the
+// sequencers). There are no Groth16 A/B/C points in this code.
 // =============================================================================
 
 const hre = require("hardhat");
@@ -30,15 +29,16 @@ async function main() {
   console.log("✓ ZKVerifier deployed:", zkAddress);
 
   // ---------------------------------------------------------------------------
-  // Demo submission — verifies the contract works and logs Committed event fields
-  // Proof layout: [uint256 batchSize (32 B)] [mock Groth16 A·B·C points (32 B+)]
+  // Demo submission — verifies the contract works and logs Committed event fields.
+  // Demo-only: submit() accepts any non-zero 32-byte proof word; no Groth16 points
+  // are used, and the commitment id below is arbitrary (not a Path A root).
   // ---------------------------------------------------------------------------
   const DEMO_BATCH_SIZE = 100n; // simulate a 100-transaction L2 batch
   const proofBytes = ethers.concat([
-    ethers.zeroPadValue(ethers.toBeHex(DEMO_BATCH_SIZE), 32), // batchSize public signal
-    ethers.id("mock-groth16-proof-ABC-points"), // mock A/B/C point data
+    ethers.zeroPadValue(ethers.toBeHex(DEMO_BATCH_SIZE), 32), // first word, read as batchSize
+    ethers.id("mock-groth16-proof-ABC-points"), // arbitrary extra bytes, not A/B/C points
   ]);
-  const stateRoot = ethers.id("genesis-state-root");
+  const stateRoot = ethers.id("genesis-state-root"); // demo-only, NOT a l2_common.batch_merkle_root value
 
   console.log("  Submitting demo ZK commitment...");
   const submitTx = await zkVerifier.submit(stateRoot, proofBytes);
@@ -64,10 +64,10 @@ async function main() {
   // OptimisticVerifier — Optimism Bedrock architecture reference (MIT License)
   // https://github.com/ethereum-optimism/optimism/blob/develop/packages/contracts-bedrock/src/L1/OptimismPortal2.sol
   //
-  // The Optimistic model accepts state roots without an upfront validity proof.
-  // Correctness is enforced economically: any watcher can file a fraud proof
-  // during the CHALLENGE_PERIOD window.  If no valid challenge is raised, the
-  // commitment reaches HARD_FINAL status and is accepted as canonical.
+  // The Optimistic model accepts batch commitments without an upfront validity
+  // proof. Correctness is enforced economically in the production model: any
+  // watcher can file a fraud proof during the CHALLENGE_PERIOD window. In this
+  // testbed only the window/status are implemented, not fraud-proof submission.
   //
   // Key differences from ZKVerifier logged below:
   //   • No proof bytes are submitted (lower L1 gas, no prover overhead)
@@ -84,7 +84,7 @@ async function main() {
 
   // ---------------------------------------------------------------------------
   // Demo submission — verifies the Optimistic contract works and logs fields
-  // Unlike ZK, no proof bytes needed — just the state root (optimistic assumption)
+  // The optimistic path submits only the batch commitment (no proof bytes).
   // ---------------------------------------------------------------------------
   const optStateRoot = ethers.id("optimistic-genesis-state-root");
   console.log("  Submitting demo Optimistic commitment...");

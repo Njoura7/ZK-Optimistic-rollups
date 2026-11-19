@@ -100,7 +100,7 @@ opt_l2_finality_time_seconds_bucket{le="+Inf"}  7.0
 opt_l2_finality_time_seconds_count               7.0
 opt_l2_finality_time_seconds_sum         0.144820 s   # avg 20.7 ms/batch
 
-# Batch assembly time (SHA-256 only, no proof step)
+# Batch commitment computation (keccak256 Merkle, shared by both paths; no proof step here)
 opt_l2_batch_processing_seconds_bucket{le="0.001"} 7.0
 opt_l2_batch_processing_seconds_bucket{le="0.005"} 7.0
 opt_l2_batch_processing_seconds_count               7.0
