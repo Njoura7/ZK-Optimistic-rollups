@@ -122,7 +122,7 @@ The sequencers are implemented as independent Python processes using Flask~\cite
         \hline
         L1 gas per submission & $\sim$165,000 (Hardhat measured) & $\sim$171,000 (Hardhat measured) \\
         \hline
-        Contract loading & Per \texttt{\_batch()} call (lazy) & Once in \texttt{\_\_init\_\_} \\
+        Contract loading & \multicolumn{2}{l}{Both cache the handle once and retry on the next batch if deployment was pending} \\
         \hline
         L1 call & \texttt{ZKVerifier.submit(root, proof)} & \texttt{OptimisticVerifier.submit(root)} \\
         \hline
@@ -133,9 +133,9 @@ The sequencers are implemented as independent Python processes using Flask~\cite
 
 \textbf{Rationale for these differences}: The Optimistic model does not require proof generation at submission time, so the sequencer can afford larger batches and longer polling intervals. Batches of 200 transactions amortize the fixed gas cost of Layer~1 submission more effectively than 100-transaction batches. The longer polling interval (8 seconds vs. 5 seconds) reflects lower latency pressure: the Optimistic model's challenge window determines finality time, not submission latency.
 
-Conversely, the ZK sequencer's proof generation imposes a computational bottleneck at submission. To keep finality latency low and allow users to see their transactions finalized quickly, the ZK sequencer uses smaller batches and shorter polling intervals. The choice of 100 transactions per batch and 5-second polling is calibrated to keep batch assembly time below 1 second on typical hardware, enabling finality within 5-10 seconds.
+Conversely, the ZK path additionally computes a domain-separated mock proof, so the demo uses smaller batches and shorter polling intervals on that side. The choice of 100 transactions per batch and 5-second polling follows the mock-proof design: batch commitment computation is a few milliseconds (see Section~\ref{sec:proof}). No wall-clock finality is implied, because Hardhat mines only on transactions; the two thresholds are a design-level comparison, not a measured throughput optimum.
 
-The gas allocations reflect the difference in Layer~1 contract work. Measured values are $\sim$165,000 for ZK and $\sim$171,000 for Optimistic per submission. Counter-intuitively, Optimistic costs slightly more per submission because the \texttt{OptimisticVerifier.submit()} function writes a 10-field \texttt{Commitment} struct to storage (ten cold SSTOREs at 20,000 gas each), while \texttt{ZKVerifier.submit()} stores fewer fields. The overall gas difference between the two rollup types comes from batch count, not per-submission cost---see Section~\ref{sec:gas} for the full breakdown.
+The gas allocations reflect the difference in Layer~1 contract work. Measured values are $\sim$165,000 for ZK and $\sim$171,000 for Optimistic per submission. Counter-intuitively, Optimistic costs slightly more per submission because the \texttt{OptimisticVerifier.submit()} function writes a 10-field \texttt{Commitment} struct to storage (ten cold SSTOREs at 20,000 gas each), while \texttt{ZKVerifier.submit()} stores fewer fields. The two paths submit at different frequencies because of their batch thresholds (100 versus 200 transactions); no multi-batch total gas figure is reported here because no raw artefact supports one---see Section~\ref{sec:gas} for the per-submission measurements.
 
 \subsection{Sequencer Implementation Structure}
 
@@ -144,12 +144,7 @@ Both sequencers follow the same four-step structure:
 \begin{enumerate}
     \item \texttt{add\_tx(tx)}: Accept a transaction via HTTP POST and append it to the pending pool.
     \item \texttt{periodic\_batch()}: Background thread that wakes up every N seconds; if the pool has reached the batch threshold, call \texttt{\_batch()}.
-    \item \texttt{\_batch()}: Compute the state root (and proof, if ZK), then submit to Layer~1. The two sequencers differ here in two ways:
-        \begin{itemize}
-            \item The \textbf{ZK sequencer} reads \texttt{/app/contracts.json} on \emph{every} \texttt{\_batch()} call to obtain the verifier address. There is no contract handle stored in \texttt{\_\_init\_\_}. If the file is absent (for example, deployment has not completed), the exception is caught and the batch is dropped silently.
-            \item The \textbf{Optimistic sequencer} calls \texttt{\_init\_contract()} in \texttt{\_\_init\_\_} and stores the contract handle as \texttt{self.contract}. If that initial call failed because the L1 node was not ready, \texttt{\_batch()} retries \texttt{\_init\_contract()} before proceeding.
-        \end{itemize}
-        This difference has a practical effect: the ZK sequencer tolerates a slow deploy by simply skipping batches until the file appears; the Optimistic sequencer needs a successful L1 connection at startup.
+    \item \texttt{\_batch()}: Compute the canonical keccak256 batch commitment (and the mock proof, if ZK), then submit to Layer~1. Both sequencers use the same contract-loading strategy: each calls \texttt{\_init\_contract()} once and caches the handle as \texttt{self.contract}. If deployment was not ready at startup, \texttt{\_batch()} retries the initialisation on the next batch instead of dropping it permanently. This lets both paths tolerate a slow deployment without a fixed wall-clock wait.
     \item \texttt{calculate\_tps()}: Background thread that updates the throughput gauge periodically.
 \end{enumerate}
 
@@ -308,7 +303,7 @@ A scripted run against a freshly deployed stack (\texttt{l1/scripts/demo\_withdr
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{web3-demo/withdrawal-finality-demo.png}
-    \caption{The withdrawal demo after a live MetaMask run, ZK already claimed next to Optimistic still mid-challenge-window.}
+    \caption{The withdrawal demo after a live MetaMask run, ZK already claimed next to Optimistic still mid-challenge-window. This capture predates the current mock-proof labelling in the demo page; the live UI now marks the ZK proof as a mock stand-in.}
     \label{fig:web3-demo}
 \end{figure}
 

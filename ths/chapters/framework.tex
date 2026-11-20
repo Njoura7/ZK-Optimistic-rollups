@@ -79,8 +79,8 @@ We record timestamps at each step. The difference between submission block and f
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.70\textwidth]{architecture/batch-flow.png}
-    \caption{The \texttt{\_batch()} function in both sequencers: the ZK path adds a mock proof hash and reloads \texttt{contracts.json} each call; the Optimistic path uses a preloaded handle and increments a batch counter.}
+    \includegraphics[width=0.70\textwidth,height=0.72\textheight,keepaspectratio]{architecture/batch-flow.png}
+    \caption{The \texttt{\_batch()} function in both sequencers: both compute the same keccak256 Merkle batch commitment; the ZK path additionally computes a domain-separated mock proof. Both cache the verifier handle once and retry on later batches if deployment was still pending.}
     \label{fig:batch-flow}
 \end{figure}
 
