@@ -24,7 +24,7 @@ Five requirements drove the design:
 
 The framework has four components that work together to compare both rollup types.
 
-The first component is a local Ethereum node running Hardhat~\cite{hardhat2024}. This node hosts both the ZKVerifier and OptimisticVerifier contracts. Because both contracts run on the same blockchain instance, any network delay or block timing variation affects both rollups equally. This prevents us from accidentally favoring one architecture.
+The first component is a local Ethereum node running Hardhat~\cite{hardhat2024}. This node hosts both the ZKVerifier and OptimisticVerifier contracts. Because both contracts run on the same blockchain instance, any network delay or block timing variation affects both rollups equally. This prevents us from accidentally favouring one architecture.
 
 The second component is two sequencers, each running as a separate Python process. They run within the same Docker~\cite{docker2024} container and connect to the shared Hardhat node. The ZK sequencer listens on port 5000; the Optimistic sequencer listens on port 5001. Running them as separate processes means if one crashes, the other continues—we can measure failures in isolation.
 
@@ -32,7 +32,7 @@ The third component is a web dashboard built with Flask~\cite{flask2024}. It sho
 
 The fourth component is the metrics stack. Prometheus~\cite{prometheus2024} scrapes metrics from each sequencer (ports 9100 and 9101) and Grafana~\cite{grafana2024} visualises the data. This gives us time-series records we can analyse later.
 
-Figure~\ref{fig:architecture} shows how these pieces connect.
+Figure~\ref{fig:architecture} shows how these pieces connect. Figure~\ref{fig:batch-flow} traces one transaction through them.
 
 \begin{figure}[htbp]
     \centering
@@ -53,13 +53,13 @@ To deploy the framework, we run a single Docker Compose~\cite{compose2024} comma
         \hline
         Finality rule & Record submission block and rule-satisfaction block & L1 blocks \\
         \hline
-        Throughput & Count transactions per time window & Tx/second \\
+        Transaction counters & Record accepted transactions and confirmed batches & Counts \\
         \hline
         Batching & Record batch size and timing & Tx per batch \\
         \hline
         Commitment and mock proof & Time spent computing the batch commitment and, for ZK, the mock proof & Seconds (live histograms); milliseconds (isolated timings) \\
         \hline
-        L1 gas per submission & Gas from Hardhat receipts (local estimate only) & Gas units \\
+        L1 gas per submission & Gas from Hardhat receipts (local receipts only; not a mainnet figure) & Gas units \\
         \hline
         Commitment parity & Check whether both paths derive the same canonical batch commitment & Binary \\
         \hline
@@ -85,7 +85,7 @@ We record the submission block and the block at which the contract rule is satis
 
 \section{Why These Design Choices}
 
-We use a domain-separated keccak hash as a mock proof rather than a real zk-SNARK. Real proofs require elliptic-curve pairing computations and take longer on specialised hardware. The keccak mock avoids that cost and supports repeated test runs. Both sequencers still compute the same batch commitment and submit it to Layer~1—the architectural difference (proof required vs.\ not required) is preserved even though the proof itself is a stand-in. We do not extrapolate the mock timings to production proving cost.
+We use a domain-separated keccak hash as a mock proof rather than a real zk-SNARK. Real proofs require elliptic-curve pairings and are far slower than this mock, often needing specialised hardware. The keccak mock avoids that cost and supports repeated test runs. Both sequencers still compute the same batch commitment and submit it to Layer~1—the architectural difference (proof required vs.\ not required) is preserved even though the proof itself is a stand-in. We do not extrapolate the mock timings to production proving cost.
 
 The ZK batch size is 100 transactions and Optimistic is 200. Larger batches amortise the fixed cost of each Layer~1 submission across more transactions, provided batch assembly remains fast. The ZK path adds a mock proof step, so we use smaller batches and a shorter polling interval; the canonical commitment takes a few milliseconds per batch and the mock proof less than that (Chapter~\ref{ch:evaluation}). The Optimistic path has no proof step, so its batching interval can be longer and its batch larger. These are configuration choices, not a measured throughput optimum.
 
@@ -159,7 +159,7 @@ Table~\ref{tab:tech-stack} lists the technologies used and why each was chosen. 
 
 \section{Configuration}
 
-The framework parameters are configurable via environment variables. This allows researchers to test how different architectural choices affect performance.
+Table~\ref{tab:config-params} lists the framework parameters and their defaults. These values are set in the Compose environment and can be changed to test different architectural choices.
 
 \begin{table}[htbp]
     \centering
@@ -189,12 +189,11 @@ The framework parameters are configurable via environment variables. This allows
     \label{tab:config-params}
 \end{table}
 
-These parameters can be set via Docker environment variables when starting the framework, allowing experimental variation without code changes. For example:
+These parameters are set in \texttt{docker-compose.yml}. Researchers can vary the configuration by editing the relevant environment entry rather than the sequencer code. After changing a value, recreate the stack:
 
 \begin{verbatim}
+# edit the parameter in docker-compose.yml, then:
 docker compose up -d
-# Now modify one parameter and re-run the full stack:
-ZK_BATCH_SIZE=150 OPT_BATCH_INTERVAL=5 docker compose up -d
 \end{verbatim}
 
 This approach lets researchers rerun the harness under a different configuration and compare batch counts, commitment timings, and gas receipts. It does not by itself produce a finality or throughput measurement.

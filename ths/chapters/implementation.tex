@@ -30,7 +30,7 @@ Both contracts follow patterns established in production systems. The \texttt{ZK
 
 The essential architectural difference between the two approaches manifests in the data each contract stores. For ZK, a commitment is final once its proof has been verified and a confirmation delay has elapsed. For Optimistic, a commitment enters a challenge period and becomes final only after that period expires without a successful dispute. Table~\ref{tab:contract-diffs} summarises the data structures that implement this difference. The Optimistic struct occupies nine storage slots against six for ZK, which contributes to the higher per-submission gas in Chapter~\ref{ch:evaluation}.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
     \small
     \setlength{\tabcolsep}{4pt}
@@ -61,23 +61,25 @@ The essential architectural difference between the two approaches manifests in t
     \label{tab:contract-diffs}
 \end{table}
 
+The \texttt{batchSize} fields are ABI placeholders in this prototype, not measured transaction counts.
+
 A terminology note applies throughout this thesis: the field named \texttt{stateRoot} in both contracts holds the canonical keccak256 binary Merkle batch commitment over ABI-encoded \texttt{(from,to,value)} tuples, not a post-execution state trie root. We use ``batch commitment'' for this value and reserve ``state root'' for the general concept in related work.
 
 \subsection{ZKVerifier Contract}
 
-The \texttt{ZKVerifier} contract is the on-chain anchor for the ZK~Rollup path. It accepts proofs submitted by the sequencer and enforces a finality delay before commitments are irreversible. The contract implements two core functions:
+The \texttt{ZKVerifier} contract is the on-chain anchor for the ZK~Rollup path. It accepts proofs submitted by the sequencer and enforces a finality delay before commitments are treated as final. The contract implements two core functions:
 
 \begin{enumerate}
     \item \texttt{submit(bytes32 stateRoot, bytes calldata proof)} — Records a state commitment and its accompanying proof. In this framework, proof verification is mocked: the function checks that a proof is provided but does not execute the full BN254 pairing computation that a production Groth16 verifier would perform. (Production Scroll~\cite{scroll2023} implements the pairing check; we simplify to preserve experimental iteration speed.)
 
-    \item \texttt{isFinalized(uint256 id)} — Returns true if the commitment has been recorded for at least five additional Layer~1 blocks. This simulates the confirmation delay in production systems before a commitment is cryptographically irreversible.
+    \item \texttt{isFinalized(uint256 id)} — Returns true if the commitment has been recorded for at least five additional Layer~1 blocks. This simulates the confirmation delay before a commitment is treated as final.
 \end{enumerate}
 
 The rationale for each design choice is as follows:
 
 \textbf{Proof verification simplification}: Full BN254 pairing verification uses elliptic-curve pairings~\cite{groth2016size}. For this framework, we preserve the architectural semantics (proof is required at submission, no challenge window needed) without that cost. The sequencer still generates a mock proof; the contract still accepts and records it; the only simplification is the verification check itself.
 
-\textbf{Five-block finality}: Production Ethereum-based rollups typically wait for 12--15 block confirmations before treating a commitment as final. We use 5 blocks in this framework to keep experimental runs short while preserving a block-based confirmation delay. We do not simulate Layer~1 reorganisations.
+\textbf{Five-block finality}: We use five additional Layer~1 blocks in this framework to keep experimental runs short while preserving a block-based confirmation delay. This is a testbed rule, not a production timing estimate; the evaluation treats the production ZK delay as an assumption. We do not simulate Layer~1 reorganisations.
 
 \textbf{State structure}: The contract stores a \texttt{Commitment} struct per batch, containing the batch commitment, inclusion block, verification flag, proof hash, batch size, and timestamp. Events are emitted on every submission, allowing the sequencer and dashboard to track finality propagation without polling.
 
@@ -114,7 +116,7 @@ Both sequencers implement the same high-level logic: maintain a pending transact
 
 The sequencers are implemented as independent Python processes using Flask~\cite{flask2024} for HTTP and web3.py~\cite{web3py2024} for Layer~1 interaction. Table~\ref{tab:sequencer-comparison} summarises how the two differ in the commitment step. The gas values come from a local Hardhat node and are not Ethereum mainnet cost estimates.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
     \footnotesize
     \setlength{\tabcolsep}{4pt}
@@ -212,16 +214,16 @@ Underlying the dashboard is a Prometheus~\cite{prometheus2024} metrics collectio
 
 \textbf{Instrumentation scope}: The L1 submission histogram records the time from transaction send to receipt, not protocol finality. It supports the L1 submission part of RQ1. The proof generation histogram records the canonical commitment and the mock proof together in seconds. The pending transaction gauge shows how the batch thresholds hold transactions before submission. We use these signals to check that the implementation follows the rules described earlier, not to compare architectural throughput.
 
-Grafana~\cite{grafana2024} connects to the Prometheus datasource and renders pre-configured dashboards when the Docker Compose~\cite{compose2024} stack starts. The same dashboards load with the stack. The dashboard panels produced by this stack are shown in Chapter~\ref{ch:evaluation} (Figures~\ref{fig:grafana-comparison} and~\ref{fig:throughput-comparison}), where they are discussed alongside the measurement results they display.
+Grafana~\cite{grafana2024} connects to the Prometheus datasource and renders pre-configured dashboards when the Docker Compose~\cite{compose2024} stack starts. The same dashboards load with the stack. The dashboard panels produced by this stack are shown in Chapter~\ref{ch:evaluation} (Figures~\ref{fig:grafana-comparison} and~\ref{fig:throughput-comparison}), where the corresponding counters are discussed alongside the reported results.
 
 \section{Validation Through Automated Tests}
 \label{sec:tests}
 
-The framework includes 30 automated tests distributed across three tiers. Each test replaces the web3 library and the Prometheus client with mock objects at import time, so no Hardhat node or running Docker stack is required. Tests can therefore execute in continuous integration without the startup cost of the full service.
+The framework includes 30 automated tests distributed across three tiers. The sequencer, integration, and adversarial tests inject mock objects for web3 and the Prometheus client at import time; the commitment tests exercise the pure helper directly. None requires a Hardhat node or running Docker stack, so the suite can execute in continuous integration without the startup cost of the full service.
 
 \subsection{Test Structure}
 
-\textbf{Unit tests} cover nineteen cases: nine canonical-commitment tests plus five for each sequencer. Each sequencer test instantiates a fresh object so that metric state accumulated in one test does not carry into the next. The commitment tests verify the golden vector, determinism, order independence, odd/empty batches, explicit ABI field order, Merkle inclusion with tamper rejection, and proof domain separation. The ZK unit tests check that the batch threshold fires at exactly 100 transactions, that the commitment step produces a 32-byte batch commitment and a non-empty mock proof, that the throughput gauge computes correctly from a known transaction count and elapsed time, and that an RPC failure during Layer~1 submission leaves the batch counter at zero. The Optimistic unit tests apply the same categories of check at the 200-transaction threshold—confirming the absence of a proof step, that the finality timestamp is recorded, and that the HTTP metrics endpoint returns the required fields.
+\textbf{Unit tests} cover nineteen cases: nine canonical-commitment tests plus five for each sequencer. Each sequencer test instantiates a fresh object so that metric state accumulated in one test does not carry into the next. The commitment tests verify the golden vector, determinism, order independence, odd/empty batches, explicit ABI field order, Merkle inclusion with tamper rejection, and proof domain separation. The ZK unit tests check that the batch threshold fires at exactly 100 transactions, that the commitment step produces a 32-byte batch commitment and a non-empty mock proof, that a known transaction count and elapsed time yield the expected TPS under the sequencer's formula, and that an RPC failure during Layer~1 submission leaves the batch counter at zero. The Optimistic unit tests apply the same categories of check at the 200-transaction threshold—confirming the absence of a proof step, that the finality timestamp is recorded, and that the HTTP metrics endpoint returns the required fields.
 
 \textbf{Integration tests} cover seven scenarios and load both sequencer classes in the same test process using distinct module aliases to prevent name conflicts. The tests verify that 200 transactions submitted to each sequencer produce two ZK batches and one Optimistic batch, that the full pipeline from submission to mock Layer~1 receipt increments the correct counters, that both paths compute the same keccak256 Merkle commitment while only the ZK path adds the domain-separated mock proof step, that 500 transactions produce five ZK batches and two Optimistic batches (with 100 below threshold and left pending), and that both metrics endpoints expose the same core fields.
 
@@ -229,7 +231,7 @@ The framework includes 30 automated tests distributed across three tiers. Each t
 
 Table~\ref{tab:test-coverage} maps each tier to the research questions it exercises.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
     \small
     \setlength{\tabcolsep}{4pt}
@@ -252,7 +254,7 @@ Table~\ref{tab:test-coverage} maps each tier to the research questions it exerci
     \label{tab:test-coverage}
 \end{table}
 
-Figure~\ref{fig:test-results} shows the full test run output from the GitHub Actions CI log, confirming all 30 tests pass on a clean checkout. The Python suite covers 9 canonical commitment tests, 5 ZK unit tests, 5 Optimistic unit tests, 7 integration tests, and 4 adversarial tests. The suite needs no Docker stack because all network and contract calls are mocked at import time. A separate Hardhat tier of 7 contract tests exercises the real Solidity escrow.
+Figure~\ref{fig:test-results} shows the full test run output from the GitHub Actions CI log, confirming all 30 tests pass on a clean checkout. The Python suite covers 9 canonical commitment tests, 5 ZK unit tests, 5 Optimistic unit tests, 7 integration tests, and 4 adversarial tests. The sequencer, integration, and adversarial tiers need no Docker stack because web3 and the Prometheus client are mocked at import time; the commitment tier uses the pure helper. A separate Hardhat tier of 7 contract tests exercises the real Solidity escrow.
 
 \begin{figure}[htbp]
     \centering
@@ -263,14 +265,14 @@ Figure~\ref{fig:test-results} shows the full test run output from the GitHub Act
 
 \subsection{Running the Tests}
 
-Because every test mocks its external dependencies at import time, the suite needs no running Docker stack, no Hardhat node, and no Ethereum connection. The fastest way to run it is directly from the project root with only four lightweight packages:
+The test suite needs no running Docker stack, no Hardhat node, and no Ethereum connection; the sequencer tiers mock web3 and the Prometheus client, and the commitment tier uses the pure helper. The fastest way to run it is directly from the project root with six lightweight packages:
 
 \begin{verbatim}
 pip install -r requirements-test.txt
 pytest tests/ -v --tb=short
 \end{verbatim}
 
-\texttt{requirements-test.txt} lists only \texttt{flask}, \texttt{flask-cors}, \texttt{pytest}, and \texttt{pytest-mock}---the packages that the sequencer sources import directly. \texttt{web3} and \texttt{prometheus-client} are replaced by \texttt{MagicMock} at import time and do not need to be installed. The full \texttt{requirements.txt} is only needed to run the live application stack.
+\texttt{requirements-test.txt} lists \texttt{flask}, \texttt{flask-cors}, \texttt{pytest}, \texttt{pytest-mock}, \texttt{eth-abi}, and \texttt{eth-utils}. The first four support the tests and the sequencer HTTP layer; the last two are dependencies of the canonical commitment helper. \texttt{web3} and \texttt{prometheus-client} are replaced by \texttt{MagicMock} at import time and do not need to be installed. The full \texttt{requirements.txt} is only needed to run the live application stack.
 
 The same suite can also be executed inside Docker to verify the container build. Two separate commands are required: the first rebuilds the image so that any recent code change is included; the second runs the suite:
 
@@ -302,7 +304,7 @@ Adding a third sequencer type requires five concrete changes. No existing sequen
 
 \textbf{3. Add a service block to \texttt{docker-compose.yml}.} Point it at the new sequencer directory, expose its ports, and set \texttt{L1\_RPC=http://localhost:8545} so it joins the shared Hardhat instance. Prometheus then needs the new target in its scrape config, and Grafana needs panels that query the new metric names.
 
-\textbf{4. Register the metrics port in \texttt{config/prometheus.yml}.} Add one \texttt{- targets: ['zk-rollup:9102']} entry under a new scrape job. All existing Grafana panels are PromQL queries---duplicate a panel, change the metric prefix, and the new sequencer appears in the dashboard without touching Grafana configuration directly.
+\textbf{4. Register the metrics port in \texttt{config/prometheus.yml}.} Add one \texttt{- targets: ['hybrid-rollup:9102']} entry under a new scrape job. All existing Grafana panels are PromQL queries---duplicate a panel, change the metric prefix, and the new sequencer appears in the dashboard without touching Grafana configuration directly.
 
 The Grafana dashboard is driven entirely by PromQL queries against Prometheus. As long as the new sequencer exports metrics with consistent naming (e.g.\ \texttt{hybrid\_l2\_batches\_total}), all existing visualisation panels can be duplicated by editing the query string, requiring no JSON schema changes.
 
@@ -311,7 +313,7 @@ The Grafana dashboard is driven entirely by PromQL queries against Prometheus. A
 \subsection{Example: A Wallet-Connected Withdrawal Client}
 \label{sec:web3-demo}
 
-The \texttt{isFinalized()} interface described above is not only consumed by the test suite. We built a small \texttt{WithdrawalEscrow} contract and a static web page (\texttt{web3-demo/}) that demonstrate the same interface from a user's perspective: a wallet deposits ETH tied to a batch commitment, and a claim function releases it once \texttt{isFinalized()} returns true for that commitment. We deploy the contract twice, once against each verifier, and use ethers.js \cite{ethersjs2024} to connect a browser wallet directly to the Hardhat node with no backend in between.
+The \texttt{isFinalized()} interface described above is not only consumed by the test suite. We built a small \texttt{WithdrawalEscrow} contract and a static web page (\texttt{web3-demo/}) that demonstrate the same interface from a user's perspective: a wallet deposits ETH tied to a batch commitment, and a claim function releases it once \texttt{isFinalized()} returns true for that commitment. We deploy the contract twice, once against each verifier, and use ethers.js~\cite{ethersjs2024} to connect a browser wallet directly to the Hardhat node with no backend in between.
 
 A scripted run against a freshly deployed stack (\texttt{l1/scripts/demo\_withdrawal\_flow.js}) makes the mechanism concrete. We deposit 0.05 ETH into the ZK escrow and check \texttt{isFinalized()} immediately afterward---it already returns true, because the demo commitment, submitted several transactions earlier during deployment, had already cleared its five-block window by the time our deposit landed. The same deposit into the Optimistic escrow returns \texttt{SOFT\_FINAL} with five blocks remaining; a claim attempted at that point reverts with \texttt{Not finalized yet}, and succeeds only after five more blocks are mined, closing out the ten-block challenge window measured from that commitment's own submission point. Both deposits are returned in full; across both round trips the only balance change on the depositor's account is gas, confirming this is a round trip rather than a one-way transfer. The capture in Figure~\ref{fig:web3-demo} comes from a live MetaMask run.
 

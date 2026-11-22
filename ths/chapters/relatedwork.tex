@@ -16,11 +16,11 @@ The systematisation provides a useful taxonomy and analyses security properties 
 
 \subsection{ZK Rollup Research}
 
-Bünz et al.\ introduced Bulletproofs, a proof system that generates efficient zero-knowledge range proofs without a trusted setup ceremony~\cite{zk-efficient-proofs}. By eliminating that ceremony, Bulletproofs removed a significant barrier to deploying zero-knowledge schemes in decentralised settings. Subsequent work extended this toward SNARKs capable of verifying general computation---the foundation for ZK~Rollups over arbitrary smart contract logic.
+Bünz et al.\ introduced Bulletproofs, a proof system that generates efficient zero-knowledge range proofs without a trusted setup ceremony~\cite{zk-efficient-proofs}. By eliminating that ceremony, Bulletproofs removed a significant barrier to deploying zero-knowledge schemes in decentralised settings. General-purpose SNARKs~\cite{groth2016size} underpin ZK~Rollups over arbitrary smart contract logic.
 
 The zkSync documentation describes a ZK~Rollup design focused on proof generation and EVM compatibility~\cite{zksync-paper}. The Scroll project~\cite{scroll2023} describes an on-chain verifier based on a SNARK proof. The \texttt{ZKVerifier} contract in this thesis takes its structural pattern from these designs: a submission function that requires a proof and a finalisation check tied to block confirmation. We compress the confirmation delay to five blocks and replace the BN254 pairing check with a hash comparison, so the framework does not require specialised hardware.
 
-Neither of these bodies of work measures ZK~Rollup behaviour when something breaks---no systematic data exists on finality under Layer~1 reorganisations or sequencer outages. That is the gap this thesis addresses.
+Neither of these bodies of work measures ZK~Rollup behaviour under failure conditions---no systematic data exists on finality under Layer~1 reorganisations or sequencer outages. That is the gap this thesis addresses.
 
 \subsection{Optimistic Rollup Research}
 
@@ -32,7 +32,7 @@ Kalodner et al.\ discuss sequencer liveness, but the cost of failure recovery ha
 
 \section{Industry Implementations}
 
-The design of this framework drew directly from four production codebases. Figure~\ref{fig:impl-repos} shows the GitHub repositories examined; each contributed specific patterns that appear in the verifier contracts or sequencer logic described in Chapter~\ref{ch:implementation}.
+The design of this framework drew directly from five codebases. Figure~\ref{fig:impl-repos} shows the GitHub repositories examined; each contributed specific patterns that appear in the verifier contracts or sequencer logic described in Chapter~\ref{ch:implementation}.
 
 \begin{figure}[htbp]
     \centering
@@ -49,7 +49,7 @@ This is directly relevant to the design in Chapter~\ref{ch:implementation}: the 
 
 \subsection{Optimism}
 
-Optimism introduced the OP Stack, a modular framework that lets other teams deploy rollup chains sharing the same security model~\cite{opstack2023}. Its Bedrock upgrade defines a staged withdrawal lifecycle: pending, soft-final while the challenge window is open, and hard-final once the window closes without a dispute or the withdrawal is explicitly finalised.
+Optimism introduced the OP Stack, a modular framework that lets other teams deploy rollup chains sharing the same security model~\cite{opstack2023}. Optimism's Bedrock upgrade defines a staged withdrawal lifecycle: pending, soft-final while the challenge window is open, and hard-final once the window closes without a dispute or the withdrawal is explicitly finalised.
 
 The \texttt{OptimisticVerifier} contract in this thesis takes this lifecycle model directly from Bedrock. The four states (\texttt{PENDING}, \texttt{SOFT\_FINAL}, \texttt{HARD\_FINAL}, \texttt{CHALLENGED}) let the dashboard and test suite observe transitions between stages. They make the finality rule visible in the contracts; they do not produce a wall-clock latency measurement in Chapter~\ref{ch:evaluation}.
 
@@ -66,17 +66,17 @@ The \texttt{OptimisticVerifier} and \texttt{ZKVerifier} contracts follow the acc
 
 \section{Gap Analysis and Thesis Contribution}
 
-Reading across this literature, four areas come up repeatedly where empirical data is missing. The framework addresses all four directly.
+Reading across this literature, four gaps recur. The framework addresses all four.
 
 \textbf{Finality rule under testbed conditions.} The literature describes the finality properties of both rollup families, but it does not compare them under the same conditions. The framework records the submission block and the block at which each contract's rule is satisfied. The result in Chapter~\ref{ch:evaluation} is a rule difference: the ZK path waits five L1 blocks after proof acceptance and the Optimistic path waits a ten-block challenge window. No wall-clock finality is measured in Hardhat, and the production gap follows from assumed protocol parameters.
 
 \textbf{Loss set after RPC failure.} When the RPC connection drops during batch assembly, the sequencer loses the accepted but unconfirmed set. The controlled comparison records that loss set and checks Layer~1 state integrity; it does not measure restart time. The results show that both sequencers preserve Layer~1 state while losing the pending set. The Optimistic path loses more transactions because its larger batch threshold holds them longer.
 
-\textbf{Controlled comparison.} Existing benchmarks evaluate a single rollup architecture in isolation, making comparison difficult because environmental conditions differ. Running both sequencers against the same Layer~1 node simultaneously, with identical block timing and gas pricing, is the core design choice that makes the results in Chapter~\ref{ch:evaluation} directly comparable.
+\textbf{Proof cost in isolation.} The reviewed designs describe proof generation as a cost but do not provide reproducible isolated timings for the shared batch commitment and the mock proof. We time both helpers directly, so RQ3 compares their relative cost without claiming a production prover measurement.
 
-\textbf{Reproducibility.} Existing performance data for Layer~2 systems comes from mainnet observations or proprietary benchmarks that others cannot replicate. This framework is open-source and deployable with one command. Another researcher can verify every number in Chapter~\ref{ch:evaluation} or run the same scenarios with different parameters.
+\textbf{Reproducibility.} Existing performance data for Layer~2 systems comes from mainnet observations or proprietary benchmarks that others cannot replicate. This framework is open-source and deployable with one command. Another researcher can verify the commitment, timing and loss figures, or run the same scenarios with different parameters.
 
 \section{Where the Existing Literature Leaves Off}
 
-Existing work is either production systems optimised for normal execution or academic papers analysing theoretical properties. What is missing is a direct comparison of both approaches under the same conditions, with the same instrumentation, under adversarial scenarios. This framework addresses that gap.
+Existing work is either production systems optimised for normal execution or academic papers analysing theoretical properties. What is missing is a direct, instrumented comparison of both approaches under adversarial scenarios. This framework addresses that gap.
 Chapter~\ref{ch:framework} describes the design choices that make a controlled comparison possible. Chapter~\ref{ch:implementation} covers the code.

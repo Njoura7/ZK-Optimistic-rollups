@@ -8,7 +8,7 @@ This appendix documents the Prometheus metrics exported by each sequencer, the P
 
 \section{Exported Metrics}
 
-Each sequencer exposes its metrics on a dedicated port: ZK on port~9100, Optimistic on port~9101. A single Prometheus instance scrapes both every five seconds. ZK metrics carry the \texttt{l2\_} prefix; Optimistic metrics carry \texttt{opt\_l2\_}.
+Each sequencer exposes its metrics on a dedicated port: ZK on port~9100, Optimistic on port~9101. A single Prometheus instance scrapes both every five seconds. ZK metrics carry the \texttt{l2\_} prefix; Optimistic metrics carry \texttt{opt\_l2\_}. Table~\ref{tab:metrics-list} lists the exported metrics.
 
 \begin{table}[htbp]
 \centering
@@ -42,7 +42,7 @@ opt\_\allowbreak l2\_\allowbreak batch\_\allowbreak gas\_\allowbreak used & Gaug
 
 \section{Live Metric Snapshot}
 
-The listings below reproduce the raw \texttt{/metrics} output captured from each port after the workload with 900 transactions per sequencer described in Chapter~\ref{ch:evaluation}. They show the live counters and histograms at one point in time. We quote no average or percentile from them: the reproducible timings in Chapter~\ref{ch:evaluation} come from \texttt{measurement/raw/baseline-path-a.json}, and the gas gauges below are Hardhat receipt values also recorded in \texttt{docs/IMPLEMENTATION\_NOTES.md}. All histogram base units are seconds. The ZK \texttt{l2\_proof\_generation\_seconds} timer wraps the canonical commitment and the mock proof together, so it is not comparable to the isolated Path A helper timings.
+Listings~\ref{lst:prometheus-zk} and~\ref{lst:prometheus-opt} reproduce the raw \texttt{/metrics} output captured from each port after the workload with 900 transactions per sequencer described in Chapter~\ref{ch:evaluation}. They show the live counters and histograms at one point in time. We quote no average or percentile from them: the reproducible timings in Chapter~\ref{ch:evaluation} come from \texttt{measurement/raw/baseline-path-a.json}, and the gas gauges below are Hardhat receipt values also recorded in \texttt{docs/IMPLEMENTATION\_NOTES.md}. All histogram base units are seconds. The proof timer is recorded when a batch is assembled, before the L1 submission check, so its count can exceed the batch counter when an assembly does not reach confirmation. The ZK \texttt{l2\_proof\_generation\_seconds} timer wraps the canonical commitment and the mock proof together, so it is not comparable to the isolated Path A helper timings.
 
 \begin{listing}[H]
 \begin{minted}[breaklines=true, breakanywhere=true, fontsize=\footnotesize]{text}
@@ -118,7 +118,7 @@ opt_l2_batch_processing_seconds_count               5.0
 opt_l2_batch_processing_seconds_sum         0.24579787254333496
 
 # Gas of the last batch submission (Hardhat receipt)
-opt_l2_batch_gas_used                       170925.0   # EVM gas units
+opt_l2_batch_gas_used                       170937.0   # EVM gas units
 \end{minted}
 \caption{Optimistic metrics snapshot}
 \label{lst:prometheus-opt}
@@ -126,7 +126,7 @@ opt_l2_batch_gas_used                       170925.0   # EVM gas units
 
 \section{PromQL Queries Used in the Dashboard}
 
-The queries below support the Grafana panels and direct Prometheus exploration at \texttt{localhost:9090}.
+Listing~\ref{lst:promql-queries} supports the Grafana panels and direct Prometheus exploration at \texttt{localhost:9090}.
 
 \begin{listing}[H]
     \begin{minted}[breaklines=true, breakanywhere=true, fontsize=\footnotesize]{text}

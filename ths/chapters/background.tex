@@ -4,7 +4,7 @@
 \chapter{Background: Layer~2 Scaling Solutions}
 \label{ch:background}
 
-Blockchain throughput is limited by design, not accident. This chapter traces why, then maps the ZK and Optimistic responses to that constraint onto the code built for this thesis.
+Blockchain throughput is limited by design, not accident. This chapter traces why, then shows how the ZK and Optimistic responses to that constraint appear in the code built for this thesis.
 
 % -----------------------------------------
 \section{Blockchain Fundamentals}
@@ -17,7 +17,7 @@ A blockchain can be modelled as a state machine. At each block~$t$ the network h
 \begin{equation}
   S_{t+1} = \text{apply}(S_t,\ \text{txs}_t)
 \end{equation}
-Integrity rests on three properties~\cite{wood2014ethereum}: consensus (agreement on transaction ordering), finality (irreversibility of confirmed blocks), and data availability (full auditability by any participant). Layer~2 systems inherit these properties from the base layer rather than building them independently. That inheritance is exactly the commitment that gets posted to Layer~1.
+Integrity rests on three properties~\cite{vansteen2023distributed}: consensus (agreement on transaction ordering), finality (irreversibility of confirmed blocks), and data availability (full auditability by any participant). Layer~2 systems inherit these properties from the base layer rather than building them independently. The commitment posted to Layer~1 is the mechanism through which that inheritance is anchored.
 
 % -----------------------------------------
 \section{The Layer~2 Execution Model}
@@ -38,14 +38,14 @@ The two dominant rollup families differ in what the sequencer submits alongside 
 \label{sec:zk}
 % -----------------------------------------
 
-A ZK~Rollup requires a validity proof with every state commitment~\cite{groth2016size}. The prover computes a zk-SNARK attesting that the transition from $\text{state}_\text{old}$ to $\text{state}_\text{new}$ is correct:
+A ZK~Rollup requires a validity proof with every state commitment~\cite{sok-layer2}. The prover computes a zk-SNARK attesting that the transition from $\text{state}_\text{old}$ to $\text{state}_\text{new}$ is correct:
 \begin{equation}
   \pi = \text{Prove}(\text{state}_\text{old},\ \text{txs},\ \text{state}_\text{new})
 \end{equation}
-The Layer~1 verifier contract accepts or rejects the submission immediately based on the proof alone---no waiting period is needed~\cite{groth2016size}. Production systems use several proof systems, including Groth16, PLONK, and STARKs~\cite{groth2016size,gabizon2019plonk,bensasson2018stark}; the framework replaces the verifier with a mock.
+The Layer~1 verifier contract accepts or rejects the submission immediately based on the proof alone---no waiting period is needed~\cite{sok-layer2}. Production systems use several proof systems, including Groth16, PLONK, and STARKs~\cite{groth2016size,gabizon2019plonk,bensasson2018stark}; the framework replaces the verifier with a mock.
 
 \textbf{Security.}
-Safety follows from proof soundness: a dishonest sequencer cannot produce a valid proof for an incorrect state transition. This is sometimes called the one-honest-prover property~\cite{sok-layer2}---the system remains safe as long as one correct prover exists. Finality is achieved shortly after the proof lands on Layer~1, typically within one block confirmation window.
+Safety follows from proof soundness: a dishonest sequencer cannot produce a valid proof for an incorrect state transition. In this framework finality follows the proof plus five L1 blocks (Chapter~\ref{ch:evaluation}); production parameters differ.
 
 \textbf{Constraints.}
 Proof generation is computationally expensive, and pairing-based verification costs more than a hash comparison~\cite{groth2016size}. The mock proof avoids that cost, so its timing is not a production cost estimate. PLONK~\cite{gabizon2019plonk} and STARKs~\cite{bensasson2018stark} change different parts of that overhead.
@@ -71,11 +71,11 @@ Safety depends on the condition that at least one honest watcher monitors the ch
 The challenge window is the primary usability cost: withdrawals to Layer~1 are delayed by the full window unless a liquidity provider offers early exit for a fee. Full transaction data must be published on-chain so watchers can reconstruct state independently; EIP-4844 blob transactions~\cite{eip4844} reduce this data cost in recent deployments.
 
 \textbf{Framework instantiation.}
-\texttt{l2-optimistic/sequencer.py} submits the same batch commitment without proof generation; both sequencers call \texttt{l2\_common.commitment.batch\_merkle\_root} on ABI-encoded \texttt{(from,to,value)} tuples. Batch size and polling interval default to 200~transactions and 8~seconds. Both sequencers load and cache the verifier contract handle once, with a retry on the next batch if deployment was still pending. Recovery scenarios are triggered programmatically and observed through Prometheus metrics on port~9101.
+\texttt{l2-optimistic/sequencer.py} submits the same batch commitment without proof generation; both sequencers call \texttt{l2\_common.commitment.batch\_merkle\_root} on ABI-encoded \texttt{(from,to,value)} tuples. Batch size and polling interval default to 200~transactions and 8~seconds. Both sequencers load and cache the verifier contract handle once, with a retry on the next batch if deployment was still pending. Recovery scenarios are triggered programmatically and observed through Prometheus metrics on their respective ports (9100 for ZK, 9101 for Optimistic).
 
-Both rollup families move execution off-chain and anchor security on-chain, but differ in the mechanism that links the two: immediate cryptographic verification in the ZK case versus deferred economic enforcement in the Optimistic case. That single design choice drives every difference discussed in Chapter~\ref{ch:evaluation}: the finality rule, per-submission gas cost, recovery behaviour after a crash, and what happens when an invalid batch commitment is submitted. Table~\ref{tab:bg-summary} puts the two side by side. The gas row describes production designs; in this testbed both submissions are close, and the Optimistic path is slightly more expensive because its commitment struct is larger (Chapter~\ref{ch:evaluation}).
+Both rollup families move execution off-chain and anchor security on-chain, but differ in the mechanism that links the two: immediate cryptographic verification in the ZK case versus deferred economic enforcement in the Optimistic case. That design choice underlies the finality rule and invalid-submission handling. The remaining differences come from configuration: batch thresholds drive crash loss, and the on-chain commitment struct drives the small gas difference. Table~\ref{tab:bg-summary} puts the two side by side. The gas row describes production designs; in this testbed both submissions are close, and the Optimistic path is slightly more expensive because its commitment struct is larger (Chapter~\ref{ch:evaluation}).
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
     \small
     \setlength{\tabcolsep}{4pt}
@@ -91,7 +91,7 @@ Both rollup families move execution off-chain and anchor security on-chain, but 
         \hline
         Invalid state detection & Immediate (proof rejection) & After fraud proof (during window) \\
         \hline
-        Security assumption & One honest prover & At least one honest watcher \\
+        Security assumption & Proof soundness & At least one honest watcher \\
         \hline
         Layer~1 gas cost & Proof verification in production & Challenge bookkeeping in production \\
         \hline

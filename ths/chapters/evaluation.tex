@@ -10,7 +10,7 @@ This chapter presents the experimental methodology and results of the comparativ
 
 \subsection{Test Environment}
 
-All experiments were conducted in a containerised environment with the following configuration:
+We ran all experiments in a containerised environment with the following configuration:
 
 \begin{itemize}
     \item \textbf{Host}: a developer laptop with 8\,GB of memory available to Docker
@@ -23,7 +23,7 @@ Hardhat mines a block for each transaction. Both sequencers shared this single L
 
 \subsection{Test Scenarios}
 
-Three primary scenarios were defined to evaluate the framework under different load conditions:
+We defined three primary scenarios to evaluate the framework under different load conditions:
 
 \begin{enumerate}
     \item \textbf{Scenario~A (Normal Load)}: 150~transactions are submitted to each sequencer, representing a moderate workload intended to exercise the basic batching and submission pipeline.
@@ -31,7 +31,7 @@ Three primary scenarios were defined to evaluate the framework under different l
     \item \textbf{Scenario~C (Batch Analysis)}: 250~transactions are submitted to observe batching patterns and L1 submission frequency.
 \end{enumerate}
 
-In addition to these performance scenarios, two adversarial scenarios were executed:
+In addition to these performance scenarios, we executed two adversarial scenarios:
 
 \begin{enumerate}
     \setcounter{enumi}{3}
@@ -43,7 +43,7 @@ The reproducible measurements reported here are the canonical batch-commitment a
 
 \subsection{Data Validation Before Analysis}
 
-Before interpreting screenshots, two checks are applied. First, the transaction counters in the Flask dashboard must match the number of transactions submitted, so that a dropped request or a metrics lag is visible. Second, Prometheus must show both sequencer scrape targets as up; zero values after a completed scenario indicate a scrape gap and require a longer post-completion wait. The \texttt{*\_finality\_time\_seconds} histograms record L1 submission-to-receipt latency (sub-second in Hardhat), not protocol finality; no claim about finality is derived from them.
+Before interpreting screenshots, we apply two checks. First, the transaction counters in the Flask dashboard must match the number of transactions submitted, so that a dropped request or a metrics lag is visible. Second, Prometheus must show both sequencer scrape targets as up; zero values after a completed scenario indicate a scrape gap and require a longer post-completion wait. The \texttt{*\_finality\_time\_seconds} histograms record L1 submission-to-receipt latency (sub-second in Hardhat), not protocol finality; no claim about finality is derived from them.
 
 These checks apply to the live-system screenshots in Figures~\ref{fig:flask-dashboard}, \ref{fig:grafana-comparison}, and~\ref{fig:throughput-comparison}. The two Grafana figures are panel screenshots illustrating the dashboard, not measured throughput or finality results; no numeric claim is based on them.
 
@@ -91,7 +91,7 @@ The Optimistic path makes more efficient use of each L1 submission because its c
         \hline
         \textbf{Metric} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Trade-off} \\
         \hline
-        Batch threshold & 100~txs & 200~txs & 2$\times$ difference \\
+        Batch threshold & 100~tx & 200~tx & 2$\times$ difference \\
         \hline
         Batches per 200~tx & 2 & 1 & 50\% fewer for Optimistic \\
         \hline
@@ -113,7 +113,7 @@ For $n$ transactions the ZK path submits $\lceil n/100 \rceil$ batches and the O
 
 \subsection{L1 Submission Latency}
 
-The sequencers export a histogram of the time from \texttt{send\_raw\_transaction} to receipt. Hardhat's automining mode mines each transaction immediately, so these observations reflect Python RPC overhead rather than block production wait time. No raw artefact for this histogram is committed; the table therefore records its scope rather than a P95 value.
+The sequencers export a histogram of the time from \texttt{send\_raw\_transaction} to receipt. Hardhat's automining mode mines each transaction immediately, so these observations reflect Python RPC overhead rather than block production wait time. No raw artefact for this histogram is committed; Table~\ref{tab:l1-latency} therefore records its scope rather than a P95 value.
 
 \begin{table}[htbp]
     \centering
@@ -143,11 +143,11 @@ Both sequencers complete L1 submission in well under a second in Hardhat's autom
 
 L1 inclusion is a necessary but not sufficient condition for finality. Each architecture imposes an additional rule before a transaction is considered final. Table~\ref{tab:true-finality} describes those rules; the assumed production figures (about 15 seconds for ZK and seven days for Optimistic) are protocol assumptions, not measurements of this stack.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
     \small
     \setlength{\tabcolsep}{4pt}
-    \begin{tabular}{>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{4.6cm}|>{\raggedright\arraybackslash}p{4.6cm}}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{4.6cm}|>{\raggedright\arraybackslash}p{4.6cm}@{}}
         \hline
         \textbf{Finality} & \textbf{ZK Rollup} & \textbf{Optimistic} \\
         \hline
@@ -182,14 +182,16 @@ Both sequencers first compute the same batch commitment via \texttt{l2\_common.c
         \hline
         Batch commitment P95 (200~tx) & 6.80\,ms & 6.80\,ms \\
         \hline
-        Mock proof P95 (any batch size) & 0.008\,ms & --- (no proof step) \\
+        Mock proof P95 (100~tx) & 0.008\,ms & --- (no proof step) \\
+        \hline
+        Mock proof P95 (200~tx) & 0.007\,ms & --- (no proof step) \\
         \hline
     \end{tabular}
     \caption{Path A timings}
     \label{tab:proof-latency}
 \end{table}
 
-The mock proof is a single domain-separated keccak hash of the commitment --- not a SNARK --- taking roughly 0.008\,ms at P95. Both paths therefore pay the same commitment cost, and the ZK-only proof step is about three orders of magnitude smaller. This is a lower bound specific to the mock: a real Groth16 prover is far more expensive, so the figure cannot be extrapolated to real prover hardware. The plan for such a prover is documented in \texttt{docs/PATH\_B\_GROTH16.md} and is future work, not part of this evaluation.
+The mock proof is a single domain-separated keccak hash of the commitment --- not a SNARK --- taking roughly 0.008\,ms at P95 for 100~tx and 0.007\,ms for 200~tx. Both paths therefore pay the same commitment cost, and the ZK-only proof step is about three orders of magnitude smaller. This is a lower bound specific to the mock: a real Groth16 prover is far more expensive, so the figure cannot be extrapolated to real prover hardware. The plan for such a prover is documented in \texttt{docs/PATH\_B\_GROTH16.md} and is future work, not part of this evaluation.
 
 The live \texttt{l2\_proof\_generation\_seconds} histogram wraps the canonical commitment and the mock proof in one timer and records seconds. It is a different quantity from the isolated helper timings above and is not directly comparable to them. We quote no mean or percentile from the live histogram.
 
@@ -210,7 +212,7 @@ Five adversarial scenarios are relevant to any Layer~2 deployment. We assume the
     \item \textbf{Data unavailability}: the sequencer withholds L2 batch data, preventing independent state reconstruction.
 \end{enumerate}
 
-Scenarios~1 and 3 were exercised in the adversarial harness (Sections~\ref{sec:invalid-state} and~\ref{sec:crash} respectively) with mocked RPC or verifier behaviour. Scenarios~2, 4, and 5 are analysed architecturally; Hardhat's deterministic block production does not simulate chain reorganisations, network-level censorship, or data withholding.
+We exercised scenarios~1 and~3 in the adversarial harness (Sections~\ref{sec:invalid-state} and~\ref{sec:crash} respectively) with mocked RPC or verifier behaviour. Scenarios~2, 4, and 5 are analysed architecturally; Hardhat's deterministic block production does not simulate chain reorganisations, network-level censorship, or data withholding.
 
 \subsection{Security Properties Compared}
 
@@ -354,25 +356,25 @@ We revisit the four questions from Chapter~\ref{ch:intro}. For each we state the
 
 \textbf{RQ2 (Crash loss).} We answer the loss set and Layer~1 integrity. A crash discards the in-memory pool: 100 transactions for ZK and 200 for Optimistic, matching the batch thresholds. Layer~1 state stays consistent in both cases. The harness uses the real sequencer classes with a mocked RPC; it does not kill a live process and does not time a restart. Restart time and a persistent mempool remain open.
 
-\textbf{RQ3 (Cost of the proof).} We answer for the canonical commitment and the mock proof in isolation. Both paths pay the same commitment cost: 3.64\,ms at P95 for 100 transactions and 6.80\,ms for 200. The ZK-only mock proof adds about 0.008\,ms. The live \texttt{l2\_proof\_generation\_seconds} histogram measures the commitment and mock proof together in seconds, so it is not comparable to these isolated figures. Real proving cost and an architectural throughput comparison remain open.
+\textbf{RQ3 (Cost of the proof).} We answer for the canonical commitment and the mock proof in isolation. Both paths pay the same commitment cost: 3.64\,ms at P95 for 100 transactions and 6.80\,ms for 200. The ZK-only mock proof adds about 0.008\,ms at 100~tx and 0.007\,ms at 200~tx. The live \texttt{l2\_proof\_generation\_seconds} histogram measures the commitment and mock proof together in seconds, so it is not comparable to these isolated figures. Real proving cost and an architectural throughput comparison remain open.
 
 \textbf{RQ4 (Reproducibility).} We answer from the committed harness. One Docker command starts the stack, the golden vector pins the canonical commitment, and \texttt{measurement/raw/baseline-path-a.json} fixes the timing and loss figures. Chain reorganisations, censorship, and data availability are discussed in Section~\ref{sec:security} but are not tested.
 
 \subsection{Consolidated Trade-offs}
 
-Table~\ref{tab:tradeoff-summary} consolidates the findings across all evaluation dimensions. Measured entries come from \texttt{measurement/raw/baseline-path-a.json}; architectural entries are consequences of the design rather than measured results.
+Table~\ref{tab:tradeoff-summary} consolidates the findings across all evaluation dimensions. Measured timing and loss entries come from \texttt{measurement/raw/baseline-path-a.json}; gas entries come from Hardhat receipts (Appendix~\ref{app:metrics}); architectural entries are consequences of the design rather than measured results.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
     \footnotesize
     \setlength{\tabcolsep}{3pt}
-    \begin{tabular}{>{\raggedright\arraybackslash}p{4.2cm}|>{\raggedright\arraybackslash}p{3.3cm}|>{\raggedright\arraybackslash}p{3.3cm}|>{\raggedright\arraybackslash}p{2.4cm}}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{4.2cm}|>{\raggedright\arraybackslash}p{3.3cm}|>{\raggedright\arraybackslash}p{3.3cm}|>{\raggedright\arraybackslash}p{2.4cm}@{}}
         \hline
         \textbf{Dimension} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Basis} \\
         \hline
         Batch commitment P95 & 3.64\,ms (100~tx) & 3.64\,ms (100~tx) & measured \\
         \hline
-        Mock proof P95 & 0.008\,ms & none & measured \\
+        Mock proof P95 (100~tx) & 0.008\,ms & none & measured \\
         \hline
         Batch threshold & 100~tx & 200~tx & configuration \\
         \hline
@@ -397,7 +399,7 @@ Several factors may limit the generalisability of our experimental results.
 
 \textbf{Internal validity.} The Hardhat local node does not replicate the full complexity of Ethereum mainnet. Block production is deterministic rather than stochastic, gas pricing is fixed rather than market-driven, and there is no network latency between the sequencer and the L1 node. These simplifications mean that absolute latency and gas values should be interpreted as relative comparisons between the two architectures rather than production-grade predictions.
 
-\textbf{Construct validity.} The ZK proof is a single domain-separated keccak hash (about 0.008\,ms at P95), not a SNARK. It preserves the structural pattern of the pipeline (commit, prove, verify) but vastly underestimates real proving cost; no overhead percentage is claimed from it. A real Groth16 prover is documented as future work in \texttt{docs/PATH\_B\_GROTH16.md}.
+\textbf{Construct validity.} The ZK proof is a single domain-separated keccak hash (about 0.008\,ms at P95), not a SNARK. It preserves the structural pattern of the pipeline (commit, prove, verify) but does not measure real proving cost; no overhead percentage is claimed from it. A real Groth16 prover is documented as future work in \texttt{docs/PATH\_B\_GROTH16.md}.
 
 \textbf{External validity.} The framework evaluates only two rollup architectures (ZK and Optimistic) with a single configuration each. Varying the batch size, challenge period, or proof system could yield different trade-off profiles. Our results are specific to the chosen parameter settings and should not be extrapolated without re-evaluation under alternative configurations.
 
