@@ -16,7 +16,7 @@ Five requirements drove the design:
 
 \textbf{Shared Layer~1.} Both rollups run against the same Hardhat node. If they ran against separate nodes or at different times, observed differences could come from the environment rather than the architecture. Sharing a node eliminates that confound.
 
-\textbf{Single-command deployment.} The full testbed starts with \texttt{docker-compose up -{}-build}. Reproducing the results should not require manual configuration steps that differ between machines.
+\textbf{Single-command deployment.} The full testbed starts with \texttt{docker compose up -{}-build}. Reproducing the results should not require manual configuration steps that differ between machines.
 
 \textbf{Sufficient instrumentation.} Every sequencer exports throughput, batch counts, finality latency, and—for ZK—proof generation time. These feed into Prometheus and Grafana for time-series analysis.
 
@@ -58,11 +58,11 @@ To deploy the framework, we run a single Docker Compose~\cite{compose2024} comma
         \hline
         Batching & Record batch size and timing & Tx per batch \\
         \hline
-        Proof generation time & Time ZK sequencer spends computing commitment & Seconds (histogram) \\
+        Commitment and mock proof & Time spent computing the canonical commitment and, for ZK, the mock proof & Seconds at source; reported in milliseconds \\
         \hline
         L1 gas per submission & Gas from Hardhat receipts (local estimate only) & Gas units \\
         \hline
-        State validity & Check if state roots match & Binary \\
+        Commitment parity & Check whether both paths derive the same canonical batch commitment & Binary \\
         \hline
     \end{tabular}
     \caption{Measurement dimensions and methods}
@@ -71,7 +71,7 @@ To deploy the framework, we run a single Docker Compose~\cite{compose2024} comma
 
 \section{How Transactions Flow Through the Framework}
 
-When we submit a transaction, here is what happens. The test scenario sends HTTP POST to one of the sequencers. The sequencer adds the transaction to a pending pool. When the pool reaches a threshold (100 transactions for ZK, 200 for Optimistic), the sequencer creates a batch. The sequencer computes the state root. For ZK, it also generates a proof. Then it sends the commitment to Layer~1.
+When we submit a transaction, here is what happens. The test scenario sends HTTP POST to one of the sequencers. The sequencer adds the transaction to a pending pool. When the pool reaches a threshold (100 transactions for ZK, 200 for Optimistic), the sequencer creates a batch. Both sequencers compute the same canonical keccak256 binary Merkle batch commitment over ABI-encoded \texttt{(from,to,value)} tuples. The ZK path additionally computes a domain-separated mock proof. Then the sequencer sends the commitment to Layer~1.
 
 The Layer~1 contract either verifies the proof (ZK) or opens a challenge window (Optimistic). For ZK, finality happens when the proof is verified and five additional blocks have passed. For Optimistic, finality happens when the challenge window closes and no dispute was filed.
 
@@ -88,7 +88,7 @@ We record timestamps at each step. The difference between submission block and f
 
 We use a domain-separated keccak hash as a mock proof rather than a real zk-SNARK. Real proofs require elliptic-curve pairing computations and, in practice, take seconds to minutes per batch on specialized hardware. The keccak mock lets us run many test scenarios quickly without that bottleneck. Both sequencers still compute the same canonical batch commitment and submit it to Layer~1—the architectural difference (proof required vs.\ not required) is preserved even though the proof itself is a stand-in. Production ZK~Rollups report proof generation times ranging from seconds to minutes per batch, so any overhead figures measured here are only a lower bound.
 
-The ZK batch size is 100 transactions and Optimistic is 200. Larger batches amortize the fixed cost of each Layer~1 submission across more transactions, which is good—but only when batch assembly itself is fast. With ZK, the commitment step is the bottleneck, so smaller batches keep per-transaction latency low. With Optimistic, there is no proof step, so the batching interval can be longer and the batch larger. These numbers reflect the trade-off each model makes.
+The ZK batch size is 100 transactions and Optimistic is 200. Larger batches amortize the fixed cost of each Layer~1 submission across more transactions, which is good—but only when batch assembly itself is fast. The ZK path adds a mock proof step, so we use smaller batches and a shorter polling interval; the canonical commitment takes a few milliseconds per batch and the mock proof less than that (Chapter~\ref{ch:evaluation}). The Optimistic path has no proof step, so its batching interval can be longer and its batch larger. These are configuration choices, not a measured throughput optimum.
 
 The Optimistic challenge window is compressed to 10 L1 blocks from the 7-day production value; Hardhat has no wall-clock block timer, so the window has no fixed duration in minutes. Any evaluation framework needs to complete within a reasonable time. Ten blocks preserves the structural property—invalid state can be challenged before finality—while keeping test runs tractable.
 
@@ -104,19 +104,22 @@ Table~\ref{tab:research-questions} shows how each research question maps to what
     \centering
     \begin{tabular}{l|>{\raggedright\arraybackslash}p{4.5cm}|>{\raggedright\arraybackslash\ttfamily\small}p{5cm}}
         \hline
-        \textbf{Question} & \textbf{What We Measure} & \normalfont\textbf{Test File} \\
+        \textbf{Question} & \textbf{What We Answer} & \normalfont\textbf{Supporting artefact} \\
         \hline
-        RQ1: Finality & Time from submission to finality &
+        RQ1: Finality & Rule parameters and L1 submission step &
             tests/integration/ \newline test\_dual\_sequencer.py \\
         \hline
-        RQ2: Recovery & Time and cost to recover after crash &
+        RQ2: Recovery & Loss set and L1 state integrity &
             tests/adversarial/ \newline test\_sequencer\_crash.py \\
         \hline
-        RQ3: Security cost & Proof generation time and gas overhead &
-            tests/integration/ \newline test\_dual\_sequencer.py \\
+        RQ3: Cost of proof & Canonical commitment and mock proof timings &
+            tests/unit/ \newline test\_commitment.py \\
+        \hline
+        RQ4: Reproducibility & Golden vector and one-command stack &
+            measurement/ \newline capture.py \\
         \hline
     \end{tabular}
-    \caption{Research questions and corresponding test files}
+    \caption{Research questions, the scope of each answer, and its supporting artefact}
     \label{tab:research-questions}
 \end{table}
 
@@ -169,7 +172,7 @@ The framework parameters are configurable via environment variables. This allows
         \hline
         OPT\_BATCH\_INTERVAL & 8 & Seconds between Optimistic batch checks \\
         \hline
-        OPT\_GAS\_LIMIT & 300\,000 & Gas limit for Optimistic submissions; raised from 150\,000 after measuring cold SSTORE cost of the 10-field Commitment struct \\
+        OPT\_GAS\_LIMIT & 250\,000 & Gas limit for Optimistic submissions; raised from 150\,000 after measuring cold SSTORE cost of the 10-field Commitment struct \\
         \hline
         L1\_RPC & \normalfont\small http://localhost:8545 & Layer~1 RPC endpoint \\
         \hline
@@ -181,12 +184,12 @@ The framework parameters are configurable via environment variables. This allows
 These parameters can be set via Docker environment variables when starting the framework, allowing experimental variation without code changes. For example:
 
 \begin{verbatim}
-docker-compose up -d
+docker compose up -d
 # Now modify one parameter and re-run the full stack:
-ZK_BATCH_SIZE=150 OPT_BATCH_INTERVAL=5 docker-compose up -d
+ZK_BATCH_SIZE=150 OPT_BATCH_INTERVAL=5 docker compose up -d
 \end{verbatim}
 
-This approach lets researchers measure how batch size, polling frequency, and gas allocation affect finality latency, throughput, and cost. Changing any parameter and re-running the test suite provides immediate feedback on its impact.
+This approach lets researchers rerun the harness under a different configuration and compare batch counts, commitment timings, and gas receipts. It does not by itself produce a finality or throughput measurement.
 
 \section{What This Chapter Establishes}
 

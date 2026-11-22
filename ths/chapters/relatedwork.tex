@@ -51,7 +51,7 @@ This is directly relevant to the design in Chapter~\ref{ch:implementation}: the 
 
 Optimism introduced the OP Stack, a modular framework that lets other teams deploy rollup chains sharing the same security model~\cite{opstack2023}. Its Bedrock upgrade defined a clear three-stage commitment lifecycle: pending, then soft-final once the challenge window closes without a dispute, then hard-final once explicitly confirmed.
 
-The \texttt{OptimisticVerifier} contract in this thesis takes this lifecycle model directly from Bedrock. The four states (\texttt{PENDING}, \texttt{SOFT\_FINAL}, \texttt{HARD\_FINAL}, \texttt{CHALLENGED}) allow the dashboard and test suite to observe transitions between stages, which is how the finality latency results in Chapter~\ref{ch:evaluation} are measured.
+The \texttt{OptimisticVerifier} contract in this thesis takes this lifecycle model directly from Bedrock. The four states (\texttt{PENDING}, \texttt{SOFT\_FINAL}, \texttt{HARD\_FINAL}, \texttt{CHALLENGED}) let the dashboard and test suite observe transitions between stages. They make the finality rule visible in the contracts; they do not produce a wall-clock latency measurement in Chapter~\ref{ch:evaluation}.
 
 \subsection{zkSync and StarkNet}
 \label{sec:zk-production}
@@ -62,13 +62,13 @@ The \texttt{ZKVerifier} contract in this framework follows the submission-plus-c
 
 \subsection{OpenZeppelin Contracts}
 
-The \texttt{OptimisticVerifier} and \texttt{ZKVerifier} contracts follow the access-control and event-emission patterns established in the OpenZeppelin Contracts library~\cite{openzeppelin2024}. Specifically, ownable ownership checks on the \texttt{submit()} function and the use of indexed events for off-chain monitoring are taken directly from OpenZeppelin's standard patterns. Using a widely-audited pattern rather than writing custom access control reduces the surface area for correctness errors in the framework's L1 layer.
+The \texttt{OptimisticVerifier} and \texttt{ZKVerifier} contracts follow the access-control and event-emission patterns established in the OpenZeppelin Contracts library~\cite{openzeppelin2024}. Specifically, ownable ownership checks on the \texttt{submit()} function and the use of indexed events for off-chain monitoring are taken directly from OpenZeppelin's standard patterns. Using an audited pattern rather than writing custom access control reduces the surface area for correctness errors in the framework's L1 layer.
 
 \section{Gap Analysis and Thesis Contribution}
 
 Reading across this literature, four areas come up repeatedly where empirical data is missing. The framework addresses all four directly.
 
-\textbf{Finality time under real conditions.} The theoretical finality properties of both rollup families are described clearly in the literature. Actual finality latencies under varying Layer~1 conditions have not been measured side by side. The framework records the submission block and finality block for every batch, giving exact latency histograms across scenarios. The key result is in Chapter~\ref{ch:evaluation}: ZK finality runs around 8~times faster in the demo environment, and the gap widens by several orders of magnitude at production challenge window lengths.
+\textbf{Finality time under real conditions.} The theoretical finality properties of both rollup families are described clearly in the literature. Actual finality latencies under varying Layer~1 conditions have not been measured side by side. The framework records the submission block and finality block for every batch, giving exact latency histograms across scenarios. The key result in Chapter~\ref{ch:evaluation} is a rule difference: the ZK path waits five L1 blocks after proof acceptance and the Optimistic path waits a ten-block challenge window. No wall-clock finality is measured in Hardhat, and the production gap follows from assumed protocol parameters.
 
 \textbf{Recovery cost after a sequencer crash.} When a sequencer crashes mid-batch, the system loses the in-flight transactions and must restart. The time and data loss associated with this have not been empirically studied. The adversarial test suite includes crash-and-restart scenarios for both sequencer types, and the results confirm that both preserve Layer~1 state integrity while losing pending transactions---with the Optimistic sequencer exposing more transactions to loss because its larger batch threshold causes them to accumulate longer before being drained.
 

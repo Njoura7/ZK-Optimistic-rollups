@@ -23,7 +23,7 @@ git clone https://github.com/Njoura7/ZK-Optimistic-rollups.git
 cd ZK-Optimistic-rollups
 
 # Build and start all services
-docker-compose up --build
+docker compose up --build
 
 # Wait 2-3 minutes for initialization
     \end{minted}
@@ -58,11 +58,11 @@ docker-compose up --build
 
 \section{Running Container State}
 
-Figure~\ref{fig:docker-containers} shows Docker Desktop during a standard evaluation run. All four services start together: \texttt{zk-rollup-demo} (main application container running both sequencers, the Flask dashboard, and the Hardhat L1 node), \texttt{zk-prometheus} (metrics collection), and \texttt{zk-grafana} (visualization). Total memory footprint is approximately 870\,MB across all containers.
+Figure~\ref{fig:docker-containers} shows Docker Desktop during a standard evaluation run. Three containers start together: \texttt{zk-rollup-demo} (main application container running both sequencers, the Flask dashboard, and the Hardhat L1 node), \texttt{zk-prometheus} (metrics collection), and \texttt{zk-grafana} (visualization).
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{dashboards/docker-containers.png}
-    \caption{Docker Desktop showing the four running containers during an evaluation run. All services start with \texttt{docker compose up -{}-build} and are healthy within approximately two minutes.}
+    \caption{Docker Desktop showing the three running containers during an evaluation run. All services start with \texttt{docker compose up -{}-build} and are healthy within approximately two minutes.}
     \label{fig:docker-containers}
 \end{figure}

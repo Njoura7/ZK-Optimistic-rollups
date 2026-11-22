@@ -24,7 +24,7 @@ The implementation has three layers: Layer~1 smart contracts (finality rules), L
 \section{Layer~1: Smart Contract Design}
 \label{sec:l1-design}
 
-Both contracts follow patterns established in production systems. The \texttt{ZKVerifier} draws on the Groth16 verification structure from Scroll (Chapter~\ref{ch:relatedwork}, Section~\ref{sec:zk-production}). The \texttt{OptimisticVerifier} draws on the multi-state finality model from Optimism Bedrock (Section 3.4 in the related work chapter).
+Both contracts follow patterns established in production systems. The \texttt{ZKVerifier} draws on the Groth16 verification structure from Scroll (Chapter~\ref{ch:relatedwork}, Section~\ref{sec:zk-production}). The \texttt{OptimisticVerifier} draws on the multi-state finality model from Optimism Bedrock described in Chapter~\ref{ch:relatedwork}.
 
 \subsection{Core Design Difference: Commitment Structures}
 
@@ -48,14 +48,14 @@ The essential architectural difference between the two approaches manifests in t
         \hline
         Submitter & --- & \texttt{address submitter} \\
         \hline
-        \multicolumn{3}{l}{\small\textit{Total cold SSTOREs on first insert: ZK~$\approx$3, Optimistic~$\approx$10}} \\
+        \multicolumn{3}{l}{\small Total cold SSTOREs on first insert: ZK~$\approx$3, Optimistic~$\approx$10} \\
         \hline
     \end{tabular}
     \caption{Commitment struct fields stored by each L1 contract. The Optimistic struct writes roughly $3\times$ more storage slots on first insertion, explaining the higher gas cost per submission measured in Chapter~\ref{ch:evaluation}.}
     \label{tab:contract-diffs}
 \end{table}
 
-A terminology note applies throughout this thesis: the field named \texttt{stateRoot} in both contracts actually holds the canonical keccak256 binary Merkle \emph{batch commitment} over ABI-encoded \texttt{(from,to,value)} tuples, not a post-execution state trie root. We use ``batch commitment'' for this value and reserve ``state root'' for the general concept in related work.
+A terminology note applies throughout this thesis: the field named \texttt{stateRoot} in both contracts actually holds the canonical keccak256 binary Merkle ``batch commitment'' over ABI-encoded \texttt{(from,to,value)} tuples, not a post-execution state trie root. We use ``batch commitment'' for this value and reserve ``state root'' for the general concept in related work.
 
 \subsection{ZKVerifier Contract}
 
@@ -102,7 +102,7 @@ The full contract implementation is available in the framework repository at \te
 \section{Layer~2: Sequencer Processes}
 \label{sec:l2-design}
 
-Both sequencers implement the same high-level logic: maintain a pending transaction pool, periodically create batches, compute commitments, and submit to Layer~1. The critical difference is in the commitment computation: ZK sequencers generate and submit a proof alongside the state root, while Optimistic sequencers submit only the state root. This difference drives all downstream architectural choices.
+Both sequencers implement the same high-level logic: maintain a pending transaction pool, periodically create batches, compute commitments, and submit to Layer~1. Both derive the canonical keccak256 binary Merkle batch commitment from ABI-encoded \texttt{(from,to,value)} tuples through the same helper, so the commitment representation is identical across paths. The difference is that the ZK sequencer additionally computes a domain-separated mock proof and submits it with the commitment, while the Optimistic sequencer submits the commitment alone. This difference, together with the batch thresholds, drives the downstream design choices.
 
 \subsection{Architectural Difference: Proof vs. No Proof}
 
@@ -167,14 +167,14 @@ Both sequencer implementations are available in the framework repository: \textt
 The framework includes a Flask~\cite{flask2024}-based web dashboard that aggregates real-time metrics from both sequencers and exposes HTTP endpoints for test automation. The dashboard runs on port~3000 and provides:
 
 \begin{itemize}
-    \item \textbf{Real-time status}: Current transaction count, batch count, and throughput for each sequencer.
-    \item \textbf{Comparative visualization}: Side-by-side graphs of finality latency and throughput over time, enabling visual identification of architectural differences.
-    \item \textbf{Test control API}: Endpoints to submit test transactions, query sequencer health, and trigger adversarial scenarios (crash simulation, delay injection).
+    \item \textbf{Real-time status}: Current transaction count, batch count, and throughput for each sequencer, fetched from the two \texttt{/metrics} endpoints.
+    \item \textbf{Scenario buttons}: Controls that inject the three load scenarios by posting transactions directly to each sequencer's \texttt{/tx} endpoint.
+    \item \textbf{Design-level comparison}: A table of architectural properties, marked in the interface as not evidence.
 \end{itemize}
 
 The dashboard during a live evaluation run is shown in Chapter~\ref{ch:evaluation} (Figure~\ref{fig:flask-dashboard}), where the transaction counts and batch totals it displays are discussed alongside the measurements they represent.
 
-Underlying the dashboard is a Prometheus~\cite{prometheus2024} metrics collection layer. Each sequencer exports metrics to a dedicated HTTP endpoint (ports 9100 and 9101) that Prometheus scrapes at 15-second intervals. Table~\ref{tab:metrics-exported} lists the metrics collected.
+Underlying the dashboard is a Prometheus~\cite{prometheus2024} metrics collection layer. Each sequencer exports metrics to a dedicated HTTP endpoint (ports 9100 and 9101) that Prometheus scrapes every five seconds. Table~\ref{tab:metrics-exported} lists the metrics collected.
 
 \begin{table}[h]
     \centering
@@ -188,9 +188,9 @@ Underlying the dashboard is a Prometheus~\cite{prometheus2024} metrics collectio
         \hline
         l2\_tps & Gauge & Rolling estimate of throughput (tx/sec) \\
         \hline
-        l2\_finality\_time\_seconds & Histogram & L1 submission latency per batch; used to compute P95 via PromQL \\
+        l2\_finality\_time\_seconds & Histogram & L1 submission latency per batch (base unit seconds), not protocol finality \\
         \hline
-        l2\_proof\_generation\_seconds & Histogram & Time to generate mock ZK proof (ZK sequencer only) \\
+        l2\_proof\_generation\_seconds & Histogram & Canonical commitment plus mock proof time (base unit seconds), ZK sequencer only \\
         \hline
         l2\_pending\_transactions & Gauge & Current size of pending transaction pool \\
         \hline
@@ -206,7 +206,7 @@ Grafana~\cite{grafana2024} connects to the Prometheus datasource and renders pre
 \section{Validation Through Automated Tests}
 \label{sec:tests}
 
-The framework includes 21 automated tests distributed across three tiers. Each test replaces the web3 library and the Prometheus client with mock objects at import time, so no Hardhat node or running Docker stack is required. Tests can therefore execute in continuous integration without the startup cost of the full service.
+The framework includes 30 automated tests distributed across three tiers. Each test replaces the web3 library and the Prometheus client with mock objects at import time, so no Hardhat node or running Docker stack is required. Tests can therefore execute in continuous integration without the startup cost of the full service.
 
 \subsection{Test Structure}
 
@@ -224,13 +224,15 @@ Table~\ref{tab:test-coverage} maps each tier to the research questions it exerci
         \hline
         \textbf{Tier} & \textbf{Tests} & \textbf{Research Questions Covered} \\
         \hline
-        Unit — ZK sequencer & 5 & RQ1 (finality mechanism), RQ3 (proof overhead) \\
+        Unit — commitment & 9 & RQ3 (canonical commitment), RQ4 (golden vector) \\
         \hline
-        Unit — Optimistic sequencer & 5 & RQ1 (challenge period), RQ3 (no proof overhead) \\
+        Unit — ZK sequencer & 5 & RQ1 (finality mechanism), RQ3 (mock proof) \\
         \hline
-        Integration — dual sequencer & 7 & RQ1, RQ3, RQ5 (metrics schema parity) \\
+        Unit — Optimistic sequencer & 5 & RQ1 (challenge period), RQ3 (no proof step) \\
         \hline
-        Adversarial — crash and recovery & 4 & RQ2 (recovery), RQ4 (invalid state) \\
+        Integration — dual sequencer & 7 & RQ1, RQ3 (commitment parity), RQ4 \\
+        \hline
+        Adversarial — crash and recovery & 4 & RQ2 (loss and state integrity) \\
         \hline
     \end{tabular}
     \caption{Test tier structure and research question coverage}
@@ -281,11 +283,11 @@ The expected result is 30 tests passing in under two minutes on any machine with
 
 Adding a third sequencer type requires four concrete changes. No existing sequencer code or contract needs to be modified.
 
-\textbf{1. Write a new sequencer class.} Copy \texttt{l2-zk/sequencer.py} or \texttt{l2-optimistic/sequencer.py} as a starting point. Three things must be implemented: an HTTP endpoint at \texttt{/submit} that appends incoming transactions to a pending list; a \texttt{\_batch()} method that assembles a commitment and calls the new L1 contract; and a Prometheus metrics export on a new port (9102, 9103, \ldots). The batch loop, Flask setup, and metric registration are boilerplate that can be copied verbatim.
+\textbf{1. Write a new sequencer class.} Copy \texttt{l2-zk/sequencer.py} or \texttt{l2-optimistic/sequencer.py} as a starting point. Three things must be implemented: an HTTP endpoint at \texttt{/tx} that appends incoming transactions to a pending list; a \texttt{\_batch()} method that assembles a commitment and calls the new L1 contract; and a Prometheus metrics export on a new port (9102, 9103, \ldots). The batch loop, Flask setup, and metric registration are boilerplate that can be copied verbatim.
 
 \textbf{2. Deploy a new Solidity contract.} The contract must expose two functions: \texttt{submit(bytes32 stateRoot, \ldots)} for the sequencer to post a commitment, and \texttt{isFinalized(uint256 id)} for the test suite to query finality. The finality rule inside those functions is where the new architecture lives---proof check, time lock, validity window, or any combination. Deploy it alongside \texttt{ZKVerifier} and \texttt{OptimisticVerifier} by adding it to the Hardhat deployment script in \texttt{l1/scripts/deploy.js}.
 
-\textbf{3. Add a service block to \texttt{docker-compose.yml}.} Point it at the new sequencer directory, expose its ports, and set \texttt{L1\_RPC=http://zk-rollup:8545} so it joins the shared Hardhat instance. The Grafana and Prometheus services pick up the new sequencer automatically once the metrics port is registered.
+\textbf{3. Add a service block to \texttt{docker-compose.yml}.} Point it at the new sequencer directory, expose its ports, and set \texttt{L1\_RPC=http://localhost:8545} so it joins the shared Hardhat instance. Prometheus then needs the new target in its scrape config, and Grafana needs panels that query the new metric names.
 
 \textbf{4. Register the metrics port in \texttt{config/prometheus.yml}.} Add one \texttt{- targets: ['zk-rollup:9102']} entry under a new scrape job. All existing Grafana panels are PromQL queries---duplicate a panel, change the metric prefix, and the new sequencer appears in the dashboard without touching Grafana configuration directly.
 
