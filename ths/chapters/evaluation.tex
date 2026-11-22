@@ -47,19 +47,19 @@ Before interpreting screenshots, two checks are applied. First, the transaction 
 
 These checks apply to the live-system screenshots in Figures~\ref{fig:flask-dashboard}, \ref{fig:grafana-comparison}, and~\ref{fig:throughput-comparison}. The two Grafana figures are panel screenshots illustrating the dashboard, not measured throughput or finality results; no numeric claim is based on them.
 
-Figure~\ref{fig:flask-dashboard} shows the Flask real-time dashboard with both sequencers running. Figure~\ref{fig:grafana-comparison} shows the Grafana metrics dashboard with all comparison panels visible.
+Figure~\ref{fig:flask-dashboard} shows the Flask dashboard with both sequencers running; its comparison table is a design-level summary marked as not evidence in the interface. Figures~\ref{fig:grafana-comparison} and~\ref{fig:throughput-comparison} show the Grafana panels. The top row covers counters, TPS and L1 submission latency; the lower panels cover rate, computation time, pending queues and gas.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{dashboards/flask-dashboard-overview.png}
-    \caption{Flask real-time dashboard during a live run. Both panels poll their sequencer's \texttt{/metrics} endpoint; the counters and batch totals depend on which scenarios were run in that container and are illustrative, not a reproducible measurement. The Architectural Comparison table records design-level properties only and is marked ``not evidence'' in the UI.}
+    \caption{Flask dashboard during a live run}
     \label{fig:flask-dashboard}
 \end{figure}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{dashboards/grafana-top-panels.png}
-    \caption{Grafana dashboard top row: transaction counters, batch counts, current TPS and L1 submission-to-receipt latency (P95) for both architectures. The latency panel measures submission latency only; protocol finality (5-block and 10-block rules in the demo) is enforced by the contracts and is not visible here. No numeric latency value is quoted from this screenshot.}
+    \caption{Grafana top row: counters and submission latency}
     \label{fig:grafana-comparison}
 \end{figure}
 
@@ -74,7 +74,7 @@ The two sequencers differ in configuration --- a 100-transaction batch every 5 s
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{dashboards/grafana-bottom-panels.png}
-    \caption{Grafana dashboard lower panels showing the transaction rate comparison, ZK mock proof generation time, Optimistic batch commitment computation time, pending transaction queues, and gas per batch. These panels illustrate live metrics; the reproducible gas figures are reported in Section~\ref{sec:gas}.}
+    \caption{Grafana lower panels: rate and overhead}
     \label{fig:throughput-comparison}
 \end{figure}
 

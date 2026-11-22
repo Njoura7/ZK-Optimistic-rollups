@@ -239,12 +239,12 @@ Table~\ref{tab:test-coverage} maps each tier to the research questions it exerci
     \label{tab:test-coverage}
 \end{table}
 
-Figure~\ref{fig:test-results} shows the full test run output from the GitHub Actions CI log, confirming all 30 tests pass on a clean checkout.
+Figure~\ref{fig:test-results} shows the full test run output from the GitHub Actions CI log, confirming all 30 tests pass on a clean checkout. The Python suite covers 9 canonical commitment tests, 5 ZK unit tests, 5 Optimistic unit tests, 7 integration tests, and 4 adversarial tests. The suite needs no Docker stack because all network and contract calls are mocked at import time. A separate Hardhat tier of 7 contract tests exercises the real Solidity escrow.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{tests.png}
-    \caption{All 30 Python tests passing in the GitHub Actions CI run: 9 canonical commitment, 5 ZK unit, 5 Optimistic unit, 7 integration, and 4 adversarial. No Docker stack is required; all network and contract calls are replaced with mocks at import time. A separate Hardhat tier of 7 contract tests exercises the real Solidity escrow.}
+    \caption{CI test run}
     \label{fig:test-results}
 \end{figure}
 
@@ -300,12 +300,12 @@ One honest note on scope: extending the test suite requires writing new unit and
 
 The \texttt{isFinalized()} interface described above is not only consumed by the test suite. We built a small \texttt{WithdrawalEscrow} contract and a static web page (\texttt{web3-demo/}) that demonstrate the same interface from a user's perspective: a wallet deposits ETH tied to a batch commitment, and a claim function releases it once \texttt{isFinalized()} returns true for that commitment. We deploy the contract twice, once against each verifier, and use ethers.js \cite{ethersjs2024} to connect a browser wallet directly to the Hardhat node with no backend in between.
 
-A scripted run against a freshly deployed stack (\texttt{l1/scripts/demo\_withdrawal\_flow.js}) makes the mechanism concrete. We deposit 0.05 ETH into the ZK escrow and check \texttt{isFinalized()} immediately afterward---it already returns true, because the demo commitment, submitted several transactions earlier during deployment, had already cleared its five-block window by the time our deposit landed. The same deposit into the Optimistic escrow returns \texttt{SOFT\_FINAL} with five blocks remaining; a claim attempted at that point reverts with \texttt{Not finalized yet}, and succeeds only after five more blocks are mined, closing out the ten-block challenge window measured from that commitment's own submission point. Both deposits are returned in full; across both round trips the only balance change on the depositor's account is gas, confirming this is a round trip rather than a one-way transfer.
+A scripted run against a freshly deployed stack (\texttt{l1/scripts/demo\_withdrawal\_flow.js}) makes the mechanism concrete. We deposit 0.05 ETH into the ZK escrow and check \texttt{isFinalized()} immediately afterward---it already returns true, because the demo commitment, submitted several transactions earlier during deployment, had already cleared its five-block window by the time our deposit landed. The same deposit into the Optimistic escrow returns \texttt{SOFT\_FINAL} with five blocks remaining; a claim attempted at that point reverts with \texttt{Not finalized yet}, and succeeds only after five more blocks are mined, closing out the ten-block challenge window measured from that commitment's own submission point. Both deposits are returned in full; across both round trips the only balance change on the depositor's account is gas, confirming this is a round trip rather than a one-way transfer. The capture in Figure~\ref{fig:web3-demo} predates the current mock-proof label in the demo page.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{web3-demo/withdrawal-finality-demo.png}
-    \caption{The withdrawal demo after a live MetaMask run, ZK already claimed next to Optimistic still mid-challenge-window. This capture predates the current mock-proof labelling in the demo page; the live UI now marks the ZK proof as a mock stand-in.}
+    \caption{Withdrawal demo after a live MetaMask run}
     \label{fig:web3-demo}
 \end{figure}
 
