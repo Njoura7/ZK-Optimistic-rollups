@@ -40,8 +40,11 @@ contract.txt
 .DS_Store
 Thumbs.db
 
-# latex for thesis
+# thesis
 # main.tex
+
+# local paper drafts
+paper/
 
 # Claude Code internals — worktrees, session state, memory
 .claude/

@@ -154,7 +154,7 @@ L1 inclusion is a necessary but not sufficient condition for finality. Each arch
     \label{tab:true-finality}
 \end{table}
 
-The ZK rule is architecturally faster than the Optimistic rule because it does not wait for a challenge window. In production this is commonly summarised as roughly 15 seconds versus a seven-day window, a ratio of about 40,320$\times$ (604,800\,s / 15\,s). That figure is an assumption about protocol parameters, not an experimental result; the earlier 672$\times$ figure was an arithmetic error. Hardhat mines only on transactions, so the demo has no meaningful wall-clock finality, and the previously quoted 8$\times$ demo ratio was a harness artefact. The practical implication for latency-sensitive applications follows from the rule, not from a measured timing.
+The ZK rule is architecturally faster than the Optimistic rule because it does not wait for a challenge window. In production this is commonly summarised as roughly 15 seconds versus a seven-day window, a ratio of about 40,320$\times$ (604,800\,s / 15\,s). That figure is an assumption about protocol parameters, not an experimental result. Hardhat mines only on transactions, so the demo has no meaningful wall-clock finality and no ratio is derived from it. The practical implication for latency-sensitive applications follows from the rule, not from a measured timing.
 
 \section{Computational Overhead: Canonical Commitment and Mock Proof}
 \label{sec:proof}
@@ -278,7 +278,7 @@ Table~\ref{tab:gas-costs} reports the gas consumed per L1 submission measured di
     \label{tab:gas-costs}
 \end{table}
 
-The per-submission gas costs are close (about 165,000 for ZK and about 171,000 for Optimistic). The Optimistic contract is slightly more expensive because its \texttt{Commitment} struct writes more storage fields. These are single-submission local measurements supporting only a relative comparison; the earlier 1.52$\times$ total-cost and 11-versus-7-batch figures had no reproducible artefact and were removed. Any estimate of real-Groth16 verifier gas is future-work speculation, not a measurement (see \texttt{docs/PATH\_B\_GROTH16.md}).
+The per-submission gas costs are close (about 165,000 for ZK and about 171,000 for Optimistic). The Optimistic contract is slightly more expensive because its \texttt{Commitment} struct writes more storage fields. These are single-submission local measurements supporting only a relative comparison. Any estimate of real-Groth16 verifier gas is future-work speculation, not a measurement (see \texttt{docs/PATH\_B\_GROTH16.md}).
 
 \subsection{Per-Transaction Cost}
 
@@ -320,7 +320,7 @@ To evaluate resilience, we instantiate each real sequencer class with a mocked R
     \label{tab:crash-recovery}
 \end{table}
 
-Both sequencers hold their transaction pool in memory only, so a crash loses the accepted-but-unconfirmed set. The reproducible invariant, recorded in \texttt{measurement/raw/baseline-path-a.json}, is deterministic: 100 transactions for ZK and 200 for Optimistic, matching the respective batch thresholds. The earlier 73/142 figures had no raw artefact and were removed. L1 state integrity was preserved in both cases: no partial or inconsistent batches were committed.
+Both sequencers hold their transaction pool in memory only, so a crash loses the accepted-but-unconfirmed set. The reproducible invariant, recorded in \texttt{measurement/raw/baseline-path-a.json}, is deterministic: 100 transactions for ZK and 200 for Optimistic, matching the respective batch thresholds. L1 state integrity was preserved in both cases: no partial or inconsistent batches were committed.
 
 The larger loss window on the Optimistic path follows directly from its larger batch threshold. This is a design trade-off: larger batches reduce on-chain submission frequency but increase the number of transactions exposed to a sequencer failure.
 
