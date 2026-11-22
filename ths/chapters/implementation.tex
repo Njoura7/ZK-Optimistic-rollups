@@ -184,23 +184,26 @@ The dashboard during a live evaluation run is shown in Chapter~\ref{ch:evaluatio
 
 Underlying the dashboard is a Prometheus~\cite{prometheus2024} metrics collection layer. Each sequencer exports metrics to a dedicated HTTP endpoint (ports 9100 and 9101) that Prometheus scrapes every five seconds. Table~\ref{tab:metrics-exported} lists the metrics collected.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
-    \begin{tabular}{>{\ttfamily\small}l|l|>{\raggedright\arraybackslash}p{5.5cm}}
+    \footnotesize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.08}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash\ttfamily}p{5.2cm}|>{\raggedright\arraybackslash}p{2.0cm}|>{\raggedright\arraybackslash}p{6.4cm}@{}}
         \hline
         \normalfont\textbf{Metric} & \textbf{Type} & \textbf{Interpretation} \\
         \hline
-        l2\_transactions\_total & Counter & Cumulative count of accepted L2 transactions \\
+        l2\_\allowbreak transactions\_\allowbreak total & Counter & Cumulative count of accepted L2 transactions \\
         \hline
-        l2\_batches\_total & Counter & Cumulative count of batches submitted to L1 \\
+        l2\_\allowbreak batches\_\allowbreak total & Counter & Cumulative count of batches submitted to L1 \\
         \hline
-        l2\_tps & Gauge & Rolling estimate of throughput (tx/sec) \\
+        l2\_\allowbreak tps & Gauge & Rolling estimate of throughput (tx/sec) \\
         \hline
-        l2\_finality\_time\_seconds & Histogram & L1 submission latency per batch (base unit seconds), not protocol finality \\
+        l2\_\allowbreak finality\_\allowbreak time\_\allowbreak seconds & Histogram & L1 submission latency per batch (base unit seconds), not protocol finality \\
         \hline
-        l2\_proof\_generation\_seconds & Histogram & Canonical commitment plus mock proof time (base unit seconds), ZK sequencer only \\
+        l2\_\allowbreak proof\_\allowbreak generation\_\allowbreak seconds & Histogram & Canonical commitment plus mock proof time (base unit seconds), ZK sequencer only \\
         \hline
-        l2\_pending\_transactions & Gauge & Current size of pending transaction pool \\
+        l2\_\allowbreak pending\_\allowbreak transactions & Gauge & Current size of pending transaction pool \\
         \hline
     \end{tabular}
     \caption{Prometheus metrics}

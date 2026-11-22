@@ -101,18 +101,21 @@ Table~\ref{tab:research-questions} shows how each research question maps to what
 
 \begin{table}[htbp]
     \centering
-    \begin{tabular}{l|>{\raggedright\arraybackslash}p{4.5cm}|>{\raggedright\arraybackslash\ttfamily\small}p{5cm}}
+    \small
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.05}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.0cm}|>{\raggedright\arraybackslash}p{4.0cm}|>{\raggedright\arraybackslash\ttfamily}p{6.0cm}@{}}
         \hline
         \textbf{Question} & \textbf{What We Answer} & \normalfont\textbf{Supporting artefact} \\
         \hline
         RQ1: Finality & Rule parameters and L1 submission step &
-            tests/integration/ \newline test\_dual\_sequencer.py \\
+            tests/integration/ \newline test\_\allowbreak dual\_\allowbreak sequencer.py \\
         \hline
         RQ2: Recovery & Loss set and L1 state integrity &
-            tests/adversarial/ \newline test\_sequencer\_crash.py \\
+            tests/adversarial/ \newline test\_\allowbreak sequencer\_\allowbreak crash.py \\
         \hline
         RQ3: Cost of proof & Canonical commitment and mock proof timings &
-            tests/unit/ \newline test\_commitment.py \\
+            tests/unit/ \newline test\_\allowbreak commitment.py \\
         \hline
         RQ4: Reproducibility & Golden vector and committed harness &
             measurement/ \newline capture.py \\
@@ -128,7 +131,10 @@ Table~\ref{tab:tech-stack} lists the technologies used and why each was chosen. 
 
 \begin{table}[htbp]
     \centering
-    \begin{tabular}{l|l|>{\raggedright\arraybackslash}p{5cm}}
+    \small
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.05}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{4.0cm}|>{\raggedright\arraybackslash}p{6.0cm}@{}}
         \hline
         \textbf{Component} & \textbf{Technology} & \textbf{Reason for choice} \\
         \hline
@@ -157,23 +163,26 @@ The framework parameters are configurable via environment variables. This allows
 
 \begin{table}[htbp]
     \centering
-    \begin{tabular}{>{\ttfamily}l|l|>{\raggedright\arraybackslash}p{5.5cm}}
+    \footnotesize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.08}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash\ttfamily}p{4.9cm}|>{\raggedright\arraybackslash}p{2.3cm}|>{\raggedright\arraybackslash}p{6.2cm}@{}}
         \hline
         \normalfont\textbf{Parameter} & \textbf{Default} & \textbf{Purpose} \\
         \hline
-        ZK\_BATCH\_SIZE & 100 & Transactions per ZK batch \\
+        ZK\_\allowbreak BATCH\_\allowbreak SIZE & 100 & Transactions per ZK batch \\
         \hline
-        ZK\_BATCH\_INTERVAL & 5 & Seconds between ZK batch checks \\
+        ZK\_\allowbreak BATCH\_\allowbreak INTERVAL & 5 & Seconds between ZK batch checks \\
         \hline
-        ZK\_GAS\_LIMIT & 200\,000 & Gas limit for ZK submissions (Hardhat estimate; not a mainnet figure) \\
+        ZK\_\allowbreak GAS\_\allowbreak LIMIT & 200\,000 & Gas limit for ZK submissions (Hardhat estimate; not a mainnet figure) \\
         \hline
-        OPT\_BATCH\_SIZE & 200 & Transactions per Optimistic batch \\
+        OPT\_\allowbreak BATCH\_\allowbreak SIZE & 200 & Transactions per Optimistic batch \\
         \hline
-        OPT\_BATCH\_INTERVAL & 8 & Seconds between Optimistic batch checks \\
+        OPT\_\allowbreak BATCH\_\allowbreak INTERVAL & 8 & Seconds between Optimistic batch checks \\
         \hline
-        OPT\_GAS\_LIMIT & 250\,000 & Gas limit for Optimistic submissions; raised from 150\,000 after measuring the Optimistic Commitment struct's storage cost \\
+        OPT\_\allowbreak GAS\_\allowbreak LIMIT & 250\,000 & Gas limit for Optimistic submissions; raised from 150\,000 after measuring the Optimistic Commitment struct's storage cost \\
         \hline
-        L1\_RPC & \normalfont\small http://localhost:8545 & Layer~1 RPC endpoint \\
+        L1\_\allowbreak RPC & \normalfont http://localhost:8545 & Layer~1 RPC endpoint \\
         \hline
     \end{tabular}
     \caption{Framework parameters}

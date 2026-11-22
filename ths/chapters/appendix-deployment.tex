@@ -33,9 +33,12 @@ docker compose up --build
 
 \subsection{Accessing Services}
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
-    \begin{tabular}{l|c|>{\raggedright\arraybackslash}p{5cm}}
+    \small
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.08}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.6cm}|>{\raggedright\arraybackslash}p{4.1cm}|>{\raggedright\arraybackslash}p{5.9cm}@{}}
         \hline
         \textbf{Service} & \textbf{URL/Port} & \textbf{Purpose} \\
         \hline

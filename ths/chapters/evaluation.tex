@@ -82,11 +82,12 @@ The two sequencers differ in configuration --- a 100-transaction batch every 5 s
 
 The Optimistic path makes more efficient use of each L1 submission because its configured batch size is twice as large. Table~\ref{tab:batch-efficiency} records this configuration-derived relationship, not a measured run.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
     \small
-    \setlength{\tabcolsep}{4pt}
-    \begin{tabular}{l|c|c|c}
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.05}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{4.6cm}|>{\centering\arraybackslash}p{2.7cm}|>{\centering\arraybackslash}p{2.8cm}|>{\raggedright\arraybackslash}p{3.3cm}@{}}
         \hline
         \textbf{Metric} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Trade-off} \\
         \hline
@@ -114,9 +115,12 @@ For $n$ transactions the ZK path submits $\lceil n/100 \rceil$ batches and the O
 
 The sequencers export a histogram of the time from \texttt{send\_raw\_transaction} to receipt. Hardhat's automining mode mines each transaction immediately, so these observations reflect Python RPC overhead rather than block production wait time. No raw artefact for this histogram is committed; the table therefore records its scope rather than a P95 value.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
-    \begin{tabular}{l|c|c}
+    \small
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.05}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.2cm}|>{\centering\arraybackslash}p{3.8cm}|>{\centering\arraybackslash}p{3.8cm}@{}}
         \hline
         \textbf{Metric} & \textbf{ZK Rollup} & \textbf{Optimistic} \\
         \hline
@@ -165,9 +169,12 @@ The ZK rule is architecturally faster than the Optimistic rule because it does n
 
 Both sequencers first compute the same batch commitment via \texttt{l2\_common.commitment.batch\_merkle\_root}. The ZK path additionally computes a mock proof. Table~\ref{tab:proof-latency} reports the reproducible Path A measurements from \texttt{measurement/raw/baseline-path-a.json}.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
-    \begin{tabular}{l|c|c}
+    \small
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.05}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.5cm}|>{\centering\arraybackslash}p{3.8cm}|>{\centering\arraybackslash}p{3.8cm}@{}}
         \hline
         \textbf{Metric} & \textbf{ZK path} & \textbf{Optimistic path} \\
         \hline
@@ -209,9 +216,12 @@ Scenarios~1 and 3 were exercised in the adversarial harness (Sections~\ref{sec:i
 
 Table~\ref{tab:security-models} contrasts the key security properties of each architecture. These are architectural properties; in this testbed the ZK proof is a mock and the on-chain verifier performs only a non-zero check, so none of the guarantees listed here is implemented.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
-    \begin{tabular}{l|>{\raggedright\arraybackslash}p{4cm}|>{\raggedright\arraybackslash}p{4cm}}
+    \small
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.05}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.3cm}|>{\raggedright\arraybackslash}p{4.7cm}|>{\raggedright\arraybackslash}p{5.2cm}@{}}
         \hline
         \textbf{Property} & \textbf{ZK Rollup} & \textbf{Optimistic Rollup} \\
         \hline
@@ -265,9 +275,12 @@ Architecturally, a real ZK rollup would reject an invalid state at proof verific
 
 Table~\ref{tab:gas-costs} reports the gas consumed per L1 submission measured directly from transaction receipts via \texttt{tx.gasUsed} in the Hardhat environment (see Appendix~\ref{app:metrics} for raw values). We report per-submission values only because no multi-batch total is supported by the raw receipts.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
-    \begin{tabular}{l|c|c}
+    \small
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.05}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.0cm}|>{\centering\arraybackslash}p{3.9cm}|>{\centering\arraybackslash}p{3.9cm}@{}}
         \hline
         \textbf{Metric} & \textbf{ZK Rollup} & \textbf{Optimistic} \\
         \hline
@@ -303,9 +316,12 @@ These figures assume full batches and follow from the configured thresholds, not
 
 To evaluate resilience, we instantiate each real sequencer class with a mocked RPC, fill its pending pool to the batch threshold, and then drop the RPC connection. Table~\ref{tab:crash-recovery} reports the resulting loss and Layer~1 state integrity. We do not kill a live process, and we do not measure a restart delay.
 
-\begin{table}[h]
+\begin{table}[htbp]
     \centering
-    \begin{tabular}{l|c|c}
+    \small
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.05}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{6.0cm}|>{\centering\arraybackslash}p{3.4cm}|>{\centering\arraybackslash}p{3.4cm}@{}}
         \hline
         \textbf{Metric} & \textbf{ZK Rollup} & \textbf{Optimistic} \\
         \hline

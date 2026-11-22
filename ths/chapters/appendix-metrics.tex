@@ -10,28 +10,30 @@ This appendix documents the Prometheus metrics exported by each sequencer, the P
 
 Each sequencer exposes its metrics on a dedicated port: ZK on port~9100, Optimistic on port~9101. A single Prometheus instance scrapes both every five seconds. ZK metrics carry the \texttt{l2\_} prefix; Optimistic metrics carry \texttt{opt\_l2\_}.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \footnotesize
-\begin{tabular}{>{\ttfamily}l|l|>{\raggedright\arraybackslash}p{5.5cm}}
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{@{}>{\raggedright\arraybackslash\ttfamily}p{5.2cm}|>{\raggedright\arraybackslash}p{2.0cm}|>{\raggedright\arraybackslash}p{6.4cm}@{}}
 \hline
 \normalfont\textbf{Metric} & \textbf{Type} & \textbf{Description} \\
 \hline
-l2\_transactions\_total & Counter & Cumulative ZK L2 transactions accepted \\
-l2\_batches\_total & Counter & Cumulative ZK batches submitted to L1 \\
-l2\_tps & Gauge & ZK transactions per second (2~s window) \\
-l2\_pending\_transactions & Gauge & ZK transactions awaiting next batch \\
-l2\_finality\_time\_seconds & Histogram & L1 submission latency per ZK batch (base unit seconds), not protocol finality \\
-l2\_proof\_generation\_seconds & Histogram & Canonical commitment plus mock proof time (base unit seconds), ZK sequencer only \\
-l2\_batch\_gas\_used & Gauge & EVM gas used by last ZK batch submission \\
+l2\_\allowbreak transactions\_\allowbreak total & Counter & Cumulative ZK L2 transactions accepted \\
+l2\_\allowbreak batches\_\allowbreak total & Counter & Cumulative ZK batches submitted to L1 \\
+l2\_\allowbreak tps & Gauge & ZK transactions per second (2~s window) \\
+l2\_\allowbreak pending\_\allowbreak transactions & Gauge & ZK transactions awaiting next batch \\
+l2\_\allowbreak finality\_\allowbreak time\_\allowbreak seconds & Histogram & L1 submission latency per ZK batch (base unit seconds), not protocol finality \\
+l2\_\allowbreak proof\_\allowbreak generation\_\allowbreak seconds & Histogram & Canonical commitment plus mock proof time (base unit seconds), ZK sequencer only \\
+l2\_\allowbreak batch\_\allowbreak gas\_\allowbreak used & Gauge & EVM gas used by last ZK batch submission \\
 \hline
-opt\_l2\_transactions\_total & Counter & Cumulative Optimistic L2 transactions \\
-opt\_l2\_batches\_total & Counter & Cumulative Optimistic batches submitted \\
-opt\_l2\_tps & Gauge & Optimistic transactions per second \\
-opt\_l2\_pending\_transactions & Gauge & Optimistic transactions awaiting next batch \\
-opt\_l2\_finality\_time\_seconds & Histogram & L1 submission latency per Optimistic batch (base unit seconds) \\
-opt\_l2\_batch\_processing\_seconds & Histogram & Batch assembly and canonical commitment time (base unit seconds) \\
-opt\_l2\_batch\_gas\_used & Gauge & EVM gas used by last Optimistic submission \\
+opt\_\allowbreak l2\_\allowbreak transactions\_\allowbreak total & Counter & Cumulative Optimistic L2 transactions \\
+opt\_\allowbreak l2\_\allowbreak batches\_\allowbreak total & Counter & Cumulative Optimistic batches submitted \\
+opt\_\allowbreak l2\_\allowbreak tps & Gauge & Optimistic transactions per second \\
+opt\_\allowbreak l2\_\allowbreak pending\_\allowbreak transactions & Gauge & Optimistic transactions awaiting next batch \\
+opt\_\allowbreak l2\_\allowbreak finality\_\allowbreak time\_\allowbreak seconds & Histogram & L1 submission latency per Optimistic batch (base unit seconds) \\
+opt\_\allowbreak l2\_\allowbreak batch\_\allowbreak processing\_\allowbreak seconds & Histogram & Batch assembly and canonical commitment time (base unit seconds) \\
+opt\_\allowbreak l2\_\allowbreak batch\_\allowbreak gas\_\allowbreak used & Gauge & EVM gas used by last Optimistic submission \\
 \hline
 \end{tabular}
 \caption{Exported metrics}
