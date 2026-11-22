@@ -34,7 +34,7 @@ opt\_l2\_batch\_processing\_seconds & Histogram & Batch assembly and canonical c
 opt\_l2\_batch\_gas\_used & Gauge & EVM gas used by last Optimistic submission \\
 \hline
 \end{tabular}
-\caption{Prometheus metrics exported by each sequencer}
+\caption{Exported metrics}
 \label{tab:metrics-list}
 \end{table}
 
@@ -78,7 +78,7 @@ l2_proof_generation_seconds_sum          0.3633718490600586
 # Gas of the last batch submission (Hardhat receipt)
 l2_batch_gas_used                         165293.0   # EVM gas units
 \end{minted}
-\caption{Raw Prometheus output — ZK Sequencer (port~9100)}
+\caption{ZK metrics snapshot}
 \label{lst:prometheus-zk}
 \end{listing}
 
@@ -118,11 +118,13 @@ opt_l2_batch_processing_seconds_sum         0.24579787254333496
 # Gas of the last batch submission (Hardhat receipt)
 opt_l2_batch_gas_used                       170925.0   # EVM gas units
 \end{minted}
-\caption{Raw Prometheus output — Optimistic Sequencer (port~9101)}
+\caption{Optimistic metrics snapshot}
 \label{lst:prometheus-opt}
 \end{listing}
 
 \section{PromQL Queries Used in the Dashboard}
+
+The queries below support the Grafana panels and direct Prometheus exploration at \texttt{localhost:9090}.
 
 \begin{listing}[H]
     \begin{minted}[breaklines=true, breakanywhere=true, fontsize=\footnotesize]{text}
@@ -154,7 +156,7 @@ histogram_quantile(0.95,
 rate(l2_transactions_total[1m])
 rate(opt_l2_transactions_total[1m])
     \end{minted}
-    \caption{PromQL queries for Grafana panels and direct Prometheus exploration at \texttt{localhost:9090}}
+    \caption{PromQL queries}
     \label{lst:promql-queries}
 \end{listing}
 

@@ -52,14 +52,14 @@ Figure~\ref{fig:flask-dashboard} shows the Flask dashboard with both sequencers 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{dashboards/flask-dashboard-overview.png}
-    \caption{Flask dashboard during a live run}
+    \caption{Dashboard overview}
     \label{fig:flask-dashboard}
 \end{figure}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{dashboards/grafana-top-panels.png}
-    \caption{Grafana top row: counters and submission latency}
+    \caption{Grafana top panels}
     \label{fig:grafana-comparison}
 \end{figure}
 
@@ -74,7 +74,7 @@ The two sequencers differ in configuration --- a 100-transaction batch every 5 s
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{dashboards/grafana-bottom-panels.png}
-    \caption{Grafana lower panels: rate and overhead}
+    \caption{Grafana lower panels}
     \label{fig:throughput-comparison}
 \end{figure}
 
@@ -95,7 +95,7 @@ The Optimistic path makes more efficient use of each L1 submission because its c
         L1 submission frequency & higher & lower & L1 cost versus latency \\
         \hline
     \end{tabular}
-    \caption{Batch efficiency derived from the configured thresholds (not a measured workload).}
+    \caption{Batch efficiency}
     \label{tab:batch-efficiency}
 \end{table}
 
@@ -127,7 +127,7 @@ The sequencers export a histogram of the time from \texttt{send\_raw\_transactio
         Committed raw artefact? & No & No \\
         \hline
     \end{tabular}
-    \caption{Scope of the \texttt{*\_finality\_time\_seconds} histograms; no latency figure is quoted from them.}
+    \caption{L1 submission latency}
     \label{tab:l1-latency}
 \end{table}
 
@@ -150,7 +150,7 @@ L1 inclusion is a necessary but not sufficient condition for finality. Each arch
         Hardhat wall-clock duration & none (mines on transactions only) & none (mines on transactions only) \\
         \hline
     \end{tabular}
-    \caption{Finality rules and assumptions; these are not measured latencies.}
+    \caption{Finality rules}
     \label{tab:true-finality}
 \end{table}
 
@@ -174,7 +174,7 @@ Both sequencers first compute the same canonical keccak256 binary Merkle commitm
         Mock proof P95 (any batch size) & 0.008\,ms & --- (no proof step) \\
         \hline
     \end{tabular}
-    \caption{Reproducible Path A timings (P95); source: \texttt{measurement/raw/baseline-path-a.json}.}
+    \caption{Path A timings}
     \label{tab:proof-latency}
 \end{table}
 
@@ -203,7 +203,7 @@ Scenarios~1 and 3 were exercised in the adversarial harness (Sections~\ref{sec:i
 
 \subsection{Security Properties Compared}
 
-Table~\ref{tab:security-models} contrasts the key security properties of each architecture.
+Table~\ref{tab:security-models} contrasts the key security properties of each architecture. These are architectural properties; in this testbed the ZK proof is a mock and the on-chain verifier performs only a non-zero check, so none of the guarantees listed here is implemented.
 
 \begin{table}[h]
     \centering
@@ -222,11 +222,11 @@ Table~\ref{tab:security-models} contrasts the key security properties of each ar
         Censorship risk & Low (anyone can generate a proof) & Medium (requires active challengers) \\
         \hline
     \end{tabular}
-    \caption{Security model comparison. These are properties of the architectures in principle; in this testbed the ZK proof is a mock and the on-chain verifier performs only a non-zero check, so none of the guarantees listed here is implemented.}
+    \caption{Security properties compared}
     \label{tab:security-models}
 \end{table}
 
-Architecturally, the ZK model rests on the soundness of a proof system: a real validity proof would guarantee the state transition, while the Optimistic model rests on economic incentives and at least one honest challenger. In this testbed the ZK proof is a domain-separated keccak mock and \texttt{ZKVerifier.verifyProof} checks only non-zero words; the interface is preserved but the cryptographic guarantee is not implemented. The distinction is documented in \texttt{docs/IMPLEMENTATION\_NOTES.md}.
+Architecturally, the ZK model rests on the soundness of a proof system: a real validity proof would guarantee the state transition, while the Optimistic model rests on economic incentives and at least one honest challenger. In this testbed the ZK proof is a domain-separated keccak mock, and \texttt{ZKVerifier.verifyProof} checks only non-zero words. The interface is preserved without the cryptographic guarantee, as documented in \texttt{docs/IMPLEMENTATION\_NOTES.md}.
 
 \subsection{Challenger Absence: Quantifying the Risk}
 \label{sec:challenger-absence}
@@ -259,7 +259,7 @@ Architecturally, a real ZK rollup would reject an invalid state at proof verific
 
 \subsection{Per-Submission Gas (Hardhat measurements)}
 
-Table~\ref{tab:gas-costs} reports the gas consumed per L1 submission measured directly from transaction receipts via \texttt{tx.gasUsed} in the Hardhat environment (see Appendix~\ref{app:metrics} for raw values).
+Table~\ref{tab:gas-costs} reports the gas consumed per L1 submission measured directly from transaction receipts via \texttt{tx.gasUsed} in the Hardhat environment (see Appendix~\ref{app:metrics} for raw values). We report per-submission values only because no multi-batch total is supported by the raw receipts.
 
 \begin{table}[h]
     \centering
@@ -274,7 +274,7 @@ Table~\ref{tab:gas-costs} reports the gas consumed per L1 submission measured di
         Source & Hardhat receipt & Hardhat receipt \\
         \hline
     \end{tabular}
-    \caption{L1 gas per submission measured from Hardhat receipts; no multi-batch total is reported because no raw artefact supports one.}
+    \caption{L1 gas per submission}
     \label{tab:gas-costs}
 \end{table}
 
@@ -316,7 +316,7 @@ To evaluate resilience, we instantiate each real sequencer class with a mocked R
         L1 state consistency preserved & Yes & Yes \\
         \hline
     \end{tabular}
-    \caption{Crash-loss invariant measured with the real sequencer classes under mocked RPC: the accepted-but-unconfirmed set equals the batch threshold.}
+    \caption{Crash-loss invariant}
     \label{tab:crash-recovery}
 \end{table}
 
@@ -363,7 +363,7 @@ Table~\ref{tab:tradeoff-summary} consolidates the findings across all evaluation
         Validity guarantee & mock verifier & challenge model & not implemented \\
         \hline
     \end{tabular}
-    \caption{Consolidated trade-off summary. Measured values cite the Path A raw artefact; no unsupported performance claims are included.}
+    \caption{Trade-off summary}
     \label{tab:tradeoff-summary}
 \end{table}
 

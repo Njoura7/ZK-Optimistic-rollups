@@ -28,7 +28,7 @@ Both contracts follow patterns established in production systems. The \texttt{ZK
 
 \subsection{Core Design Difference: Commitment Structures}
 
-The essential architectural difference between the two approaches manifests in the data each contract stores. For ZK, a commitment is final once its proof has been verified and a confirmation delay has elapsed. For Optimistic, a commitment enters a challenge period and becomes final only after that period expires without a successful dispute. Table~\ref{tab:contract-diffs} summarizes the data structures that implement this difference.
+The essential architectural difference between the two approaches manifests in the data each contract stores. For ZK, a commitment is final once its proof has been verified and a confirmation delay has elapsed. For Optimistic, a commitment enters a challenge period and becomes final only after that period expires without a successful dispute. Table~\ref{tab:contract-diffs} summarizes the data structures that implement this difference. The Optimistic struct writes roughly $3\times$ more storage slots on first insertion, explaining the higher gas cost per submission measured in Chapter~\ref{ch:evaluation}.
 
 \begin{table}[h]
     \centering
@@ -51,7 +51,7 @@ The essential architectural difference between the two approaches manifests in t
         \multicolumn{3}{l}{\small Total cold SSTOREs on first insert: ZK~$\approx$3, Optimistic~$\approx$10} \\
         \hline
     \end{tabular}
-    \caption{Commitment struct fields stored by each L1 contract. The Optimistic struct writes roughly $3\times$ more storage slots on first insertion, explaining the higher gas cost per submission measured in Chapter~\ref{ch:evaluation}.}
+    \caption{Commitment struct fields}
     \label{tab:contract-diffs}
 \end{table}
 
@@ -106,7 +106,7 @@ Both sequencers implement the same high-level logic: maintain a pending transact
 
 \subsection{Architectural Difference: Proof vs. No Proof}
 
-The sequencers are implemented as independent Python processes using Flask~\cite{flask2024} for HTTP and web3.py~\cite{web3py2024} for Layer~1 interaction. Table~\ref{tab:sequencer-comparison} summarizes how the two differ in the commitment step.
+The sequencers are implemented as independent Python processes using Flask~\cite{flask2024} for HTTP and web3.py~\cite{web3py2024} for Layer~1 interaction. Table~\ref{tab:sequencer-comparison} summarizes how the two differ in the commitment step. The gas values come from a local Hardhat node and are not Ethereum mainnet cost estimates.
 
 \begin{table}[h]
     \centering
@@ -127,7 +127,7 @@ The sequencers are implemented as independent Python processes using Flask~\cite
         L1 call & \texttt{ZKVerifier.submit(root, proof)} & \texttt{OptimisticVerifier.submit(root)} \\
         \hline
     \end{tabular}
-    \caption{Architectural differences between sequencer types. Gas values are measured from a local Hardhat node and are not representative of Ethereum mainnet costs.}
+    \caption{Sequencer comparison}
     \label{tab:sequencer-comparison}
 \end{table}
 
@@ -195,7 +195,7 @@ Underlying the dashboard is a Prometheus~\cite{prometheus2024} metrics collectio
         l2\_pending\_transactions & Gauge & Current size of pending transaction pool \\
         \hline
     \end{tabular}
-    \caption{Prometheus metrics collected from sequencers}
+    \caption{Prometheus metrics}
     \label{tab:metrics-exported}
 \end{table}
 
@@ -235,7 +235,7 @@ Table~\ref{tab:test-coverage} maps each tier to the research questions it exerci
         Adversarial — crash and recovery & 4 & RQ2 (loss and state integrity) \\
         \hline
     \end{tabular}
-    \caption{Test tier structure and research question coverage}
+    \caption{Test tiers}
     \label{tab:test-coverage}
 \end{table}
 
@@ -244,7 +244,7 @@ Figure~\ref{fig:test-results} shows the full test run output from the GitHub Act
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{tests.png}
-    \caption{CI test run}
+    \caption{CI test output}
     \label{fig:test-results}
 \end{figure}
 
@@ -300,12 +300,12 @@ One honest note on scope: extending the test suite requires writing new unit and
 
 The \texttt{isFinalized()} interface described above is not only consumed by the test suite. We built a small \texttt{WithdrawalEscrow} contract and a static web page (\texttt{web3-demo/}) that demonstrate the same interface from a user's perspective: a wallet deposits ETH tied to a batch commitment, and a claim function releases it once \texttt{isFinalized()} returns true for that commitment. We deploy the contract twice, once against each verifier, and use ethers.js \cite{ethersjs2024} to connect a browser wallet directly to the Hardhat node with no backend in between.
 
-A scripted run against a freshly deployed stack (\texttt{l1/scripts/demo\_withdrawal\_flow.js}) makes the mechanism concrete. We deposit 0.05 ETH into the ZK escrow and check \texttt{isFinalized()} immediately afterward---it already returns true, because the demo commitment, submitted several transactions earlier during deployment, had already cleared its five-block window by the time our deposit landed. The same deposit into the Optimistic escrow returns \texttt{SOFT\_FINAL} with five blocks remaining; a claim attempted at that point reverts with \texttt{Not finalized yet}, and succeeds only after five more blocks are mined, closing out the ten-block challenge window measured from that commitment's own submission point. Both deposits are returned in full; across both round trips the only balance change on the depositor's account is gas, confirming this is a round trip rather than a one-way transfer. The capture in Figure~\ref{fig:web3-demo} predates the current mock-proof label in the demo page.
+A scripted run against a freshly deployed stack (\texttt{l1/scripts/demo\_withdrawal\_flow.js}) makes the mechanism concrete. We deposit 0.05 ETH into the ZK escrow and check \texttt{isFinalized()} immediately afterward---it already returns true, because the demo commitment, submitted several transactions earlier during deployment, had already cleared its five-block window by the time our deposit landed. The same deposit into the Optimistic escrow returns \texttt{SOFT\_FINAL} with five blocks remaining; a claim attempted at that point reverts with \texttt{Not finalized yet}, and succeeds only after five more blocks are mined, closing out the ten-block challenge window measured from that commitment's own submission point. Both deposits are returned in full; across both round trips the only balance change on the depositor's account is gas, confirming this is a round trip rather than a one-way transfer. The capture in Figure~\ref{fig:web3-demo} comes from a live MetaMask run and predates the current mock-proof label in the demo page.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{web3-demo/withdrawal-finality-demo.png}
-    \caption{Withdrawal demo after a live MetaMask run}
+    \caption{Withdrawal demo}
     \label{fig:web3-demo}
 \end{figure}
 

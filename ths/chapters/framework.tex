@@ -37,7 +37,7 @@ Figure~\ref{fig:architecture} shows how these pieces connect.
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.85\textwidth]{architecture/system-architecture.png}
-    \caption{Framework components and connections}
+    \caption{Framework components}
     \label{fig:architecture}
 \end{figure}
 
@@ -62,7 +62,7 @@ To deploy the framework, we run a single Docker Compose~\cite{compose2024} comma
         Commitment parity & Check whether both paths derive the same canonical batch commitment & Binary \\
         \hline
     \end{tabular}
-    \caption{Measurement dimensions and methods}
+    \caption{Measurement dimensions}
     \label{tab:eval-dimensions}
 \end{table}
 
@@ -77,7 +77,7 @@ We record timestamps at each step. The difference between submission block and f
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.70\textwidth,height=0.72\textheight,keepaspectratio]{architecture/batch-flow.png}
-    \caption{Batch submission flow}
+    \caption{Batch flow}
     \label{fig:batch-flow}
 \end{figure}
 
@@ -116,7 +116,7 @@ Table~\ref{tab:research-questions} shows how each research question maps to what
             measurement/ \newline capture.py \\
         \hline
     \end{tabular}
-    \caption{Research questions, the scope of each answer, and its supporting artefact}
+    \caption{Research question mapping}
     \label{tab:research-questions}
 \end{table}
 
@@ -145,7 +145,7 @@ Table~\ref{tab:tech-stack} lists the technologies used and why each was chosen. 
         Deployment & Docker Compose~\cite{compose2024} & One command starts all services; environment variables control every parameter \\
         \hline
     \end{tabular}
-    \caption{Technology stack and selection rationale}
+    \caption{Technology stack}
     \label{tab:tech-stack}
 \end{table}
 
@@ -174,7 +174,7 @@ The framework parameters are configurable via environment variables. This allows
         L1\_RPC & \normalfont\small http://localhost:8545 & Layer~1 RPC endpoint \\
         \hline
     \end{tabular}
-    \caption{Configurable framework parameters}
+    \caption{Framework parameters}
     \label{tab:config-params}
 \end{table}
 

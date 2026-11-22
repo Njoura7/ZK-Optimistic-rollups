@@ -73,7 +73,7 @@ The challenge window is the primary usability cost: withdrawals to Layer~1 are d
 \textbf{Framework instantiation.}
 \texttt{l2-optimistic/sequencer.py} submits the same canonical keccak256 Merkle batch commitment without proof generation; both sequencers call \texttt{l2\_common.commitment.batch\_merkle\_root} on ABI-encoded \texttt{(from,to,value)} tuples. Batch size and polling interval default to 200~transactions and 8~seconds. Both sequencers load and cache the verifier contract handle once, with a retry on the next batch if deployment was still pending. Recovery scenarios are triggered programmatically and observed through Prometheus metrics on port~9101.
 
-Both rollup families move execution off-chain and anchor security on-chain, but differ in the mechanism that links the two: immediate cryptographic verification in the ZK case versus deferred economic enforcement in the Optimistic case. That single design choice drives every difference discussed in Chapter~\ref{ch:evaluation}: the finality rule, per-submission gas cost, recovery behaviour after a crash, and what happens when an invalid batch commitment is submitted. Table~\ref{tab:bg-summary} puts the two side by side.
+Both rollup families move execution off-chain and anchor security on-chain, but differ in the mechanism that links the two: immediate cryptographic verification in the ZK case versus deferred economic enforcement in the Optimistic case. That single design choice drives every difference discussed in Chapter~\ref{ch:evaluation}: the finality rule, per-submission gas cost, recovery behaviour after a crash, and what happens when an invalid batch commitment is submitted. Table~\ref{tab:bg-summary} puts the two side by side. The gas row describes production designs; in this testbed both submissions are close, and the Optimistic path is slightly more expensive because its commitment struct is larger (Chapter~\ref{ch:evaluation}).
 
 \begin{table}[h]
     \centering
@@ -94,7 +94,7 @@ Both rollup families move execution off-chain and anchor security on-chain, but 
         Layer~1 gas cost & Proof verification in production & Challenge bookkeeping in production \\
         \hline
     \end{tabular}
-    \caption{ZK and Optimistic rollup properties compared. The gas row describes production designs; in this testbed both submissions are close and the Optimistic path is slightly more expensive because its commitment struct is larger (Chapter~\ref{ch:evaluation}).}
+    \caption{Rollup properties compared}
     \label{tab:bg-summary}
 \end{table}
 
