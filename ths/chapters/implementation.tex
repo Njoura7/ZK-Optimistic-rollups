@@ -110,7 +110,9 @@ The sequencers are implemented as independent Python processes using Flask~\cite
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|>{\centering\arraybackslash}p{4cm}|>{\centering\arraybackslash}p{4.5cm}}
+    \footnotesize
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{4.2cm}|>{\raggedright\arraybackslash}p{4.2cm}}
         \hline
         & \textbf{ZK Sequencer} & \textbf{Optimistic Sequencer} \\
         \hline
@@ -122,7 +124,7 @@ The sequencers are implemented as independent Python processes using Flask~\cite
         \hline
         L1 gas per submission & $\sim$165,000 (Hardhat measured) & $\sim$171,000 (Hardhat measured) \\
         \hline
-        Contract loading & \multicolumn{2}{l}{Both cache the handle once and retry on the next batch if deployment was pending} \\
+        Contract loading & \multicolumn{2}{>{\raggedright\arraybackslash}p{8.4cm}}{Both cache the handle once and retry on the next batch if deployment was pending} \\
         \hline
         L1 call & \texttt{ZKVerifier.submit(root, proof)} & \texttt{OptimisticVerifier.submit(root)} \\
         \hline
@@ -220,7 +222,9 @@ Table~\ref{tab:test-coverage} maps each tier to the research questions it exerci
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|c|l}
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{3.4cm}|c|>{\raggedright\arraybackslash}p{7.6cm}}
         \hline
         \textbf{Tier} & \textbf{Tests} & \textbf{Research Questions Covered} \\
         \hline
@@ -271,9 +275,9 @@ Running \texttt{docker compose build} before each test session is necessary beca
 Individual tiers can be targeted by path:
 
 \begin{verbatim}
-pytest tests/unit/          # 19 tests  (9 commitment, 5 ZK, 5 Optimistic)
-pytest tests/integration/   # 7 tests   (dual-sequencer scenarios)
-pytest tests/adversarial/   # 4 tests   (crash, delay, invalid state)
+pytest tests/unit/        # 19 tests
+pytest tests/integration/ # 7 tests
+pytest tests/adversarial/ # 4 tests
 \end{verbatim}
 
 The expected result is 30 tests passing in under two minutes on any machine with Python~3.9 or later. The same suite runs automatically on every commit via GitHub Actions (\texttt{.github/workflows/ci.yml}).

@@ -35,11 +35,11 @@ In addition to these performance scenarios, two adversarial scenarios were execu
 
 \begin{enumerate}
     \setcounter{enumi}{3}
-    \item \textbf{Scenario~D (Sequencer Crash)}: each sequencer is forcibly terminated mid-batch and restarted after a configurable delay, measuring recovery time and transaction loss.
-    \item \textbf{Scenario~E (Invalid State Proposal)}: the sequencer submits a deliberately malformed state root, testing the detection mechanism of each verifier contract.
+    \item \textbf{Scenario~D (Sequencer Crash)}: the RPC connection drops mid-batch, so we record the accepted-but-unconfirmed set and verify that Layer~1 state stays consistent.
+    \item \textbf{Scenario~E (Invalid State Proposal)}: the verifier response is mocked as a rejection, testing how the sequencer handles a rejected commitment.
 \end{enumerate}
 
-The reproducible measurements reported here are the canonical batch-commitment and mock-proof timings and the deterministic crash-loss invariant in \texttt{measurement/raw/baseline-path-a.json}. Gas figures come from Hardhat receipts recorded in \texttt{docs/IMPLEMENTATION_NOTES.md} and the snapshot in Appendix~\ref{app:metrics}; they are not fields of that artefact. Screenshots of the live dashboard and Grafana are illustrations of the running system, not measurement evidence. TPS values displayed by the demo are dominated by the rate at which the harness injects HTTP requests and are not treated as an architectural throughput result.
+The reproducible measurements reported here are the canonical batch-commitment and mock-proof timings and the deterministic crash-loss invariant in \texttt{measurement/raw/baseline-path-a.json}. Gas figures come from Hardhat receipts recorded in \texttt{docs/IMPLEMENTATION\_NOTES.md} and the snapshot in Appendix~\ref{app:metrics}; they are not fields of that artefact. Screenshots of the live dashboard and Grafana are illustrations of the running system, not measurement evidence. TPS values displayed by the demo are dominated by the rate at which the harness injects HTTP requests and are not treated as an architectural throughput result.
 
 \subsection{Data Validation Before Analysis}
 
@@ -84,6 +84,8 @@ The Optimistic path makes more efficient use of each L1 submission because its c
 
 \begin{table}[h]
     \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
     \begin{tabular}{l|c|c|c}
         \hline
         \textbf{Metric} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Trade-off} \\
@@ -139,7 +141,9 @@ L1 inclusion is a necessary but not sufficient condition for finality. Each arch
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|c|c}
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{4.6cm}|>{\raggedright\arraybackslash}p{4.6cm}}
         \hline
         \textbf{Finality} & \textbf{ZK Rollup} & \textbf{Optimistic} \\
         \hline
@@ -344,7 +348,9 @@ Table~\ref{tab:tradeoff-summary} consolidates the findings across all evaluation
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|c|c|l}
+    \footnotesize
+    \setlength{\tabcolsep}{3pt}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{4.2cm}|>{\raggedright\arraybackslash}p{3.3cm}|>{\raggedright\arraybackslash}p{3.3cm}|>{\raggedright\arraybackslash}p{2.4cm}}
         \hline
         \textbf{Dimension} & \textbf{ZK Rollup} & \textbf{Optimistic} & \textbf{Basis} \\
         \hline
