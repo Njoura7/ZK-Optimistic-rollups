@@ -4,13 +4,13 @@
 \chapter{Related Work}
 \label{ch:relatedwork}
 
-The rollup literature covers two things well: formal security analysis and mainnet throughput under normal load. What it does not cover is failure---both architectures tested under the same adverse conditions, measured with the same instrumentation. This chapter reviews what exists, identifies where it stops, and explains what this framework contributes.
+The rollup literature covers formal security analysis and mainnet throughput under normal load. It rarely tests both architectures under the same adverse conditions with the same instrumentation. This chapter reviews what exists, identifies where it stops, and explains what this framework contributes.
 
 \section{Academic Research on Layer~2 Protocols}
 
-\subsection{Systematization of Knowledge}
+\subsection{Systematisation of Knowledge}
 
-Thibault et al.\ provide the most thorough systematisation of Layer~2 blockchain protocols~\cite{sok-layer2}. Their taxonomy organises the design space into four families. Payment channels, exemplified by the Lightning Network and Raiden, enable bidirectional off-chain transfers between fixed pairs of participants. Sidechains, including Plasma and various commit-chain designs, operate as semi-independent chains that periodically anchor their state to the parent chain. Rollups, encompassing both ZK and Optimistic variants, post transaction data on-chain while moving execution off-chain. Hybrid approaches such as Validium and Volition blend on-chain and off-chain data availability to offer a configurable trade-off between cost and security.
+Thibault et al.\ provide a comprehensive systematisation of Layer~2 blockchain protocols~\cite{sok-layer2}. Their taxonomy organises the design space into four families. Payment channels, exemplified by the Lightning Network and Raiden, enable bidirectional off-chain transfers between fixed pairs of participants. Sidechains, including Plasma and various commit-chain designs, operate as semi-independent chains that periodically anchor their state to the parent chain. Rollups, encompassing both ZK and Optimistic variants, post transaction data on-chain while moving execution off-chain. Hybrid approaches such as Validium and Volition blend on-chain and off-chain data availability to offer a configurable trade-off between cost and security.
 
 The systematisation provides a useful taxonomy and analyses security properties at a theoretical level. What it does not include is any empirical measurement of how these systems behave under failure conditions. The absence of controlled experiments leaves open whether the theoretical security guarantees hold under real failure conditions.
 
@@ -18,7 +18,7 @@ The systematisation provides a useful taxonomy and analyses security properties 
 
 Bünz et al.\ introduced Bulletproofs, a proof system that generates efficient zero-knowledge range proofs without a trusted setup ceremony~\cite{zk-efficient-proofs}. By eliminating that ceremony, Bulletproofs removed a significant barrier to deploying zero-knowledge schemes in decentralised settings. Subsequent work extended this toward SNARKs capable of verifying general computation---the foundation for ZK~Rollups over arbitrary smart contract logic.
 
-The zkSync team published the architectural design of their PLONK-based ZK~Rollup~\cite{zksync-paper}, focusing on proof generation and EVM compatibility. The Scroll project~\cite{scroll2023} follows the same line with a Groth16-based on-chain verifier. The \texttt{ZKVerifier} contract in this thesis takes its structural pattern from these two designs: a submission function that requires a proof and a finalization check tied to block confirmation. What we do differently is compress the confirmation delay to five blocks and replace the BN254 pairing check with a hash comparison, so the framework can iterate quickly without specialized hardware.
+The zkSync documentation describes a ZK~Rollup design focused on proof generation and EVM compatibility~\cite{zksync-paper}. The Scroll project~\cite{scroll2023} describes an on-chain verifier based on a SNARK proof. The \texttt{ZKVerifier} contract in this thesis takes its structural pattern from these designs: a submission function that requires a proof and a finalisation check tied to block confirmation. We compress the confirmation delay to five blocks and replace the BN254 pairing check with a hash comparison, so the framework does not require specialised hardware.
 
 Neither of these bodies of work measures ZK~Rollup behaviour when something breaks---no systematic data exists on finality under Layer~1 reorganisations or sequencer outages. That is the gap this thesis addresses.
 
@@ -43,22 +43,22 @@ The design of this framework drew directly from four production codebases. Figur
 
 \subsection{Arbitrum}
 
-Arbitrum is the most deployed Optimistic~Rollup on Ethereum mainnet~\cite{cannon2023}. It uses a seven-day challenge window and an interactive fraud proof mechanism built on the Cannon virtual machine. If the centralised sequencer goes offline, a decentralised validator set can take over transaction ordering.
+Arbitrum is a widely deployed Optimistic~Rollup on Ethereum mainnet~\cite{nitro2023}. It uses a seven-day challenge window and an interactive fraud proof mechanism based on the Arbitrum Virtual Machine. Optimism uses Cannon as its fault proof virtual machine~\cite{cannon2023}. If the centralised sequencer goes offline, a decentralised validator set can take over transaction ordering.
 
-This is directly relevant to the design in Chapter~\ref{ch:implementation}: the ten-block challenge window and the binary challenge outcome in \texttt{OptimisticVerifier} are simplified versions of the Arbitrum model. The simplification removes the multi-round bisection game but keeps the property that matters for comparison---an incorrect state root can be blocked before it becomes final.
+This is directly relevant to the design in Chapter~\ref{ch:implementation}: the ten-block challenge window and the binary challenge outcome in \texttt{OptimisticVerifier} are simplified versions of the Arbitrum model. The simplification removes the multi-round bisection game but keeps the property needed for comparison---an incorrect state root can be blocked before it becomes final.
 
 \subsection{Optimism}
 
-Optimism introduced the OP Stack, a modular framework that lets other teams deploy rollup chains sharing the same security model~\cite{opstack2023}. Its Bedrock upgrade defined a clear three-stage commitment lifecycle: pending, then soft-final once the challenge window closes without a dispute, then hard-final once explicitly confirmed.
+Optimism introduced the OP Stack, a modular framework that lets other teams deploy rollup chains sharing the same security model~\cite{opstack2023}. Its Bedrock upgrade defines a staged withdrawal lifecycle: pending, soft-final while the challenge window is open, and hard-final once the window closes without a dispute or the withdrawal is explicitly finalised.
 
 The \texttt{OptimisticVerifier} contract in this thesis takes this lifecycle model directly from Bedrock. The four states (\texttt{PENDING}, \texttt{SOFT\_FINAL}, \texttt{HARD\_FINAL}, \texttt{CHALLENGED}) let the dashboard and test suite observe transitions between stages. They make the finality rule visible in the contracts; they do not produce a wall-clock latency measurement in Chapter~\ref{ch:evaluation}.
 
 \subsection{zkSync and StarkNet}
 \label{sec:zk-production}
 
-zkSync uses a PLONK-based proof system and targets full EVM compatibility~\cite{zksync-paper}. StarkNet uses the Cairo language with a STARK proof system~\cite{starknet2024,cairo2021}. STARKs scale efficiently for large computations and require no trusted setup, though they produce larger proof objects than SNARKs. Both projects have spent years optimising proof generation on specialized hardware.
+zkSync targets EVM compatibility with validity proofs~\cite{zksync-paper}. StarkNet uses the Cairo language with a STARK proof system~\cite{starknet2024,cairo2021}. STARKs scale efficiently for large computations and require no trusted setup, though they produce larger proof objects than SNARKs. Both projects have spent years optimising proof generation on specialised hardware.
 
-The \texttt{ZKVerifier} contract in this framework follows the submission-plus-confirmation model from zkSync Era (see Figure~\ref{fig:impl-repos}): a \texttt{submit()} function that requires a proof object and a finalization check gated on block confirmation count. The proof generation step in the ZK sequencer is a deliberate simplification of what zkSync actually does---a domain-separated keccak mock proof instead of BN254 elliptic-curve pairings---so that the evaluation can iterate without specialist hardware. Neither zkSync nor StarkNet publishes data on sequencer downtime or failure recovery, which is one of the gaps this thesis addresses.
+The \texttt{ZKVerifier} contract in this framework follows the submission-plus-confirmation model from zkSync Era (see Figure~\ref{fig:impl-repos}): a \texttt{submit()} function that requires a proof object and a finalisation check gated on block confirmation count. The proof generation step in the ZK sequencer simplifies the zkSync design by replacing BN254 elliptic-curve pairings with a domain-separated keccak mock proof, so the evaluation does not require specialist hardware. Neither zkSync nor StarkNet publishes data on sequencer downtime or failure recovery, which is one of the gaps this thesis addresses.
 
 \subsection{OpenZeppelin Contracts}
 
@@ -68,15 +68,15 @@ The \texttt{OptimisticVerifier} and \texttt{ZKVerifier} contracts follow the acc
 
 Reading across this literature, four areas come up repeatedly where empirical data is missing. The framework addresses all four directly.
 
-\textbf{Finality time under real conditions.} The theoretical finality properties of both rollup families are described clearly in the literature. Actual finality latencies under varying Layer~1 conditions have not been measured side by side. The framework records the submission block and finality block for every batch, giving exact latency histograms across scenarios. The key result in Chapter~\ref{ch:evaluation} is a rule difference: the ZK path waits five L1 blocks after proof acceptance and the Optimistic path waits a ten-block challenge window. No wall-clock finality is measured in Hardhat, and the production gap follows from assumed protocol parameters.
+\textbf{Finality rule under testbed conditions.} The literature describes the finality properties of both rollup families, but it does not compare them under the same conditions. The framework records the submission block and the block at which each contract's rule is satisfied. The result in Chapter~\ref{ch:evaluation} is a rule difference: the ZK path waits five L1 blocks after proof acceptance and the Optimistic path waits a ten-block challenge window. No wall-clock finality is measured in Hardhat, and the production gap follows from assumed protocol parameters.
 
-\textbf{Recovery cost after a sequencer crash.} When a sequencer crashes mid-batch, the system loses the in-flight transactions and must restart. The time and data loss associated with this have not been empirically studied. The adversarial test suite includes crash-and-restart scenarios for both sequencer types, and the results confirm that both preserve Layer~1 state integrity while losing pending transactions---with the Optimistic sequencer exposing more transactions to loss because its larger batch threshold causes them to accumulate longer before being drained.
+\textbf{Loss set after RPC failure.} When the RPC connection drops during batch assembly, the sequencer loses the accepted but unconfirmed set. The controlled comparison records that loss set and checks Layer~1 state integrity; it does not measure restart time. The results show that both sequencers preserve Layer~1 state while losing the pending set. The Optimistic path loses more transactions because its larger batch threshold holds them longer.
 
-\textbf{Controlled head-to-head comparison.} Existing benchmarks evaluate a single rollup architecture in isolation, making comparison difficult because environmental conditions differ. Running both sequencers against the same Layer~1 node simultaneously, with identical block timing and gas pricing, is the core design choice that makes the results in Chapter~\ref{ch:evaluation} directly comparable.
+\textbf{Controlled comparison.} Existing benchmarks evaluate a single rollup architecture in isolation, making comparison difficult because environmental conditions differ. Running both sequencers against the same Layer~1 node simultaneously, with identical block timing and gas pricing, is the core design choice that makes the results in Chapter~\ref{ch:evaluation} directly comparable.
 
 \textbf{Reproducibility.} Existing performance data for Layer~2 systems comes from mainnet observations or proprietary benchmarks that others cannot replicate. This framework is open-source and deployable with one command. Another researcher can verify every number in Chapter~\ref{ch:evaluation} or run the same scenarios with different parameters.
 
 \section{Where the Existing Literature Leaves Off}
 
-Existing work is either production systems optimised for the happy path, or academic papers analysing theoretical properties. What is missing is a direct empirical comparison of both approaches under the same conditions, with the same instrumentation, and under adversarial scenarios. That is the gap this framework attempts to fill.
+Existing work is either production systems optimised for normal execution or academic papers analysing theoretical properties. What is missing is a direct comparison of both approaches under the same conditions, with the same instrumentation, under adversarial scenarios. This framework addresses that gap.
 Chapter~\ref{ch:framework} describes the design choices that make a controlled comparison possible. Chapter~\ref{ch:implementation} covers the code.

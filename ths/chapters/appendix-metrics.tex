@@ -40,7 +40,7 @@ opt\_l2\_batch\_gas\_used & Gauge & EVM gas used by last Optimistic submission \
 
 \section{Live Metric Snapshot}
 
-The listings below reproduce the raw \texttt{/metrics} output captured from each port after the 900-transaction-per-sequencer workload described in Chapter~\ref{ch:evaluation}. They show the live counters and histograms at one point in time. We quote no average or percentile from them: the reproducible timings in Chapter~\ref{ch:evaluation} come from \texttt{measurement/raw/baseline-path-a.json}, and the gas gauges below are Hardhat receipt values also recorded in \texttt{docs/IMPLEMENTATION\_NOTES.md}. All histogram base units are seconds. The ZK \texttt{l2\_proof\_generation\_seconds} timer wraps the canonical commitment and the mock proof together, so it is not comparable to the isolated Path A helper timings.
+The listings below reproduce the raw \texttt{/metrics} output captured from each port after the workload with 900 transactions per sequencer described in Chapter~\ref{ch:evaluation}. They show the live counters and histograms at one point in time. We quote no average or percentile from them: the reproducible timings in Chapter~\ref{ch:evaluation} come from \texttt{measurement/raw/baseline-path-a.json}, and the gas gauges below are Hardhat receipt values also recorded in \texttt{docs/IMPLEMENTATION\_NOTES.md}. All histogram base units are seconds. The ZK \texttt{l2\_proof\_generation\_seconds} timer wraps the canonical commitment and the mock proof together, so it is not comparable to the isolated Path A helper timings.
 
 \begin{listing}[H]
 \begin{minted}[breaklines=true, breakanywhere=true, fontsize=\footnotesize]{text}

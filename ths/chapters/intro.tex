@@ -10,13 +10,13 @@ Bitcoin~\cite{nakamoto2008bitcoin} solved a specific problem: two strangers can 
 
 Layer~2 systems address this by moving execution off-chain. A sequencer batches transactions, computes a state commitment, and posts it to Layer~1. Layer~1 only validates the commitment, not each transaction individually. Two approaches to this commitment emerged. ZK~Rollups attach a cryptographic proof; Layer~1 verifies it immediately and finalises the batch. Optimistic~Rollups post only the state root and open a window during which anyone can dispute it; if no challenge arrives, the commitment becomes final.
 
-ZK~Rollups finalise after a shorter rule; Optimistic~Rollups avoid proof verification in production. Both are described well in theory, but empirical data on how they behave when conditions are not ideal is limited.
+In this framework, the ZK path has the shorter finality rule; the Optimistic path avoids proof verification at submission. Both are described well in theory, but empirical data on how they behave when conditions are not ideal is limited.
 
 \section{Motivation}
 
-Our field of study is service and software architecture, so distributed systems is a core subject. Our supervisor pointed us to the textbook by van Steen and Tanenbaum~\cite{vansteen2023distributed}, which covers blockchain as a hybrid distributed architecture (Chapter~2) and fault tolerance mechanisms (Chapter~8). The book is a solid foundation but it does not address Layer~2 protocols or how different rollup designs compare under failure conditions.
+Distributed systems is a core subject in service and software architecture. The textbook by van Steen and Tanenbaum~\cite{vansteen2023distributed} covers blockchain as a hybrid distributed architecture and fault tolerance mechanisms. It does not address Layer~2 protocols or compare rollup designs under failure conditions.
 
-That gap became the starting point. We wanted to understand blockchain from a systems perspective---not just the theory but what real implementations do under real conditions. A friend working as a blockchain developer pushed the question further by pointing out that most Layer~1 scalability problems are addressed and that the active research gaps are now at Layer~2, particularly around rollup behaviour under failures. That conversation shaped the scope of this thesis.
+We therefore study blockchain from a systems perspective. Published work describes Layer~2 designs and normal-case performance. Open questions remain about how the two rollup families behave under failures, especially when both are tested under the same conditions.
 
 \section{Research Gap}
 
@@ -28,26 +28,26 @@ Existing evaluations measure throughput under ideal load, latency when sequencer
 
 \begin{enumerate}
     \item What finality rule does each architecture enforce under the same Layer~1 conditions, and how do the testbed and production parameters compare?
-    \item What does a sequencer crash cost in pending transaction loss and Layer~1 state integrity?
+    \item What does the modelled sequencer crash cost in pending transaction loss and Layer~1 state integrity?
     \item What is the cost of the mock proof relative to the shared canonical batch commitment, and which throughput claims does the harness support?
-    \item Can the head-to-head comparison be reproduced on standard developer hardware from a committed harness?
+    \item Can the direct comparison be reproduced on standard developer hardware from a committed harness?
 \end{enumerate}
 
-\textbf{Scope of the answers.} We answer two questions from rules and two from the harness. For RQ1 we report the finality rule and the L1 submission step; Hardhat mines only on transactions, so no wall-clock finality is measured. For RQ2 the harness gives the deterministic loss set and confirms L1 state integrity, but it does not time a restart. For RQ3 we measure the canonical keccak256 binary Merkle batch commitment and the mock proof in isolation; both sequencers call the same helper over ABI-encoded \texttt{(from,to,value)} tuples, so the commitment cannot explain a difference between the paths. Real proving cost and architectural throughput remain open. RQ4 is answered by the committed harness: one Docker command, a pinned golden vector, and a deterministic raw artefact. Chain reorganisations, censorship, and data availability are discussed in Chapter~\ref{ch:evaluation} but are not tested.
+\textbf{Scope of the answers.} We answer RQ1 from the protocol rule and the shared L1 submission step, and RQ2--RQ4 from the committed harness. For RQ1 we report the finality rule and the L1 submission step; Hardhat mines only on transactions, so no wall-clock finality is measured. For RQ2 the harness gives the deterministic loss set and confirms L1 state integrity, but it does not time a restart. For RQ3 we measure the batch commitment and the mock proof in isolation; both sequencers call the same helper over ABI-encoded \texttt{(from,to,value)} tuples, so the commitment cannot explain a difference between the paths. Real proving cost and architectural throughput remain open. RQ4 is answered by the committed harness: one Docker command, a pinned golden vector, and a deterministic raw artefact. Chain reorganisations, censorship, and data availability are discussed in Chapter~\ref{ch:evaluation} but are not tested.
 
 \section{Innovation and Contributions}
 
-We built a controlled testbed where both rollup architectures run against the same local Ethereum node~\cite{hardhat2024} under identical conditions, including deliberate failures. Both sequencers compute the same canonical keccak256 binary Merkle batch commitment over ABI-encoded \texttt{(from,to,value)} tuples, so any measured difference comes from the proof step and the batching configuration rather than from the commitment representation. We simulate sequencer crashes, submit invalid commitments, and record what each design does. The headline result is architectural: the ZK path finalises after a proof plus five L1 blocks, while the Optimistic path waits a ten-block challenge window in the demo (about seven days in production). Assuming roughly 15~seconds for ZK, the production gap is about 40,320$\times$ --- a protocol-parameter assumption, not a measured latency. Hardhat mines only on transactions, so the demo has no meaningful wall-clock finality.
+We built a controlled testbed where both rollup architectures run against the same local Ethereum node~\cite{hardhat2024} under identical conditions, including RPC loss and verifier rejection. Both sequencers compute the same canonical keccak256 binary Merkle batch commitment over ABI-encoded \texttt{(from,to,value)} tuples, so any measured difference comes from the proof step and the batching configuration rather than from the commitment representation. We record the resulting loss set and Layer~1 state. The main result is architectural: the ZK path finalises after a proof plus five L1 blocks, while the Optimistic path waits a ten-block challenge window in the demo (about seven days in production). Assuming roughly 15~seconds for ZK, the production gap is about 40,320$\times$, a protocol-parameter assumption rather than a measured latency. Hardhat mines only on transactions, so the demo has no meaningful wall-clock finality.
 
-Three things make this different from existing work. It is a controlled head-to-head comparison of both rollup types under adversarial conditions on the same node---existing benchmarks test one architecture in isolation. The results are reproducible: the testbed starts with one Docker command, and the commitment and crash-loss figures are fixed by a golden vector and a committed raw artefact. Adding a third rollup type requires only a new Solidity contract and a Python class that follows the existing interface.
+This work differs from existing evaluations in three ways. It is a controlled comparison of both rollup types under adversarial conditions on the same node, while existing benchmarks test one architecture in isolation. The results are reproducible: the testbed starts with one Docker command, and the commitment and crash-loss figures are fixed by a golden vector and a committed raw artefact. Adding a third rollup type requires a new sequencer, contract, Compose service, scrape configuration, dashboard panels, and tests.
 
-One scope note: gas figures in Chapter~\ref{ch:evaluation} are EVM gas units returned by Hardhat through transaction receipts. They reflect real opcode costs and allow direct comparison between ZK and Optimistic submissions. They cannot be converted to ETH or dollar amounts without a gas price that this local environment does not have, so only relative differences are reported.
+Gas figures in Chapter~\ref{ch:evaluation} are EVM gas units returned by Hardhat through transaction receipts. They reflect opcode costs and allow direct comparison between ZK and Optimistic submissions. Hardhat has no market-derived gas price, so we do not convert them to ETH or dollar amounts.
 
 \section{Thesis Structure}
 
 Chapter~\ref{ch:background} covers the technical background: why blockchains are slow by design and how ZK and Optimistic rollups address that differently. Each section maps the theory directly to the code built in this thesis.
 
-Chapter~\ref{ch:relatedwork} surveys existing work and shows where it stops, which is where this thesis begins.
+Chapter~\ref{ch:relatedwork} surveys prior work and states the remaining gap.
 
 Chapters~\ref{ch:framework} and~\ref{ch:implementation} describe what was built: the design decisions behind the testing environment, then the contracts, sequencer processes, metrics stack, and automated test suite.
 

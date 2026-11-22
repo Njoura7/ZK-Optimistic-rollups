@@ -10,7 +10,7 @@ This chapter presents the experimental methodology and results of the comparativ
 
 \subsection{Test Environment}
 
-All experiments were conducted in a containerized environment with the following configuration:
+All experiments were conducted in a containerised environment with the following configuration:
 
 \begin{itemize}
     \item \textbf{Host}: a developer laptop with 8\,GB of memory available to Docker
@@ -27,7 +27,7 @@ Three primary scenarios were defined to evaluate the framework under different l
 
 \begin{enumerate}
     \item \textbf{Scenario~A (Normal Load)}: 150~transactions are submitted to each sequencer, representing a moderate workload intended to exercise the basic batching and submission pipeline.
-    \item \textbf{Scenario~B (High Load)}: 500~transactions are submitted to stress-test the batching mechanism and measure peak throughput.
+    \item \textbf{Scenario~B (High Load)}: 500~transactions are submitted to exercise the batching mechanism at higher load.
     \item \textbf{Scenario~C (Batch Analysis)}: 250~transactions are submitted to observe batching patterns and L1 submission frequency.
 \end{enumerate}
 
@@ -133,11 +133,11 @@ The sequencers export a histogram of the time from \texttt{send\_raw\_transactio
     \label{tab:l1-latency}
 \end{table}
 
-Both sequencers complete L1 submission in well under a second in Hardhat's automining mode. The Grafana panels formerly labelled ``Finality Time'' now use the name ``L1 Submission Latency'' to make this distinction explicit. This chapter does not quote a P95 value from a screenshot. The finality difference is enforced by contract rules, not by the submission step.
+Both sequencers complete L1 submission in well under a second in Hardhat's automining mode. The Grafana panels are labelled ``L1 Submission Latency''. This chapter does not quote a P95 value from a screenshot. The finality difference is enforced by contract rules, not by the submission step.
 
 \subsection{Finality Rules (Not Measured Latencies)}
 
-L1 inclusion is a necessary but not sufficient condition for finality. Each architecture imposes an additional rule before a transaction is considered final. Table~\ref{tab:true-finality} describes those rules; the wall-clock figures sometimes quoted in prose (about 15 seconds for ZK and seven days for Optimistic) are protocol assumptions, not measurements of this stack.
+L1 inclusion is a necessary but not sufficient condition for finality. Each architecture imposes an additional rule before a transaction is considered final. Table~\ref{tab:true-finality} describes those rules; the assumed production figures (about 15 seconds for ZK and seven days for Optimistic) are protocol assumptions, not measurements of this stack.
 
 \begin{table}[h]
     \centering
@@ -163,7 +163,7 @@ The ZK rule is architecturally faster than the Optimistic rule because it does n
 \section{Computational Overhead: Canonical Commitment and Mock Proof}
 \label{sec:proof}
 
-Both sequencers first compute the same canonical keccak256 binary Merkle commitment over ABI-encoded \texttt{(from,to,value)} tuples via \texttt{l2\_common.commitment.batch\_merkle\_root}. The ZK path additionally computes a mock proof. Table~\ref{tab:proof-latency} reports the reproducible Path A measurements from \texttt{measurement/raw/baseline-path-a.json}.
+Both sequencers first compute the same batch commitment via \texttt{l2\_common.commitment.batch\_merkle\_root}. The ZK path additionally computes a mock proof. Table~\ref{tab:proof-latency} reports the reproducible Path A measurements from \texttt{measurement/raw/baseline-path-a.json}.
 
 \begin{table}[h]
     \centering
@@ -197,13 +197,13 @@ Five adversarial scenarios are relevant to any Layer~2 deployment. We assume the
 
 \begin{enumerate}
     \item \textbf{Malicious sequencer}: submits an invalid state root to L1.
-    \item \textbf{L1 reorganization}: confirmed L1 blocks are replaced, invalidating anchored commitments.
+    \item \textbf{L1 reorganisation}: confirmed L1 blocks are replaced, invalidating anchored commitments.
     \item \textbf{Sequencer crash}: the sequencer fails mid-batch, losing in-flight transactions.
     \item \textbf{Transaction censorship}: the sequencer selectively excludes certain transactions.
     \item \textbf{Data unavailability}: the sequencer withholds L2 batch data, preventing independent state reconstruction.
 \end{enumerate}
 
-Scenarios~1 and 3 were exercised in the adversarial harness (Sections~\ref{sec:invalid-state} and~\ref{sec:crash} respectively) with mocked RPC or verifier behaviour. Scenarios~2, 4, and 5 are analyzed architecturally; Hardhat's deterministic block production does not simulate chain reorganizations, network-level censorship, or data withholding.
+Scenarios~1 and 3 were exercised in the adversarial harness (Sections~\ref{sec:invalid-state} and~\ref{sec:crash} respectively) with mocked RPC or verifier behaviour. Scenarios~2, 4, and 5 are analysed architecturally; Hardhat's deterministic block production does not simulate chain reorganisations, network-level censorship, or data withholding.
 
 \subsection{Security Properties Compared}
 
@@ -249,7 +249,7 @@ n \geq \frac{\ln \varepsilon}{\ln (1 - p)}
 
 For $p = 0.1$ and $\varepsilon = 0.01$, this gives $n \geq 44$~independent watchtower nodes. This is an illustration of the monitoring burden implied by the optimistic assumption, not a measurement of this testbed. A production ZK rollup has no corresponding watchtower requirement because a real validity proof rejects invalid state; the mock verifier here does not implement that guarantee.
 
-\subsection{Behavior Under Invalid State Proposals}
+\subsection{Behaviour Under Invalid State Proposals}
 \label{sec:invalid-state}
 
 Scenario~E exercised malicious-root handling in the mocked adversarial harness. The Python tests configure a verifier \texttt{MagicMock} to return \texttt{False} and assert that the sequencer treats the commitment as not finalised. This tests the sequencer's control flow only: no on-chain rejection is exercised. The deployed \texttt{ZKVerifier} accepts any non-zero 32-byte proof word and has no binding between proof and root, so an on-chain mock verifier would not reject a mismatched proof.
@@ -336,7 +336,7 @@ We revisit the four questions from Chapter~\ref{ch:intro}. For each we state the
 
 \textbf{RQ1 (Finality).} We answer the rule, not a wall-clock latency. The ZK contract accepts a proof and waits five L1 blocks; the Optimistic contract waits a ten-block challenge window. In production these correspond to roughly 15 seconds and seven days, which are protocol assumptions. Both paths share the L1 submission step. Hardhat mines only on transactions, so no wall-clock finality is measured, and no finality claim is derived from the submission-latency histogram.
 
-\textbf{RQ2 (Crash recovery).} We answer the loss set and Layer~1 integrity. A crash discards the in-memory pool: 100 transactions for ZK and 200 for Optimistic, matching the batch thresholds. Layer~1 state stays consistent in both cases. The harness uses the real sequencer classes with a mocked RPC; it does not kill a live process and does not time a restart. Restart time and a persistent mempool remain open.
+\textbf{RQ2 (Crash loss).} We answer the loss set and Layer~1 integrity. A crash discards the in-memory pool: 100 transactions for ZK and 200 for Optimistic, matching the batch thresholds. Layer~1 state stays consistent in both cases. The harness uses the real sequencer classes with a mocked RPC; it does not kill a live process and does not time a restart. Restart time and a persistent mempool remain open.
 
 \textbf{RQ3 (Cost of the proof).} We answer for the canonical commitment and the mock proof in isolation. Both paths pay the same commitment cost: 3.64\,ms at P95 for 100 transactions and 6.80\,ms for 200. The ZK-only mock proof adds about 0.008\,ms. The live \texttt{l2\_proof\_generation\_seconds} histogram measures the commitment and mock proof together in seconds, so it is not comparable to these isolated figures. Real proving cost and an architectural throughput comparison remain open.
 
@@ -373,11 +373,11 @@ Table~\ref{tab:tradeoff-summary} consolidates the findings across all evaluation
     \label{tab:tradeoff-summary}
 \end{table}
 
-Neither architecture dominates across all dimensions. The ZK path finalises after a shorter rule and has a smaller crash-loss window; the Optimistic path submits less often and is cheaper per transaction in this local testbed. The proof guarantee itself is a mock, so the security comparison is architectural. The choice between them remains application-dependent.
+Neither architecture dominates across all dimensions. The ZK path has the shorter finality rule and a smaller crash-loss window; the Optimistic path submits less often, and its per-submission receipt gas is slightly higher. The proof guarantee itself is a mock, so the security comparison is architectural. The choice between them remains application-dependent.
 
 \section{Threats to Validity}
 
-Several factors may limit the generalizability of our experimental results.
+Several factors may limit the generalisability of our experimental results.
 
 \textbf{Internal validity.} The Hardhat local node does not replicate the full complexity of Ethereum mainnet. Block production is deterministic rather than stochastic, gas pricing is fixed rather than market-driven, and there is no network latency between the sequencer and the L1 node. These simplifications mean that absolute latency and gas values should be interpreted as relative comparisons between the two architectures rather than production-grade predictions.
 

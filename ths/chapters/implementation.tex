@@ -7,7 +7,7 @@
 \section{Overview}
 
 
-This chapter describes how the framework is built. The design chapter (Chapter~\ref{ch:framework}) explained what we want to measure and why. This chapter explains what we actually wrote and what trade-offs we made.
+This chapter describes how the framework is built. Chapter~\ref{ch:framework} states what we measure and why. This chapter explains the implementation and its trade-offs.
 
 Three things had to work together:
 
@@ -16,10 +16,10 @@ Three things had to work together:
 
     \item \textbf{Shared Layer~1.} Both sequencers operate against the same Hardhat node simultaneously. This eliminates timing and block-production differences as confounds.
 
-    \item \textbf{Instrumented measurement.} Every state transition records a timestamp and outcome so we can analyze the data later.
+    \item \textbf{Instrumented measurement.} Every state transition records a timestamp and outcome so we can analyse the data later.
 \end{enumerate}
 
-The implementation has three layers: Layer~1 smart contracts (finality rules), Layer~2 sequencer processes (batching and submission), and a metrics stack (Prometheus and Grafana). Where the framework simplifies production behavior, we explain why and what that means for the results.
+The implementation has three layers: Layer~1 smart contracts (finality rules), Layer~2 sequencer processes (batching and submission), and a metrics stack (Prometheus and Grafana). Where the framework simplifies production behaviour, we explain why and what that means for the results.
 
 \section{Layer~1: Smart Contract Design}
 \label{sec:l1-design}
@@ -28,34 +28,40 @@ Both contracts follow patterns established in production systems. The \texttt{ZK
 
 \subsection{Core Design Difference: Commitment Structures}
 
-The essential architectural difference between the two approaches manifests in the data each contract stores. For ZK, a commitment is final once its proof has been verified and a confirmation delay has elapsed. For Optimistic, a commitment enters a challenge period and becomes final only after that period expires without a successful dispute. Table~\ref{tab:contract-diffs} summarizes the data structures that implement this difference. The Optimistic struct writes roughly $3\times$ more storage slots on first insertion, explaining the higher gas cost per submission measured in Chapter~\ref{ch:evaluation}.
+The essential architectural difference between the two approaches manifests in the data each contract stores. For ZK, a commitment is final once its proof has been verified and a confirmation delay has elapsed. For Optimistic, a commitment enters a challenge period and becomes final only after that period expires without a successful dispute. Table~\ref{tab:contract-diffs} summarises the data structures that implement this difference. The Optimistic struct occupies nine storage slots against six for ZK, which contributes to the higher per-submission gas in Chapter~\ref{ch:evaluation}.
 
 \begin{table}[h]
     \centering
-    \begin{tabular}{l|>{\raggedright\arraybackslash}p{4.5cm}|>{\raggedright\arraybackslash}p{4.5cm}}
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}p{4.4cm}|>{\raggedright\arraybackslash}p{4.4cm}}
         \hline
         \textbf{Field} & \textbf{ZKVerifier} & \textbf{OptimisticVerifier} \\
         \hline
-        State root & \texttt{bytes32 stateRoot} & \texttt{bytes32 stateRoot} \\
+        Batch commitment & \texttt{bytes32 stateRoot} & \texttt{bytes32 stateRoot} \\
         \hline
-        Proof & \texttt{bytes proof} & --- (not required) \\
+        Inclusion block & \texttt{uint256 blockNumber} & \texttt{uint256 blockNumber} \\
         \hline
-        Submission block & \texttt{uint256 submissionBlock} & \texttt{uint256 submissionBlock} \\
+        Proof data & \texttt{bytes32 proofHash} & --- (not required) \\
         \hline
-        Challenge deadline & --- & \texttt{uint256 challengeDeadline} \\
+        Admission flag & \texttt{bool verified} & --- \\
         \hline
-        Finality flags & \texttt{bool isFinalized} & \texttt{bool isFinalized}, \texttt{bool isChallenged} \\
+        Challenge data & --- & \texttt{uint256 challengeDeadline}, \texttt{bool challenged} \\
         \hline
-        Submitter & --- & \texttt{address submitter} \\
+        Finality flag & --- & \texttt{bool finalized} \\
         \hline
-        \multicolumn{3}{l}{\small Total cold SSTOREs on first insert: ZK~$\approx$3, Optimistic~$\approx$10} \\
+        Batch metadata & \texttt{uint256 batchSize}, \texttt{uint256 timestamp} & \texttt{bytes32 batchHash}, \texttt{uint256 batchSize}, \texttt{uint256 timestamp}, \texttt{uint256 l2BlockNumber} \\
+        \hline
+        Submitter & --- & \texttt{address sequencer} \\
+        \hline
+        \multicolumn{3}{l}{\small Occupied storage slots: ZK~6, Optimistic~9 (two adjacent booleans pack)} \\
         \hline
     \end{tabular}
     \caption{Commitment struct fields}
     \label{tab:contract-diffs}
 \end{table}
 
-A terminology note applies throughout this thesis: the field named \texttt{stateRoot} in both contracts actually holds the canonical keccak256 binary Merkle ``batch commitment'' over ABI-encoded \texttt{(from,to,value)} tuples, not a post-execution state trie root. We use ``batch commitment'' for this value and reserve ``state root'' for the general concept in related work.
+A terminology note applies throughout this thesis: the field named \texttt{stateRoot} in both contracts holds the canonical keccak256 binary Merkle batch commitment over ABI-encoded \texttt{(from,to,value)} tuples, not a post-execution state trie root. We use ``batch commitment'' for this value and reserve ``state root'' for the general concept in related work.
 
 \subsection{ZKVerifier Contract}
 
@@ -69,11 +75,11 @@ The \texttt{ZKVerifier} contract is the on-chain anchor for the ZK~Rollup path. 
 
 The rationale for each design choice is as follows:
 
-\textbf{Proof verification simplification}: Full BN254 pairing verification requires substantial gas (200K-500K per proof~\cite{groth2016size}). For this framework, we preserve the architectural semantics (proof is required at submission, no challenge window needed) without incurring the full computational cost. The sequencer still generates a proof; the contract still accepts and records it; the only simplification is the verification check itself.
+\textbf{Proof verification simplification}: Full BN254 pairing verification uses elliptic-curve pairings~\cite{groth2016size}. For this framework, we preserve the architectural semantics (proof is required at submission, no challenge window needed) without that cost. The sequencer still generates a mock proof; the contract still accepts and records it; the only simplification is the verification check itself.
 
-\textbf{Five-block finality}: Production Ethereum-based rollups typically wait for 12-15 block confirmations before treating a commitment as final. We use 5 blocks in this framework to keep experimental runs tractable while preserving the order of magnitude of the delay. Any Layer~1 reorganization shorter than 5 blocks will not affect finality in either system.
+\textbf{Five-block finality}: Production Ethereum-based rollups typically wait for 12--15 block confirmations before treating a commitment as final. We use 5 blocks in this framework to keep experimental runs short while preserving a block-based confirmation delay. We do not simulate Layer~1 reorganisations.
 
-\textbf{State structure}: The contract stores a \texttt{Commitment} struct per batch, containing the state root, submission block number, and proof hash. Events are emitted on every submission, allowing the sequencer and dashboard to track finality propagation without polling.
+\textbf{State structure}: The contract stores a \texttt{Commitment} struct per batch, containing the batch commitment, inclusion block, verification flag, proof hash, batch size, and timestamp. Events are emitted on every submission, allowing the sequencer and dashboard to track finality propagation without polling.
 
 The full contract implementation is available in the framework repository at \texttt{l1/contracts/ZKVerifier.sol}.
 
@@ -88,25 +94,25 @@ The \texttt{OptimisticVerifier} contract implements the fraud-proof challenge mo
 
     \item \texttt{finalize(uint256 id)} — Makes explicit on-chain that a commitment has survived its challenge period without dispute. After calling this function, the commitment is marked \texttt{finalized}.
 
-    \item \texttt{isFinalized(uint256 id)} — Returns true if the commitment is explicitly finalized OR if the challenge period has expired without a dispute. This dual path ensures that finality is recognized whether or not anyone calls the explicit \texttt{finalize()} function.
+    \item \texttt{isFinalized(uint256 id)} — Returns true if the commitment is explicitly finalised OR if the challenge period has expired without a dispute. This dual path ensures that finality is recognised whether or not anyone calls the explicit \texttt{finalize()} function.
 \end{enumerate}
 
 \textbf{Challenge period duration}: We set the challenge period to 10 L1 blocks. Production systems use 7 days~\cite{arbitrum-original}; the compressed window is necessary for experimental tractability while preserving the architectural semantics. Hardhat mines only on transactions, so the window has no fixed wall-clock duration; any test scenario can be executed and analysed in seconds rather than days.
 
 \textbf{Dispute resolution}: In production Arbitrum and Optimism, a valid fraud proof requires an interactive bisection game followed by on-chain re-execution of a single VM step. Here, we record a dispute but do not re-execute; the challenge simply invalidates the root. This simplification removes the largest source of complexity while preserving the core property: incorrect state roots can be challenged and prevented from reaching finality.
 
-\textbf{Finality model}: The four-state model (\texttt{PENDING}, \texttt{SOFT\_FINAL}, \texttt{HARD\_FINAL}, \texttt{CHALLENGED}) inherited from Optimism Bedrock allows the dashboard and test suite to distinguish finality stages. This is essential for the comparative analysis in Chapter~\ref{ch:evaluation}: users and applications may behave differently if a commitment is soft-final (deadline passed, no challenge yet) versus hard-final (explicit on-chain finalization).
+\textbf{Finality model}: The four-state model (\texttt{PENDING}, \texttt{SOFT\_FINAL}, \texttt{HARD\_FINAL}, \texttt{CHALLENGED}) inherited from Optimism Bedrock allows the dashboard and test suite to distinguish finality stages. This is essential for the comparative analysis in Chapter~\ref{ch:evaluation}: a commitment is soft-final while the challenge window is open and hard-final once the window closes without a challenge or after explicit finalisation.
 
 The full contract implementation is available in the framework repository at \texttt{l1/contracts/OptimisticVerifier.sol}.
 
 \section{Layer~2: Sequencer Processes}
 \label{sec:l2-design}
 
-Both sequencers implement the same high-level logic: maintain a pending transaction pool, periodically create batches, compute commitments, and submit to Layer~1. Both derive the canonical keccak256 binary Merkle batch commitment from ABI-encoded \texttt{(from,to,value)} tuples through the same helper, so the commitment representation is identical across paths. The difference is that the ZK sequencer additionally computes a domain-separated mock proof and submits it with the commitment, while the Optimistic sequencer submits the commitment alone. This difference, together with the batch thresholds, drives the downstream design choices.
+Both sequencers implement the same high-level logic: maintain a pending transaction pool, periodically create batches, compute commitments, and submit to Layer~1. Both derive the batch commitment from ABI-encoded \texttt{(from,to,value)} tuples through the same helper, so the commitment representation is identical across paths. The difference is that the ZK sequencer additionally computes a domain-separated mock proof and submits it with the commitment, while the Optimistic sequencer submits the commitment alone. This difference, together with the batch thresholds, drives the downstream design choices.
 
 \subsection{Architectural Difference: Proof vs. No Proof}
 
-The sequencers are implemented as independent Python processes using Flask~\cite{flask2024} for HTTP and web3.py~\cite{web3py2024} for Layer~1 interaction. Table~\ref{tab:sequencer-comparison} summarizes how the two differ in the commitment step. The gas values come from a local Hardhat node and are not Ethereum mainnet cost estimates.
+The sequencers are implemented as independent Python processes using Flask~\cite{flask2024} for HTTP and web3.py~\cite{web3py2024} for Layer~1 interaction. Table~\ref{tab:sequencer-comparison} summarises how the two differ in the commitment step. The gas values come from a local Hardhat node and are not Ethereum mainnet cost estimates.
 
 \begin{table}[h]
     \centering
@@ -133,11 +139,11 @@ The sequencers are implemented as independent Python processes using Flask~\cite
     \label{tab:sequencer-comparison}
 \end{table}
 
-\textbf{Rationale for these differences}: The Optimistic model does not require proof generation at submission time, so the sequencer can afford larger batches and longer polling intervals. Batches of 200 transactions amortize the fixed gas cost of Layer~1 submission more effectively than 100-transaction batches. The longer polling interval (8 seconds vs. 5 seconds) reflects lower latency pressure: the Optimistic model's challenge window determines finality time, not submission latency.
+\textbf{Rationale for these differences}: The Optimistic model does not require proof generation at submission time, so the sequencer can afford larger batches and longer polling intervals. Batches of 200 transactions amortise the fixed gas cost of Layer~1 submission more effectively than 100-transaction batches. The longer polling interval (8 seconds vs. 5 seconds) reflects lower latency pressure: the Optimistic model's challenge window determines finality time, not submission latency.
 
 Conversely, the ZK path additionally computes a domain-separated mock proof, so the demo uses smaller batches and shorter polling intervals on that side. The choice of 100 transactions per batch and 5-second polling follows the mock-proof design: batch commitment computation is a few milliseconds (see Section~\ref{sec:proof}). No wall-clock finality is implied, because Hardhat mines only on transactions; the two thresholds are a design-level comparison, not a measured throughput optimum.
 
-The gas allocations reflect the difference in Layer~1 contract work. Measured values are $\sim$165,000 for ZK and $\sim$171,000 for Optimistic per submission. Counter-intuitively, Optimistic costs slightly more per submission because the \texttt{OptimisticVerifier.submit()} function writes a 10-field \texttt{Commitment} struct to storage (ten cold SSTOREs at 20,000 gas each), while \texttt{ZKVerifier.submit()} stores fewer fields. The two paths submit at different frequencies because of their batch thresholds (100 versus 200 transactions); no multi-batch total gas figure is reported here because no raw artefact supports one---see Section~\ref{sec:gas} for the per-submission measurements.
+The gas allocations reflect the difference in Layer~1 contract work. Measured values are $\sim$165,000 for ZK and $\sim$171,000 for Optimistic per submission. The Optimistic struct occupies nine storage slots against six for ZK, which explains the higher receipt gas; we do not derive a fixed \texttt{SSTORE} cost because several fields are zero on first submission. The two paths submit at different frequencies because of their batch thresholds (100 versus 200 transactions); no multi-batch total gas figure is reported here because no raw artefact supports one---see Section~\ref{sec:gas} for the per-submission measurements.
 
 \subsection{Sequencer Implementation Structure}
 
@@ -146,7 +152,7 @@ Both sequencers follow the same four-step structure:
 \begin{enumerate}
     \item \texttt{add\_tx(tx)}: Accept a transaction via HTTP POST and append it to the pending pool.
     \item \texttt{periodic\_batch()}: Background thread that wakes up every N seconds; if the pool has reached the batch threshold, call \texttt{\_batch()}.
-    \item \texttt{\_batch()}: Compute the canonical keccak256 batch commitment (and the mock proof, if ZK), then submit to Layer~1. Both sequencers use the same contract-loading strategy: each calls \texttt{\_init\_contract()} once and caches the handle as \texttt{self.contract}. If deployment was not ready at startup, \texttt{\_batch()} retries the initialisation on the next batch instead of dropping it permanently. This lets both paths tolerate a slow deployment without a fixed wall-clock wait.
+    \item \texttt{\_batch()}: Compute the batch commitment (and the mock proof, if ZK), then submit to Layer~1. Both sequencers use the same contract-loading strategy: each calls \texttt{\_init\_contract()} once and caches the handle as \texttt{self.contract}. If deployment was not ready at startup, \texttt{\_batch()} retries the initialisation on the next batch instead of dropping it permanently. This lets both paths tolerate a slow deployment without a fixed wall-clock wait.
     \item \texttt{calculate\_tps()}: Background thread that updates the throughput gauge periodically.
 \end{enumerate}
 
@@ -157,9 +163,9 @@ The Flask HTTP API exposes three endpoints:
     \item \texttt{GET /health} — Return liveness status (Optimistic sequencer only)
 \end{itemize}
 
-Both sequencers export Prometheus metrics on dedicated ports (9100 for ZK, 9101 for Optimistic), enabling the monitoring stack to observe finality latency, proof generation time, and other real-time data.
+Both sequencers export Prometheus metrics on dedicated ports (9100 for ZK, 9101 for Optimistic), enabling the monitoring stack to observe L1 submission latency and proof generation time.
 
-\textbf{Implementation simplification}: In production systems, the sequencer also performs state execution (applying transactions to a state tree, updating storage, etc.). This framework omits that step and uses deterministic keccak256 Merkle batch commitments over ABI-encoded \texttt{(from,to,value)} tuples (not post-execution state trie roots). This simplification allows the framework to run on modest hardware while preserving the key architectural difference: ZK requires a mock proof at every submission, while Optimistic does not. The comparative analysis in Chapter~\ref{ch:evaluation} remains valid because it measures the differences that matter—finality latency, throughput, and proof generation time—regardless of whether state execution is simplified.
+\textbf{Implementation simplification}: In production systems, the sequencer also performs state execution (applying transactions to a state tree, updating storage, etc.). This framework omits that step and uses deterministic keccak256 Merkle batch commitments over ABI-encoded \texttt{(from,to,value)} tuples (not post-execution state trie roots). This simplification allows the framework to run on modest hardware while preserving the key architectural difference: ZK requires a mock proof at every submission, while Optimistic does not. The comparative analysis in Chapter~\ref{ch:evaluation} is limited to the reported questions: finality rules, L1 submission latency, commitment and mock proof timings, and crash loss. We make no architectural throughput claim.
 
 Both sequencer implementations are available in the framework repository: \texttt{l2-zk/sequencer.py} and \texttt{l2-optimistic/sequencer.py}.
 
@@ -201,9 +207,9 @@ Underlying the dashboard is a Prometheus~\cite{prometheus2024} metrics collectio
     \label{tab:metrics-exported}
 \end{table}
 
-\textbf{Why this instrumentation matters}: The finality latency histogram answers RQ1—we can see exactly how long it takes for transactions to become irreversible, not just an average. The proof generation histogram isolates the computational cost of the ZK path. By comparing these histograms, we can tell whether ZK is faster because of architectural differences, or because our implementation is optimized differently. The pending transaction gauge shows how batching parameters affect how long users wait before their transaction gets included in a batch.
+\textbf{Instrumentation scope}: The L1 submission histogram records the time from transaction send to receipt, not protocol finality. It supports the L1 submission part of RQ1. The proof generation histogram records the canonical commitment and the mock proof together in seconds. The pending transaction gauge shows how the batch thresholds hold transactions before submission. We use these signals to check that the implementation follows the rules described earlier, not to compare architectural throughput.
 
-Grafana~\cite{grafana2024} connects to the Prometheus datasource and renders pre-configured dashboards automatically when the Docker Compose~\cite{compose2024} stack starts. This ensures that anyone deploying the framework sees the same visualizations without manual configuration. The dashboard panels produced by this stack are shown in Chapter~\ref{ch:evaluation} (Figures~\ref{fig:grafana-comparison} and~\ref{fig:throughput-comparison}), where they are discussed alongside the measurement results they display.
+Grafana~\cite{grafana2024} connects to the Prometheus datasource and renders pre-configured dashboards when the Docker Compose~\cite{compose2024} stack starts. The same dashboards load with the stack. The dashboard panels produced by this stack are shown in Chapter~\ref{ch:evaluation} (Figures~\ref{fig:grafana-comparison} and~\ref{fig:throughput-comparison}), where they are discussed alongside the measurement results they display.
 
 \section{Validation Through Automated Tests}
 \label{sec:tests}
@@ -216,7 +222,7 @@ The framework includes 30 automated tests distributed across three tiers. Each t
 
 \textbf{Integration tests} cover seven scenarios and load both sequencer classes in the same test process using distinct module aliases to prevent name conflicts. The tests verify that 200 transactions submitted to each sequencer produce two ZK batches and one Optimistic batch, that the full pipeline from submission to mock Layer~1 receipt increments the correct counters, that both paths compute the same keccak256 Merkle commitment while only the ZK path adds the domain-separated mock proof step, that 500 transactions produce five ZK batches and two Optimistic batches (with 100 below threshold and left pending), and that both metrics endpoints expose the same core fields.
 
-\textbf{Adversarial tests} cover four failure scenarios. One injects a \texttt{RuntimeError} at the moment the batch threshold fires and verifies that a replacement sequencer starts with clean state. A second applies the same crash scenario to the Optimistic sequencer at its larger threshold. A third introduces a 1.5-second delay inside \texttt{\_batch()} to model Layer~1 inclusion latency and confirms that all transaction counts remain accurate despite the blocking call. A fourth configures the ZK contract mock to reject finalization for a malicious state root and confirms that the Optimistic challenge window shows blocks remaining before finality.
+\textbf{Adversarial tests} cover four failure scenarios. One injects a \texttt{RuntimeError} at the moment the batch threshold fires and verifies that a replacement sequencer starts with clean state. A second applies the same crash scenario to the Optimistic sequencer at its larger threshold. A third introduces a 1.5-second delay inside \texttt{\_batch()} to model Layer~1 inclusion latency and confirms that all transaction counts remain accurate despite the blocking call. A fourth configures the ZK contract mock to reject finalisation for a malicious state root and confirms that the Optimistic challenge window shows blocks remaining before finality.
 
 Table~\ref{tab:test-coverage} maps each tier to the research questions it exercises.
 
@@ -280,12 +286,12 @@ pytest tests/integration/ # 7 tests
 pytest tests/adversarial/ # 4 tests
 \end{verbatim}
 
-The expected result is 30 tests passing in under two minutes on any machine with Python~3.9 or later. The same suite runs automatically on every commit via GitHub Actions (\texttt{.github/workflows/ci.yml}).
+The expected result is 30 passing tests. The same suite runs automatically on every commit via GitHub Actions (\texttt{.github/workflows/ci.yml}).
 
 \section{Extending the Framework}
 \label{sec:extending}
 
-Adding a third sequencer type requires four concrete changes. No existing sequencer code or contract needs to be modified.
+Adding a third sequencer type requires five concrete changes. No existing sequencer code or contract needs to be modified.
 
 \textbf{1. Write a new sequencer class.} Copy \texttt{l2-zk/sequencer.py} or \texttt{l2-optimistic/sequencer.py} as a starting point. Three things must be implemented: an HTTP endpoint at \texttt{/tx} that appends incoming transactions to a pending list; a \texttt{\_batch()} method that assembles a commitment and calls the new L1 contract; and a Prometheus metrics export on a new port (9102, 9103, \ldots). The batch loop, Flask setup, and metric registration are boilerplate that can be copied verbatim.
 
@@ -295,16 +301,16 @@ Adding a third sequencer type requires four concrete changes. No existing sequen
 
 \textbf{4. Register the metrics port in \texttt{config/prometheus.yml}.} Add one \texttt{- targets: ['zk-rollup:9102']} entry under a new scrape job. All existing Grafana panels are PromQL queries---duplicate a panel, change the metric prefix, and the new sequencer appears in the dashboard without touching Grafana configuration directly.
 
-The Grafana dashboard is driven entirely by PromQL queries against Prometheus. As long as the new sequencer exports metrics with consistent naming (e.g.\ \texttt{hybrid\_l2\_batches\_total}), all existing visualization panels can be duplicated by editing the query string, requiring no JSON schema changes.
+The Grafana dashboard is driven entirely by PromQL queries against Prometheus. As long as the new sequencer exports metrics with consistent naming (e.g.\ \texttt{hybrid\_l2\_batches\_total}), all existing visualisation panels can be duplicated by editing the query string, requiring no JSON schema changes.
 
-One honest note on scope: extending the test suite requires writing new unit and integration tests that mock the new contract. The existing tests are tightly coupled to the ZK and Optimistic class interfaces; they will not automatically cover a third type. The mock pattern in \texttt{tests/unit/test\_zk\_sequencer.py} can be used as a template, but new test cases are the largest part of the work when adding a new architecture.
+\textbf{5. Add tests.} New unit and integration tests must mock the new contract. The existing tests are coupled to the ZK and Optimistic class interfaces and do not cover a third type. The mock pattern in \texttt{tests/unit/test\_zk\_sequencer.py} can be used as a template.
 
 \subsection{Example: A Wallet-Connected Withdrawal Client}
 \label{sec:web3-demo}
 
 The \texttt{isFinalized()} interface described above is not only consumed by the test suite. We built a small \texttt{WithdrawalEscrow} contract and a static web page (\texttt{web3-demo/}) that demonstrate the same interface from a user's perspective: a wallet deposits ETH tied to a batch commitment, and a claim function releases it once \texttt{isFinalized()} returns true for that commitment. We deploy the contract twice, once against each verifier, and use ethers.js \cite{ethersjs2024} to connect a browser wallet directly to the Hardhat node with no backend in between.
 
-A scripted run against a freshly deployed stack (\texttt{l1/scripts/demo\_withdrawal\_flow.js}) makes the mechanism concrete. We deposit 0.05 ETH into the ZK escrow and check \texttt{isFinalized()} immediately afterward---it already returns true, because the demo commitment, submitted several transactions earlier during deployment, had already cleared its five-block window by the time our deposit landed. The same deposit into the Optimistic escrow returns \texttt{SOFT\_FINAL} with five blocks remaining; a claim attempted at that point reverts with \texttt{Not finalized yet}, and succeeds only after five more blocks are mined, closing out the ten-block challenge window measured from that commitment's own submission point. Both deposits are returned in full; across both round trips the only balance change on the depositor's account is gas, confirming this is a round trip rather than a one-way transfer. The capture in Figure~\ref{fig:web3-demo} comes from a live MetaMask run and predates the current mock-proof label in the demo page.
+A scripted run against a freshly deployed stack (\texttt{l1/scripts/demo\_withdrawal\_flow.js}) makes the mechanism concrete. We deposit 0.05 ETH into the ZK escrow and check \texttt{isFinalized()} immediately afterward---it already returns true, because the demo commitment, submitted several transactions earlier during deployment, had already cleared its five-block window by the time our deposit landed. The same deposit into the Optimistic escrow returns \texttt{SOFT\_FINAL} with five blocks remaining; a claim attempted at that point reverts with \texttt{Not finalized yet}, and succeeds only after five more blocks are mined, closing out the ten-block challenge window measured from that commitment's own submission point. Both deposits are returned in full; across both round trips the only balance change on the depositor's account is gas, confirming this is a round trip rather than a one-way transfer. The capture in Figure~\ref{fig:web3-demo} comes from a live MetaMask run.
 
 \begin{figure}[htbp]
     \centering
@@ -313,10 +319,10 @@ A scripted run against a freshly deployed stack (\texttt{l1/scripts/demo\_withdr
     \label{fig:web3-demo}
 \end{figure}
 
-This is a demonstration of the finality gap already measured in Chapter~\ref{ch:evaluation}, not a new measurement; it adds no data of its own, only a concrete illustration, gated by real transactions rather than a table, of what those numbers mean for someone waiting on a withdrawal. Figure~\ref{fig:web3-demo} captures one such run: the ZK panel reads \textquotedblleft Finalized --- claim available\textquotedblright\ with \textquotedblleft Already claimed\textquotedblright\ beneath it, meaning the full deposit-to-claim cycle already completed, while the Optimistic panel still reads \textquotedblleft Challenge window open --- 5 block(s) remaining\textquotedblright\ with its claim button disabled. MetaMask's own Activity tab, visible alongside the page, confirms both as real signed transactions against the escrow addresses rather than a simulated interface.
+This demonstrates the finality rules described in Chapter~\ref{ch:evaluation}; it adds no measurements. Figure~\ref{fig:web3-demo} captures one run: the ZK panel reads \textquotedblleft Finalized --- claim available\textquotedblright\ with \textquotedblleft Already claimed\textquotedblright\ beneath it, while the Optimistic panel still reads \textquotedblleft Challenge window open --- 5 block(s) remaining\textquotedblright\ with its claim button disabled. The MetaMask Activity tab shows the signed transactions against the escrow addresses.
 
 \section{From Code to Measurement}
 
-This chapter described how the design objectives from Chapter~\ref{ch:framework} became concrete code. The Layer~1 contracts enforce the correct finality rules for each architecture without running the full cryptographic operations that would make experimental iteration impractical. The Layer~2 sequencers implement the batching and submission logic that distinguishes ZK from Optimistic, with parameters exposed as environment variables so that any configuration can be tested by restarting the stack. The metrics layer exports histograms and counters that answer the research questions directly: finality latency distributions for RQ1, crash behavior for RQ2, and proof overhead for RQ3. The automated test suite validates each component in isolation before anything runs against the live Hardhat node.
+This chapter described how the design objectives from Chapter~\ref{ch:framework} became concrete code. The Layer~1 contracts enforce the correct finality rules for each architecture without running the full cryptographic operations that would make experimental iteration impractical. The Layer~2 sequencers implement the batching and submission logic that distinguishes ZK from Optimistic, with parameters exposed as environment variables so that any configuration can be tested by restarting the stack. The metrics layer exports histograms and counters that support the L1 submission check for RQ1, the loss set for RQ2, and the commitment and mock proof timings for RQ3. The automated test suite validates each component in isolation before anything runs against the live Hardhat node.
 
 Chapter~\ref{ch:evaluation} takes these components as given and uses them to generate measurements. It reports what the numbers look like under normal load, high load, and adversarial conditions, and discusses what the differences mean for each architecture.

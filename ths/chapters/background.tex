@@ -31,7 +31,7 @@ The economic motivation is cost amortisation. One Layer~1 verification is shared
   \text{Cost per L2 tx} =
     \frac{\text{L1 batch cost} + \text{L2 execution cost}}{\text{batch size}}
 \end{equation}
-The two dominant rollup families differ in what the sequencer submits alongside the state root: a cryptographic validity proof in the ZK case, or nothing---relying instead on a post-hoc fraud challenge---in the Optimistic case~\cite{sok-layer2}. In this thesis, gas consumption is measured as EVM gas units reported by the Hardhat node. These reflect real opcode costs and allow a relative comparison between architectures, but they do not correspond to ETH or dollar amounts because the local node uses a synthetic gas price.
+The two dominant rollup families differ in what the sequencer submits alongside the state root: a cryptographic validity proof in the ZK case, or nothing---relying instead on a post-hoc fraud challenge---in the Optimistic case~\cite{sok-layer2}. In this thesis, gas consumption is measured as EVM gas units reported by the Hardhat node. These reflect opcode costs and allow a relative comparison between architectures, but they do not correspond to ETH or dollar amounts because Hardhat uses a fixed gas price rather than a market-derived one.
 
 % -----------------------------------------
 \section{ZK Rollups}
@@ -42,16 +42,16 @@ A ZK~Rollup requires a validity proof with every state commitment~\cite{groth201
 \begin{equation}
   \pi = \text{Prove}(\text{state}_\text{old},\ \text{txs},\ \text{state}_\text{new})
 \end{equation}
-The Layer~1 verifier contract accepts or rejects the submission immediately based on the proof alone---no waiting period is needed~\cite{groth2016size}. Production deployments such as zkSync~\cite{zksync-paper} and Scroll~\cite{scroll2023} implement Groth16~\cite{groth2016size} verification using Ethereum's BN254 pairing precompile.
+The Layer~1 verifier contract accepts or rejects the submission immediately based on the proof alone---no waiting period is needed~\cite{groth2016size}. Production systems use several proof systems, including Groth16, PLONK, and STARKs~\cite{groth2016size,gabizon2019plonk,bensasson2018stark}; the framework replaces the verifier with a mock.
 
 \textbf{Security.}
 Safety follows from proof soundness: a dishonest sequencer cannot produce a valid proof for an incorrect state transition. This is sometimes called the one-honest-prover property~\cite{sok-layer2}---the system remains safe as long as one correct prover exists. Finality is achieved shortly after the proof lands on Layer~1, typically within one block confirmation window.
 
 \textbf{Constraints.}
-Proof generation is computationally expensive and adds measurable latency per batch~\cite{zksync-paper}. On-chain verification costs between 200K and 500K gas due to pairing operations~\cite{groth2016size}. Newer schemes such as PLONK~\cite{gabizon2019plonk} and STARKs~\cite{bensasson2018stark} reduce some of these overheads, but Groth16 remains the most common in production as of this writing.
+Proof generation is computationally expensive, and pairing-based verification costs more than a hash comparison~\cite{groth2016size}. The mock proof avoids that cost, so its timing is not a production cost estimate. PLONK~\cite{gabizon2019plonk} and STARKs~\cite{bensasson2018stark} change different parts of that overhead.
 
 \textbf{Framework instantiation.}
-Both sequencers compute the same canonical batch commitment with \texttt{l2\_common.commitment.batch\_merkle\_root}: a keccak256 binary Merkle root over ABI-encoded \texttt{(from,to,value)} tuples. This is a batch commitment, not a post-execution state trie root. \texttt{ZKVerifier.sol} accepts it together with a 32-byte mock proof (a domain-separated keccak hash from \texttt{mock\_proof()}) and binds them to a placeholder verifying-key hash; there is no circuit or pairing check. This preserves the structural property (proof required at submission; no challenge window) without the hardware cost of real elliptic-curve computation. Batch size and polling interval default to 100~transactions and 5~seconds.
+Both sequencers compute the same batch commitment with \texttt{l2\_common.commitment.batch\_merkle\_root}: a keccak256 binary Merkle root over ABI-encoded \texttt{(from,to,value)} tuples. It is not a post-execution state trie root. \texttt{ZKVerifier.sol} accepts it together with a 32-byte mock proof (a domain-separated keccak hash from \texttt{mock\_proof()}) and binds them to a placeholder verifying-key hash; there is no circuit or pairing check. This preserves the structural property (proof required at submission; no challenge window) without the hardware cost of real elliptic-curve computation. Batch size and polling interval default to 100~transactions and 5~seconds.
 
 % -----------------------------------------
 \section{Optimistic Rollups}
@@ -60,18 +60,18 @@ Both sequencers compute the same canonical batch commitment with \texttt{l2\_com
 
 An Optimistic~Rollup posts a state root without a proof and opens a challenge window---a period during which any observer can dispute the commitment by submitting a fraud proof~\cite{arbitrum-original}. In production deployments such as Optimism and Arbitrum, this window is seven days. In this framework it is compressed to ten Layer~1 blocks for experimental tractability. Hardhat mines only on transactions, so the window has no fixed wall-clock duration.
 
-Fraud proving in production systems uses a bisection protocol that narrows disagreement to a single instruction, which Layer~1 re-executes~\cite{arbitrum-original,cannon2023}.
+Fraud proving in production systems uses a bisection protocol that narrows disagreement to a single instruction, which Layer~1 re-executes~\cite{arbitrum-original}.
 
 A commitment that survives its window without a valid challenge transitions from optimistic acceptance to finality. The \texttt{OptimisticVerifier.sol} contract in this framework models the lifecycle through four states: \texttt{PENDING}, \texttt{SOFT\_FINAL}, \texttt{HARD\_FINAL}, and \texttt{CHALLENGED}.
 
 \textbf{Security.}
-Safety depends on what Kalodner et al.~\cite{arbitrum-original} term the at-least-one-honest-watcher condition: the system is secure as long as one participant monitors the chain and challenges invalid roots within the window. This is an economic guarantee enforced through sequencer collateral, not a cryptographic one~\cite{sok-layer2}.
+Safety depends on the condition that at least one honest watcher monitors the chain: the system is secure as long as one participant challenges invalid roots within the window~\cite{arbitrum-original}. This is an economic guarantee enforced through sequencer collateral, not a cryptographic one~\cite{sok-layer2}.
 
 \textbf{Constraints.}
 The challenge window is the primary usability cost: withdrawals to Layer~1 are delayed by the full window unless a liquidity provider offers early exit for a fee. Full transaction data must be published on-chain so watchers can reconstruct state independently; EIP-4844 blob transactions~\cite{eip4844} reduce this data cost in recent deployments.
 
 \textbf{Framework instantiation.}
-\texttt{l2-optimistic/sequencer.py} submits the same canonical keccak256 Merkle batch commitment without proof generation; both sequencers call \texttt{l2\_common.commitment.batch\_merkle\_root} on ABI-encoded \texttt{(from,to,value)} tuples. Batch size and polling interval default to 200~transactions and 8~seconds. Both sequencers load and cache the verifier contract handle once, with a retry on the next batch if deployment was still pending. Recovery scenarios are triggered programmatically and observed through Prometheus metrics on port~9101.
+\texttt{l2-optimistic/sequencer.py} submits the same batch commitment without proof generation; both sequencers call \texttt{l2\_common.commitment.batch\_merkle\_root} on ABI-encoded \texttt{(from,to,value)} tuples. Batch size and polling interval default to 200~transactions and 8~seconds. Both sequencers load and cache the verifier contract handle once, with a retry on the next batch if deployment was still pending. Recovery scenarios are triggered programmatically and observed through Prometheus metrics on port~9101.
 
 Both rollup families move execution off-chain and anchor security on-chain, but differ in the mechanism that links the two: immediate cryptographic verification in the ZK case versus deferred economic enforcement in the Optimistic case. That single design choice drives every difference discussed in Chapter~\ref{ch:evaluation}: the finality rule, per-submission gas cost, recovery behaviour after a crash, and what happens when an invalid batch commitment is submitted. Table~\ref{tab:bg-summary} puts the two side by side. The gas row describes production designs; in this testbed both submissions are close, and the Optimistic path is slightly more expensive because its commitment struct is larger (Chapter~\ref{ch:evaluation}).
 
